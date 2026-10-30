@@ -48,6 +48,7 @@ internal sealed class MainForm:Form{
         }catch(Exception ex){if(smoke){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}MessageBox.Show("Cannot open the interface. Ensure Microsoft Edge WebView2 Runtime is installed. "+ex.Message);Exit();}
     }
     async void HandleMessage(object? sender,CoreWebView2WebMessageReceivedEventArgs e){
+        if(smoke)File.AppendAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.bridge"),e.Source+" "+ConfigStore.S(JsonNode.Parse(e.WebMessageAsJson),"name")+"\\n");
         if(e.Source!="about:blank"||e.WebMessageAsJson.Length>1024*1024)return;
         long id=0;
         try{
@@ -135,12 +136,15 @@ internal sealed class MainForm:Form{
         try{
             await NativeSmokeTest();
             await Task.Delay(1200);
-            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(state.version!=='1.5.6')throw Error('version');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})()");
+            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(state.version!=='1.5.6')throw Error('version');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");
             // ExecuteScriptAsync returns a Promise object for async expressions. Confirm
             // persisted state from C# after the bridge has completed, then inspect DOM.
-            await Task.Delay(500);
+            string outcome="null";
+            for(int tries=0;tries<50;tries++){await Task.Delay(100);outcome=await web.CoreWebView2.ExecuteScriptAsync("JSON.stringify(window.__smokeResult||null)");if(outcome!="\"null\"")break;}
+            var diagnostic=await web.CoreWebView2.ExecuteScriptAsync("JSON.stringify({url:location.href,ctState:typeof window.ctState,cfg:typeof cfg,toast:document.querySelector('#toast')?.textContent,body:document.body.innerText.slice(0,1800),result:window.__smokeResult})");
+            using(var screenshot=File.Create(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png")))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,screenshot);
             var ready=await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-hold=snapKeys]')!==null&&document.querySelector('[data-hold=navigateKeys]')!==null&&document.querySelector('[data-install-integration=blender]')!==null");
-            if(ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready);
+            if(ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, held key controls, integration installer and saved combination verified.");

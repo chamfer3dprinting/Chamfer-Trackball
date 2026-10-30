@@ -30,6 +30,14 @@ Check(Math.Abs(far.Target.X/near.Target.X-10)<.001,"Pan scales with real scene d
 var snap=CameraMath.Move(c,NavMode.Snap,120,30);
 var dir=Vector3.Normalize(snap.Eye-snap.Pivot);var components=new[]{Math.Abs(dir.X),Math.Abs(dir.Y),Math.Abs(dir.Z)}.Where(x=>x>.001).ToArray();
 Check(components.Max()-components.Min()<.001,"Snap aligns to face/edge/corner direction");
+Vector2 ProjectPivot(CameraPose camera){
+ var b=Vector3.Normalize(camera.Eye-camera.Target);var r=Vector3.Normalize(Vector3.Cross(camera.Up,b));var u=Vector3.Normalize(Vector3.Cross(b,r));var v=camera.Pivot-camera.Eye;
+ return new(Vector3.Dot(v,r)/-Vector3.Dot(v,b),Vector3.Dot(v,u)/-Vector3.Dot(v,b));
+}
+var offCenter=c with{Pivot=new Vector3(3,-1,2)};
+var offSnap=CameraMath.Move(offCenter,NavMode.Snap,95,-30);
+Check(Vector2.Distance(ProjectPivot(offCenter),ProjectPivot(offSnap))<.0001,"Off-center snapping keeps the pivot under the cursor");
+Check(Math.Abs(Vector3.Distance(offCenter.Eye,offCenter.Pivot)-Vector3.Distance(offSnap.Eye,offSnap.Pivot))<.0001,"Off-center snapping preserves the pivot radius");
 var fly=CameraMath.Move(c,NavMode.Navigate,0,20,0,true);
 Check(Vector3.Distance(fly.Eye,c.Eye)>.01&&fly.Valid,"Alt navigation applies height movement");
 bool invalid=false;try{CameraMath.Move(c with{Pivot=new(float.NaN,0,0)},NavMode.Orbit,1,2);}catch(ArgumentException){invalid=true;}Check(invalid,"Reject non-finite camera data");
