@@ -1,128 +1,41 @@
-# Chamfer Trackball navigation handoff
+# Chamfer Trackball handoff · 2026-10-30
 
-## Status — Codex, 2026-10-29
+Editable C# application, tests, embedded UI, Blender/Fusion adapters, logo and repeatable Windows builds now live in this repository. The earlier private-source/configuration-only handoff has been superseded. Work in GitHub and cloud builds; the owner requested no PC development folders and executable-only delivery. Do not use Claude for this task.
 
-This is a configuration change and implementation handoff, not a new application build.
-The newest release verified in this repository is v1.5.5. The repository currently
-contains release automation and release notes; its README says application source is
-kept privately. Do not label this work v1.5.6 or v1.5.9 without building and testing
-the application from the actual source.
+## Current owner requirements
 
-## Requested behavior
+- Admin displays **v1.5.5**, with unique increasing build revisions and source metadata. Do not overwrite the old v1.5.5 tag or any executable.
+- The first public candidate is **v1.0.1**, stored as a GitHub draft. Publishing is the owner's explicit Admin action. Later source builds choose the next public patch after the previous public release.
+- btn1 Middle top-left; btn2 Back top-right; btn3 Left click bottom-left; btn4 Right click bottom-right.
+- Left wheel scrolls up/down; the other retains horizontal scrolling. Preserve wheel direction.
+- Corrections apply only to the identified trackball. Ordinary mice retain their inputs; never change Windows-wide SwapMouseButtons or wheel settings.
+- The original Chamfer cube logo is embedded in the executable, tray, settings UI and floating guide.
+- The guide is draggable, topmost without focus activation, shows live program/mode/buttons, and has minimize, restore and close controls.
+- Shift = orbit; Ctrl+Shift = pan plus simultaneous wheel zoom; Alt + ball = aligned snapping; backtick + ball = navigation, Alt for height. Never Ctrl alone.
+- Held bindings and button combinations, including incomplete drafts, persist through saving and restart.
 
-- Ordinary pointing, all mouse buttons, and both scroll wheels retain native mouse
-  behavior when no navigation mode is held. No wheel inversion or wheel-side swap.
-- Hold **Shift** and roll to rotate. Release Shift to return to the mouse.
-- Hold **Ctrl+Shift** for simultaneous pan and zoom.
-- Hold **Alt** and roll to snap to aligned face, edge, and corner views. Do not
-  assign this to the bottom-left mouse button.
-- Hold **backtick (`)** for camera navigation, with the Alt navigation behavior
-  demonstrated in the reference.
-- Never use Ctrl by itself as a navigation trigger.
-- Expose editable bindings and save them across restarts and upgrades.
-- Get a real 3D pivot under the cursor from the target app so rotation stays
-  around that point instead of a distant origin.
+## Device handling
 
-## Configuration completed and verified
+Buttons & keys → Identify trackball, then roll only its ball. This stores the Raw Input device path privately in the existing AppData settings and enables trackball click/wheel-axis correction. No device ID is guessed from enumeration order, a generic receiver name or the last mouse seen. Re-identify after a different connection path or a fail-open notification.
 
-The existing app's Reset to normal command was applied. Windows mouse-button
-swapping was restored to off. Both programs now use normal actions for all
-buttons and both wheels; custom button combinations and mode overrides are empty.
+InputDriver withholds physical button/wheel events with WH_MOUSE_LL and uses WM_INPUT to route each device. Other mice are replayed unchanged. Injected echoes are ignored. DeviceMapping pairs releases with their original mapped downs. MouseGate requires a withheld-event ticket before replay and times out unmatched events to normal input. Absolute pointing devices are preserved during capture as well. This avoids a kernel driver, but real hardware behavior is still an owner verification item.
 
-The 3D modelling program is selected, with these existing v20 settings:
+## Updates and publishing
 
-```json
-{
-  "orbitKeys": "shift",
-  "panKeys": "ctrl+shift",
-  "zoomKeys": "none",
-  "leftWheel": "normal",
-  "rightWheel": "normal",
-  "modeButtons": {},
-  "combos": []
-}
-```
+BuildInfo and MSBuild properties define the edition; Admin commands are rejected in the public build. Admin About & updates follows only admin-v1.5.5-build.N. Public updates follow only published, stable public-vX.Y.Z releases and ignore legacy previews/drafts.
 
-Normal mouse has orbitKeys, panKeys and zoomKeys set to "none". The global
-shortcutsEverywhere option is false. Settings persisted through a clean quit and
-relaunch, and the app's home screen displayed Shift for Orbit and Ctrl+Shift for
-Pan. These are configuration/load checks; physical-device navigation in CAD apps
-has not been validated.
+The build workflow verifies both editions before storing an Admin prerelease and an unpublished candidate. The candidate version is stamped into the executable and Admin metadata. About checks at startup and every 15 minutes when enabled, and supports manual check/install. Downloads require the GitHub asset SHA-256 digest.
 
-## Still requires application source and implementation
+Admin publishing requires the owner's repository Contents read/write token, encrypted locally with Windows DPAPI. Do not read or export stored credentials. No token, connector credential or private signing key is embedded. Release for public copies the verified candidate into a new public release, validates the upload digest, then publishes. Withdraw returns the release to a draft; re-release retains its original binary.
 
-Ctrl+Shift currently configures **pan only**. The existing UI prevents assigning
-the same hold binding separately to pan and zoom. Combined pan/zoom, Alt snapping,
-and backtick navigation have not been implemented by this configuration change.
+## Navigation capabilities and limits
 
-Add explicit modes with most-specific chord priority: Ctrl+Shift must win over
-Shift; plain Ctrl must pass through. Release the mode and any injected buttons or
-keys on modifier release, focus loss, app switch, device disconnect, or shutdown.
-Preserve normal clicks and native wheel behavior outside the held modes.
+The standard M512 report supplies X/Y and wheels, not independent physical ball twist. The camera engine supports orbit, pan/zoom, wheel roll, 26 aligned snap directions and navigation. Do not advertise added hardware sensing or universal native CAD integration.
 
-Cursor pivoting and accurate camera movement require native integration with
-each supported 3D application's scene and camera APIs. Query the camera and
-ray-picked surface point on mode entry; keep a stable pivot during a gesture.
-Use a deliberate selection or camera-target fallback when the cursor misses.
-Pan and zoom must use scene depth and projection rather than a fixed guessed
-distance. Snap changes the camera, never model geometry.
+Blender/Fusion adapters exchange real scene camera and cursor/selection pivot data. Other apps have editable mouse-emulation profiles. Native pivot, snap and navigation require the relevant host adapter. Live installed Blender/Fusion behavior and physical M512 operation have not been validated here.
 
-Do not describe two-axis mouse motion or inferred circles as measured three-axis
-ball rotation. The Rotatrix reference uses two optical sensors and a custom
-controller; its native integrations supply scene/camera information.
-For an ordinary X/Y mouse input path, a third independent input needs a wheel,
-another control, or hardware that actually reports it. Declare and test the
-available capabilities before promising simultaneous three-axis ball sensing.
+## Verification
 
-## Verification and delivery needed next
+The Windows workflow runs 70 core checks, interface and integration syntax validation, separate single-file publishes and real WebView2 smoke tests for both editions. Checks include logo/edition resources, public rejection of Admin commands, saved combinations and a loopback native camera/pivot handshake. It captures settings/guide screenshots in workflow artifacts. Do not put those images into public build logs.
 
-Obtain the private Go/UI/build source without publishing credentials or private
-source into this public release repository. Implement the modes and native app
-adapters there. Test modifier precedence, normal mouse behavior, release/focus
-cleanup, settings and combination persistence, restart/upgrade migration, pivot
-stability, snapping, pan/zoom, and navigation in each supported application.
-Build matching public/admin binaries, advance the actual app version once, and
-publish verified artifacts and release notes here. Have Claude read this handoff
-before continuing; its private project has not been synchronized by this commit.
-
-References: [Rotatrix hardware](https://rotatrix.com/) and
-[OpenAxis integration overview](https://openaxis.rotatrix.com/).
-
-
-## Codex source rebuild — 2026-10-30
-
-The owner authorized rebuilding the missing editable source in this same repository,
-without creating development folders on the PC, and requested only an executable as
-the download. Source, tests, a Windows build workflow, the existing interface and native
-Blender/Fusion adapters have now been added for v1.5.6. The original handoff above records
-the earlier configuration-only state; its source blocker is superseded by this rebuild.
-
-The first CI run passed 31 core regression checks and interface/Python syntax checks;
-a Windows compile error is being corrected. No new executable has been released yet.
-Native adapters and physical M512 behavior still need testing in the owner's actual
-applications. Pan/zoom uses ball X/Y plus a wheel for depth; no physical twist sensor
-is claimed. Existing Chamfer3D v1 motion support remains; Alt snap/fly require a newer
-host adapter there. Consult the README for precise compatibility and source layout.
-
-
-## Codex verified executable delivery — 2026-10-30
-
-v1.5.6 was built from commit 475c866b0d1c9f1b8a5f9337ddf1ebddc98a44d0.
-The Windows workflow passed all 39 core regression checks, interface JavaScript/Python
-syntax checks, single-executable publishing, actual WebView2 startup and settings UI,
-held-key controls and saved draft-combination verification, native camera/pivot HTTP
-handshake, stale-session cleanup and origin rejection checks. Off-center snapping
-preserves the pivot's screen position and radius; speed and gesture preferences now
-survive program switches. The internal settings page is served under a dedicated
-trusted virtual origin. The Blender orthographic adapter uses absolute scale updates.
-
-The release contains only ChamferTrackball.exe (52,160,080 bytes), as requested.
-GitHub's uploaded asset digest matched the build's SHA-256:
-4ccdef538250894a62a5f08f83b59262e3c892f7b2bcc9cb2183a9bb2db5f292.
-Release: https://github.com/chamfer3dprinting/Chamfer-Trackball/releases/tag/v1.5.6
-This is an owner prerelease; no claim of physical M512/CAD host validation is made.
-Blender and Fusion integrations are embedded in the executable and install from its
-CAD apps page; users must enable the installed integration in the host. Other apps
-retain configurable mouse emulation, and the older Chamfer3D v1 link retains motion
-support with its documented snap/fly limitation. No development source folders were
-created on the owner's PC. Existing mouse settings were preserved during this build.
+Verified source: 8af36c29100ce74929b2e24d4f5313566119e024. GitHub Actions run [41053380169](https://github.com/chamfer3dprinting/Chamfer-Trackball/actions/runs/41053380169) passed all 70 core checks, syntax checks, both single-file publishes, and both actual WebView2/bridge smoke tests. Admin build 14 asset SHA-256: c348a4ab982946e12a9d1307f76f6c9bf2738a22d6c1ad2822bd3b5216e456b2. Public candidate v1.0.1 build 14 was verified as a draft; no public release was activated. Physical M512 behavior and live CAD hosts remain unverified.

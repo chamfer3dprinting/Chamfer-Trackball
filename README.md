@@ -41,3 +41,5 @@ Build: `dotnet publish src/Chamfer.Trackball.App -c Release -r win-x64 --self-co
 ## Validation · 2026-10-30
 
 This change adds per-device mapping regressions for unchanged ordinary mice, paired releases, wheel axes and deltas, fail-open tickets and isolated update channels, on top of the existing saved-combination and camera/pivot checks. The workflow result records actual build/UI validation; physical M512 behavior and live Blender/Fusion host behavior need owner testing. No public channel promotion is performed by the build workflow.
+
+Verified build 14: [Windows workflow run](https://github.com/chamfer3dprinting/Chamfer-Trackball/actions/runs/41053380169) passed all 70 checks, syntax validation, both publishes and both actual UI smoke tests. Source: `8af36c29100ce74929b2e24d4f5313566119e024`. Admin executable SHA-256: `c348a4ab982946e12a9d1307f76f6c9bf2738a22d6c1ad2822bd3b5216e456b2`. Public v1.0.1 build 14 remains a draft.
