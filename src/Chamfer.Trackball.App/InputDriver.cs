@@ -90,7 +90,11 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                                 deviceName=name.ToString();deviceNames[h.Device]=deviceName;}
                                 LastDevice=deviceName;var selected=SelectedDevice();
                                 if(selected.Length==0||selected==LastDevice)
-                                    Motion?.Invoke(Marshal.ReadInt32(p,offset+12),Marshal.ReadInt32(p,offset+16),LastDevice);
+                                    {
+                                        var dx=Marshal.ReadInt32(p,offset+12);var dy=Marshal.ReadInt32(p,offset+16);
+                                        if((dx!=0||dy!=0)&&IsCad())foreach(var key in deferred)usedDeferred.Add(key);
+                                        Motion?.Invoke(dx,dy,LastDevice);
+                                    }
                             }
                         }
                     }

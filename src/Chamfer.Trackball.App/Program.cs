@@ -6,7 +6,7 @@ internal static class Program{
         ApplicationConfiguration.Initialize();
         using var single=new Mutex(true,"Local\\ChamferTrackballRebuilt",out bool first);
         if(!first){MessageBox.Show("Chamfer Trackball is already running. Open it from the tray.");return;}
-        try{Application.Run(new MainForm(args.Contains("--smoke-test")));}
+        try{Application.Run(new MainForm(args.Contains("--smoke-test"),args.Contains("--tray")));}
         catch(Exception ex){if(args.Contains("--smoke-test")){Console.Error.WriteLine(ex);Environment.Exit(1);}MessageBox.Show(ex.Message,"Chamfer Trackball",MessageBoxButtons.OK,MessageBoxIcon.Error);}
     }
     static void Install(string[] a){

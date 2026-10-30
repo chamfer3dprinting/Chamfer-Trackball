@@ -17,14 +17,14 @@ internal sealed class MainForm:Form{
     bool quit;readonly bool smoke;JsonObject update=new(){["channel"]="public",["stage"]="latest",["version"]=ConfigStore.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Editable source rebuild: Shift orbit, Ctrl+Shift pan/zoom, Alt snap and backtick navigation with native integrations.")};
     string updateUrl="",updateHash="";
     readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(30)};
-    public MainForm(bool smoke=false){
+    public MainForm(bool smoke=false,bool startTray=false){
         this.smoke=smoke;
         Text="Chamfer Trackball";ClientSize=new(1106,754);MinimumSize=new(920,640);StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(20,23,27);
         settingsPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"ChamferTrackball","settings.json");
         store=new(settingsPath);native=new();if(native.Error.Length>0){native.Dispose();throw new InvalidOperationException(native.Error);}input=new();controller=new(store,input,native);
         Controls.Add(web);http.DefaultRequestHeaders.UserAgent.ParseAdd("ChamferTrackball/"+ConfigStore.Version);
         var menu=new ContextMenuStrip();menu.Items.Add("Open",null,(_,_)=>{Show();WindowState=FormWindowState.Normal;Activate();});menu.Items.Add("Quit",null,(_,_)=>Exit());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>{Show();Activate();};
-        Shown+=async(_,_)=>await Initialize();
+        Shown+=async(_,_)=>{await Initialize();if(startTray)Hide();};
         FormClosing+=(_,e)=>{if(!quit){e.Cancel=true;Hide();return;}controller.Dispose();input.Dispose();native.Dispose();tray.Dispose();http.Dispose();};
     }
     async Task Initialize(){
@@ -111,8 +111,29 @@ internal sealed class MainForm:Form{
         var p=new ProcessStartInfo(target){UseShellExecute=false};p.ArgumentList.Add("--install-update");p.ArgumentList.Add(target);p.ArgumentList.Add(Environment.ProcessPath!);p.ArgumentList.Add(Environment.ProcessId.ToString());
         Process.Start(p);update["stage"]="restarting";Exit();
     }
+    async Task NativeSmokeTest(){
+        using var client=new HttpClient{Timeout=TimeSpan.FromSeconds(3)};
+        var first=JsonNode.Parse(await client.GetStringAsync("http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId))!;
+        var connection=native.Find("blender",Environment.ProcessId)??throw new Exception("Native adapter registration failed.");
+        native.Begin(connection,NavMode.Orbit,240,120);
+        var begin=JsonNode.Parse(await client.GetStringAsync("http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId))!;
+        if(begin["commands"]!.AsArray().All(x=>ConfigStore.S(x,"t")!="begin"))throw new Exception("Native begin request missing.");
+        var scene=new JsonObject{["id"]=first["id"]!.GetValue<string>(),["t"]="scene",["session"]=connection.Session,["eye"]=new JsonArray(4,3,10),["target"]=new JsonArray(1,1,0),["up"]=new JsonArray(0,1,0),["pivot"]=new JsonArray(1,1,0),["verticalFov"]=.8,["orthoHeight"]=10,["width"]=1200,["height"]=800};
+        using(var response=await client.PostAsync("http://127.0.0.1:47613/native/scene",new StringContent(scene.ToJsonString(),Encoding.UTF8,"application/json")))response.EnsureSuccessStatusCode();
+        if(connection.Pose==null||!native.Move(connection,NavMode.Orbit,20,10,60,false,1))throw new Exception("Native camera/pivot handshake failed.");
+        var pose=JsonNode.Parse(await client.GetStringAsync("http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId))!;
+        if(!pose["commands"]!.AsArray().Any(x=>ConfigStore.S(x,"t")=="camera"))throw new Exception("Native camera response missing.");
+        native.End(connection);
+        using(var response=await client.PostAsync("http://127.0.0.1:47613/native/scene",new StringContent(scene.ToJsonString(),Encoding.UTF8,"application/json")))response.EnsureSuccessStatusCode();
+        if(connection.Pose!=null)throw new Exception("An ended gesture accepted a stale camera reply.");
+        using var forbidden=new HttpRequestMessage(HttpMethod.Get,"http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId);
+        forbidden.Headers.Add("Origin","https://untrusted.example");
+        using var denied=await client.SendAsync(forbidden);
+        if(denied.StatusCode!=System.Net.HttpStatusCode.Forbidden)throw new Exception("Native origin restriction failed.");
+    }
     async Task SmokeTest(){
         try{
+            await NativeSmokeTest();
             await Task.Delay(1200);
             var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(state.version!=='1.5.6')throw Error('version');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})()");
             // ExecuteScriptAsync returns a Promise object for async expressions. Confirm
@@ -120,7 +141,7 @@ internal sealed class MainForm:Form{
             await Task.Delay(500);
             var ready=await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-hold=snapKeys]')!==null&&document.querySelector('[data-hold=navigateKeys]')!==null&&document.querySelector('[data-install-integration=blender]')!==null");
             if(ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready);
-            var output=Path.Combine(Path.GetTempPath(),"chamfer-ui-smoke.png");
+            var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
             File.WriteAllText(Path.Combine(Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, held key controls, integration installer and saved combination verified.");
             Exit();
