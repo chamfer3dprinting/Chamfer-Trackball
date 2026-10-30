@@ -43,10 +43,13 @@ jobs:
       - name: Verify actual settings interface and bridge
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden
+          $process = Start-Process -FilePath "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:RUNNER_TEMP/chamfer-ui-smoke.stdout" -RedirectStandardError "$env:RUNNER_TEMP/chamfer-ui-smoke.stderr"
           if (-not $process.WaitForExit(90000)) { Stop-Process -Id $process.Id; throw 'UI smoke test timed out' }
           if ($process.ExitCode -ne 0 -or -not (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.ok")) {
             if (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.error") { Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.error" }
+            Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.stdout", "$env:RUNNER_TEMP/chamfer-ui-smoke.stderr" -ErrorAction SilentlyContinue
+            Write-Output "App exit code: $($process.ExitCode)"
+            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='.NET Runtime'} -MaxEvents 1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Message
             throw 'Actual UI verification failed'
           }
           Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.ok"

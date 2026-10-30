@@ -45,7 +45,7 @@ internal sealed class MainForm:Form{
             using var reader=new StreamReader(s);
             if(smoke)web.CoreWebView2.NavigationCompleted+=async(_,_)=>await SmokeTest();
             web.NavigateToString(await reader.ReadToEndAsync());
-        }catch(Exception ex){if(smoke){Console.Error.WriteLine(ex);Environment.Exit(1);}MessageBox.Show("Cannot open the interface. Ensure Microsoft Edge WebView2 Runtime is installed. "+ex.Message);Exit();}
+        }catch(Exception ex){if(smoke){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}MessageBox.Show("Cannot open the interface. Ensure Microsoft Edge WebView2 Runtime is installed. "+ex.Message);Exit();}
     }
     async void HandleMessage(object? sender,CoreWebView2WebMessageReceivedEventArgs e){
         if(e.Source!="about:blank"||e.WebMessageAsJson.Length>1024*1024)return;
