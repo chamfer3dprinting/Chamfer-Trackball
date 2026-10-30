@@ -52,7 +52,7 @@ public sealed class ComboTracker {
         if(held.Count<2){fired="";return null;}
         if(!down||combos==null)return null;
         foreach(var node in combos){
-            if(node?["buttons"] is not System.Text.Json.Nodes.JsonArray buttons)continue;
+            if(node?["buttons"] is not System.Text.Json.Nodes.JsonArray buttons||ConfigStore.S(node?["bind"],"action") is "" or "normal")continue;
             var ids=buttons.Where(b=>b!=null).Select(b=>b!.GetValue<int>()).Distinct().Order().ToArray();
             if(ids.Length<2||!ids.All(held.Contains))continue;
             var token=string.Join(",",ids);if(token==fired)continue;
@@ -60,4 +60,8 @@ public sealed class ComboTracker {
         }
         return null;
     }
+}
+
+public static class ActionPolicy {
+ public static bool Global(string action)=>action is "keys" or "macro" or "nextProgram" or "program" or "sendLeft" or "sendRight" or "sendMiddle" or "sendX1" or "sendX2" or "disabled";
 }

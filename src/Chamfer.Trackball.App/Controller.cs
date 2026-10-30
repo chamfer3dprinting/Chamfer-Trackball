@@ -135,7 +135,7 @@ internal sealed class Controller:IDisposable{
             if(wheelAction=="invert"){Win32.Mouse(msg==0x20a?0x800u:0x1000u,0,0,-data);return true;}
             if(wheelAction=="disabled")return true;
             if(wheelAction=="zoom"&&IsCad){Win32.Mouse(0x800,0,0,data);return true;}
-            if(wheelAction is "program" or "goProgram"){int i=wheelAction=="program"?ConfigStore.I(cfg,"activeProgram")+(data>0?1:-1):ConfigStore.I(cfg,prefix+"Wheel"+(data>0?"UpProgram":"DownProgram"));int count=cfg["programs"]!.AsArray().Count;store.Select((i%count+count)%count);return true;}
+            if(wheelAction is "program" or "goProgram"){int i=wheelAction=="program"?ConfigStore.I(cfg,"activeProgram")+(data>0?1:-1):cfg["wheelPrograms"]?[(prefix=="left"?0:2)+(data>0?0:1)]?.GetValue<int>()??0;int count=cfg["programs"]!.AsArray().Count;store.Select((i%count+count)%count);return true;}
             if(wheelAction=="keys"){Shortcut(ConfigStore.S(cfg,prefix+"Wheel"+(data>0?"UpKeys":"DownKeys")));return true;}
             if(wheelAction=="cycle"&&IsCad){latched=latched switch{NavMode.Idle=>NavMode.Orbit,NavMode.Orbit=>NavMode.PanZoom,NavMode.PanZoom=>NavMode.Roll,_=>NavMode.Idle};Change(latched);return true;}
             return false;
@@ -145,13 +145,13 @@ internal sealed class Controller:IDisposable{
         lastBtn=ButtonName(id);lastBtnTime=DateTime.UtcNow;
         if(down)pressed.Add(id);else pressed.Remove(id);
         var combo=combos.Change(id,down,cfg["combos"]?.AsArray());
-        bool member=cfg["combos"]?.AsArray().Any(c=>c?["buttons"] is JsonArray ids&&ids.Count(v=>v!=null)>=2&&ids.Any(v=>v?.GetValue<int>()==id))==true;
-        if(combo!=null&&IsCad){foreach(var p in pressed)comboUsed.Add(p);Dispatch(combo);return true;}
+        bool member=cfg["combos"]?.AsArray().Any(c=>c?["buttons"] is JsonArray ids&&ids.Count(v=>v!=null)>=2&&ids.Any(v=>v?.GetValue<int>()==id)&&ConfigStore.S(c?["bind"],"action") is not "" and not "normal"&&(IsCad||ActionPolicy.Global(ConfigStore.S(c?["bind"],"action"))))==true;
+        if(combo!=null&&(IsCad||ActionPolicy.Global(ConfigStore.S(combo,"action")))){foreach(var p in pressed)comboUsed.Add(p);Dispatch(combo);return true;}
         if(down&&mode!=NavMode.Idle&&id is 3 or 4){End();latched=NavMode.Idle;stoppedByClick=true;}
         var bind=cfg["buttons"]?[ButtonName(id)]?.AsObject()??new JsonObject{["action"]="normal"};
         if(latched!=NavMode.Idle&&cfg["modeButtons"]?[ButtonName(id)] is JsonObject alternate&&ConfigStore.S(alternate,"action")!="normal")bind=alternate;
         string action=ConfigStore.S(bind,"action","normal");
-        bool mapped=(IsCad||ConfigStore.B(cfg,"shortcutsEverywhere"))&&action!="normal"||member&&IsCad;
+        bool mapped=(IsCad||ActionPolicy.Global(action)||ConfigStore.B(cfg,"shortcutsEverywhere"))&&action!="normal"||member;
         if(!mapped)return false;
         if(down){
             intercepted[id]=(JsonObject)bind.DeepClone();
@@ -183,7 +183,7 @@ internal sealed class Controller:IDisposable{
             case "fit":if(profile!=null)Shortcut(ConfigStore.S(profile,"fit"));fit=true;break;
             case "zoomIn":Win32.Mouse(0x800,0,0,120);break;case "zoomOut":Win32.Mouse(0x800,0,0,-120);break;
             case "lockRotate":case "lock3d":Toggle(NavMode.Orbit);break;case "lockTranslate":Toggle(NavMode.PanZoom);break;case "lockZoom":Toggle(NavMode.Zoom);break;case "lockTwist":Toggle(NavMode.Roll);break;
-            case "panToggle":Toggle(latched==NavMode.Orbit?NavMode.PanZoom:NavMode.Orbit);break;
+            case "panToggle":latched=latched switch{NavMode.Orbit=>NavMode.PanZoom,NavMode.PanZoom=>NavMode.Zoom,_=>NavMode.Orbit};Change(latched);break;
         }
         Log(action);
     }

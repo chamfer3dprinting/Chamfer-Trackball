@@ -29,7 +29,7 @@ internal sealed class NativeServer:IDisposable {
     public bool Move(Client c,NavMode mode,float dx,float dy,float wheel,bool vertical,float gain){
         lock(c.Gate){
             if(c.Version==1){
-                Queue(c,new(){["t"]="m",["ox"]=mode==NavMode.Orbit?dx*gain:0,["oy"]=mode==NavMode.Orbit?dy*gain:0,["roll"]=mode is NavMode.Orbit or NavMode.Roll?wheel*-.0015f:0,["px"]=mode==NavMode.PanZoom?dx*gain:0,["py"]=mode==NavMode.PanZoom?dy*gain:0,["zoom"]=mode==NavMode.Zoom?(-dy*.008f+wheel*.0015f):mode==NavMode.PanZoom?wheel*.0015f:0});
+                Queue(c,new(){["t"]="m",["ox"]=mode==NavMode.Orbit?dx*gain:0,["oy"]=mode==NavMode.Orbit?dy*gain:0,["roll"]=mode==NavMode.Roll?-dx*gain*.005f:mode==NavMode.Orbit?wheel*-.0015f:0,["px"]=mode==NavMode.PanZoom?dx*gain:0,["py"]=mode==NavMode.PanZoom?dy*gain:0,["zoom"]=mode==NavMode.Zoom?(-dy*.008f+wheel*.0015f):mode is NavMode.PanZoom or NavMode.Roll?wheel*.0015f:0});
                 return true;
             }
             if(c.Pose==null)return false;

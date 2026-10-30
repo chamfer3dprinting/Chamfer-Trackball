@@ -12,7 +12,12 @@ public static class CameraMath {
         var back=Unit(c.Eye-c.Target);var right=Unit(Vector3.Cross(c.Up,back));var up=Unit(Vector3.Cross(back,right));
         var depth=MathF.Max(1e-5f,MathF.Abs(Vector3.Dot(c.Eye-c.Pivot,back)));
         var pixel=(c.Orthographic?c.OrthoHeight:2*depth*MathF.Tan(c.VerticalFov/2))/c.Height;
-        if(mode is NavMode.Orbit or NavMode.Roll){
+        if(mode==NavMode.Roll){
+            var twist=Quaternion.CreateFromAxisAngle(back,-dx*.005f);
+            var pose=c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,twist),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,twist),Up=Unit(Vector3.Transform(up,twist))};
+            return Zoom(pose,wheel*.0015f);
+        }
+        if(mode==NavMode.Orbit){
             var q=mode==NavMode.Roll?Quaternion.Identity:Quaternion.Normalize(Quaternion.CreateFromAxisAngle(up,-dx*.005f)*Quaternion.CreateFromAxisAngle(right,-dy*.005f));
             q=Quaternion.Normalize(Quaternion.CreateFromAxisAngle(back,-wheel*.0015f)*q);
             return c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,q),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,q),Up=Unit(Vector3.Transform(up,q))};

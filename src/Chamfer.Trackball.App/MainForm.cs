@@ -10,6 +10,7 @@ using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Win32;
 namespace Chamfer.Trackball.App;
 internal sealed class MainForm:Form{
+    const string AppUrl="https://chamfer-trackball.invalid/";
     readonly WebView2 web=new(){Dock=DockStyle.Fill};
     readonly NotifyIcon tray=new(){Icon=SystemIcons.Application,Text="Chamfer Trackball",Visible=true};
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer native;readonly Controller controller;
@@ -35,21 +36,25 @@ internal sealed class MainForm:Form{
             web.CoreWebView2.Settings.AreDevToolsEnabled=false;
             web.CoreWebView2.Settings.IsStatusBarEnabled=false;
             web.CoreWebView2.Settings.AreDefaultContextMenusEnabled=false;
-            web.CoreWebView2.NavigationStarting+=(_,e)=>{if(e.Uri!="about:blank")e.Cancel=true;};
+            web.CoreWebView2.NavigationStarting+=(_,e)=>{if(e.Uri!=AppUrl)e.Cancel=true;};
             web.CoreWebView2.NewWindowRequested+=(_,e)=>{e.Handled=true;if(Uri.TryCreate(e.Uri,UriKind.Absolute,out var u)&&u.Scheme=="https")Process.Start(new ProcessStartInfo(u.AbsoluteUri){UseShellExecute=true});};
             web.CoreWebView2.WebMessageReceived+=HandleMessage;
             string[] names=["ctState","ctSave","ctStatus","ctResetAll","ctProgram","ctLog","ctQuit","ctHide","ctStartup","ctPadRect","ctRow","ctTitleBar","ctOpenMouseSettings","ctOpenSettingsFile","ctTestMacro","ctUpdState","ctUpdCheck","ctUpdInstall","ctInstallIntegration","ctAddProfile"];
             var js="(()=>{const pending=new Map();let seq=0;chrome.webview.addEventListener('message',e=>{const m=e.data;const p=pending.get(m.id);if(!p)return;pending.delete(m.id);m.error?p[1](new Error(m.error)):p[0](m.result);});for(const n of "+JsonSerializer.Serialize(names)+")window[n]=(...args)=>new Promise((ok,no)=>{const id=++seq;pending.set(id,[ok,no]);chrome.webview.postMessage({id,name:n,args});});})();";
             await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(js);
             using var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("ChamferTrackball.ui.html")??throw new IOException("Interface resource is missing.");
-            using var reader=new StreamReader(s);
-            if(smoke)web.CoreWebView2.NavigationCompleted+=async(_,_)=>await SmokeTest();
-            web.NavigateToString(await reader.ReadToEndAsync());
+            using var reader=new StreamReader(s);var html=Encoding.UTF8.GetBytes(await reader.ReadToEndAsync());
+            web.CoreWebView2.AddWebResourceRequestedFilter(AppUrl+"*",CoreWebView2WebResourceContext.All);
+            web.CoreWebView2.WebResourceRequested+=(_,e)=>{
+                if(e.Request.Uri==AppUrl)e.Response=env.CreateWebResourceResponse(new MemoryStream(html,false),200,"OK","Content-Type: text/html; charset=utf-8\\r\\nCache-Control: no-store");
+            };
+            if(smoke)web.CoreWebView2.NavigationCompleted+=async(_,e)=>{if(e.IsSuccess&&web.Source?.AbsoluteUri==AppUrl)await SmokeTest();};
+            web.CoreWebView2.Navigate(AppUrl);
         }catch(Exception ex){if(smoke){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}MessageBox.Show("Cannot open the interface. Ensure Microsoft Edge WebView2 Runtime is installed. "+ex.Message);Exit();}
     }
     async void HandleMessage(object? sender,CoreWebView2WebMessageReceivedEventArgs e){
         if(smoke)File.AppendAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.bridge"),e.Source+" "+ConfigStore.S(JsonNode.Parse(e.WebMessageAsJson),"name")+"\\n");
-        if(e.Source!="about:blank"||e.WebMessageAsJson.Length>1024*1024)return;
+        if(e.Source!=AppUrl||e.WebMessageAsJson.Length>1024*1024)return;
         long id=0;
         try{
             var message=JsonNode.Parse(e.WebMessageAsJson)!.AsObject();id=message["id"]!.GetValue<long>();var args=message["args"]!.AsArray();object? result=null;

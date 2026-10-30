@@ -39,7 +39,10 @@ public sealed class ConfigStore {
             var i=Math.Clamp(I(next,"activeProgram",0),0,next["programs"]!.AsArray().Count-1);
             next["activeProgram"]=i;
             var p=next["programs"]![i]!.AsObject();
-            foreach(var key in ProgramFields) if(next.ContainsKey(key))p[key]=next[key]?.DeepClone();
+            foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
+            p["feel"]??=new JsonObject();
+            foreach(var key in new[]{"orbitSens","panSens","zoomSens","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
+            next["feel"]=p["feel"]!.DeepClone();
             Validate(next);Write(next);config=next;Revision++;
         }
     }
