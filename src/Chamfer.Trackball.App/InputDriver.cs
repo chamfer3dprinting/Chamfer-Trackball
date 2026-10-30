@@ -55,7 +55,8 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(count>256||(query==uint.MaxValue&&Marshal.GetLastWin32Error()!=122))return false;
         var list=new Win32.RawDevice[count];
         if(Win32.GetRegisteredRawInputDevices(list,ref count,size)==uint.MaxValue)return false;
-        return list.Any(d=>d.Page==1&&d.Usage==2&&d.Target==Handle&&(d.Flags&0x2100)==0x2100);
+        // Windows reports INPUTSINK here without the DEVNOTIFY registration bit.
+        return list.Any(d=>d.Page==1&&d.Usage==2&&d.Target==Handle&&(d.Flags&0x100)!=0);
     }
     void EnsureRegistration(){
         if(OwnsRegistration())return;
