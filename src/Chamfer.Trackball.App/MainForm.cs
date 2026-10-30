@@ -46,7 +46,7 @@ internal sealed class MainForm:Form{
             using var reader=new StreamReader(s);var html=Encoding.UTF8.GetBytes(await reader.ReadToEndAsync());
             web.CoreWebView2.AddWebResourceRequestedFilter(AppUrl+"*",CoreWebView2WebResourceContext.All);
             web.CoreWebView2.WebResourceRequested+=(_,e)=>{
-                if(e.Request.Uri==AppUrl)e.Response=env.CreateWebResourceResponse(new MemoryStream(html,false),200,"OK","Content-Type: text/html; charset=utf-8\\r\\nCache-Control: no-store");
+                if(e.Request.Uri==AppUrl)e.Response=env.CreateWebResourceResponse(new MemoryStream(html,false),200,"OK","Content-Type: text/html; charset=utf-8");
             };
             if(smoke)web.CoreWebView2.NavigationCompleted+=async(_,e)=>{if(e.IsSuccess&&web.Source?.AbsoluteUri==AppUrl)await SmokeTest();};
             web.CoreWebView2.Navigate(AppUrl);

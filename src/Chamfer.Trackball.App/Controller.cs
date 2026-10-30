@@ -131,7 +131,8 @@ internal sealed class Controller:IDisposable{
         if(wheel&&mode!=NavMode.Idle){pendingWheel+=data;Flush();return true;}
         if(wheel){
             var prefix=msg==0x20a?"right":"left";var wheelAction=ConfigStore.S(cfg,prefix+"Wheel","normal");
-            if(wheelAction=="normal"||!IsCad&&!ConfigStore.B(cfg,"shortcutsEverywhere"))return false;
+            if(wheelAction=="normal")return false;
+            if(!IsCad&&wheelAction is not "keys" and not "program" and not "goProgram"&&!ConfigStore.B(cfg,"shortcutsEverywhere"))return false;
             if(wheelAction=="invert"){Win32.Mouse(msg==0x20a?0x800u:0x1000u,0,0,-data);return true;}
             if(wheelAction=="disabled")return true;
             if(wheelAction=="zoom"&&IsCad){Win32.Mouse(0x800,0,0,data);return true;}
