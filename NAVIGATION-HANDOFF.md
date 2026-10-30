@@ -103,3 +103,26 @@ Native adapters and physical M512 behavior still need testing in the owner's act
 applications. Pan/zoom uses ball X/Y plus a wheel for depth; no physical twist sensor
 is claimed. Existing Chamfer3D v1 motion support remains; Alt snap/fly require a newer
 host adapter there. Consult the README for precise compatibility and source layout.
+
+
+## Codex verified executable delivery — 2026-10-30
+
+v1.5.6 was built from commit 475c866b0d1c9f1b8a5f9337ddf1ebddc98a44d0.
+The Windows workflow passed all 39 core regression checks, interface JavaScript/Python
+syntax checks, single-executable publishing, actual WebView2 startup and settings UI,
+held-key controls and saved draft-combination verification, native camera/pivot HTTP
+handshake, stale-session cleanup and origin rejection checks. Off-center snapping
+preserves the pivot's screen position and radius; speed and gesture preferences now
+survive program switches. The internal settings page is served under a dedicated
+trusted virtual origin. The Blender orthographic adapter uses absolute scale updates.
+
+The release contains only ChamferTrackball.exe (52,160,080 bytes), as requested.
+GitHub's uploaded asset digest matched the build's SHA-256:
+4ccdef538250894a62a5f08f83b59262e3c892f7b2bcc9cb2183a9bb2db5f292.
+Release: https://github.com/chamfer3dprinting/Chamfer-Trackball/releases/tag/v1.5.6
+This is an owner prerelease; no claim of physical M512/CAD host validation is made.
+Blender and Fusion integrations are embedded in the executable and install from its
+CAD apps page; users must enable the installed integration in the host. Other apps
+retain configurable mouse emulation, and the older Chamfer3D v1 link retains motion
+support with its documented snap/fly limitation. No development source folders were
+created on the owner's PC. Existing mouse settings were preserved during this build.
