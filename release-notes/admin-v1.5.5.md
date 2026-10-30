@@ -2,10 +2,15 @@
 - About & updates checks the matching release channel and verifies SHA-256 before replacing the executable.
 - Public v1.0.1 remains an unpublished GitHub draft. Only the owner's explicit Release for public action promotes it.
 - Admin connects using the owner's repository token, encrypted with Windows DPAPI. No credentials or release-signing keys are included in either executable.
-- Identify the trackball once by rolling it. Click and wheel-axis correction is then scoped to that device. Other mouse input is replayed unchanged; Windows mouse settings stay untouched.
+- Identify the trackball once by rolling it. Original clicks and wheel axes are preserved; optional corrections are scoped to that device when enabled. Other mouse input is replayed unchanged; Windows mouse settings stay untouched.
 - btn1 Middle (top-left), btn2 Back (top-right), btn3 Left click (bottom-left), btn4 Right click (bottom-right). Left wheel up/down; right wheel horizontal. Scroll direction is preserved.
 - Restored draggable, always-on-top floating guide with live program, mode, button states, minimize/restore and the original Chamfer logo.
 - Original logo is also embedded in the settings interface, executable and tray icon.
 - Shift orbit, Ctrl+Shift pan with wheel zoom, Alt snapping, backtick navigation and persisted combinations remain available.
 - Native pivot/snap/navigation integrations for Blender/Fusion remain included. Stock M512 X/Y plus wheels does not measure independent ball twist.
 - Automated checks cover mapping isolation, paired releases, fail-open policy, update channels, saved combinations, camera math and real WebView2 UI startup. Physical M512 behavior and live CAD hosts still need owner testing.
+
+- Optional Ball navigation setup: roll to orbit, Back toggles orbit/pan, clockwise/anticlockwise circles zoom in/out, and straight rolling returns. Circle size and zoom sensitivity are adjustable.
+- Normal mouse is the startup/reset default; reset disables optional device swaps. Identifying a device no longer turns swaps on.
+- Custom orbit, pan and zoom held keys remain editable. Configured non-modifier navigation keys no longer type while used to navigate.
+- Queued setting writes protect rapid binding/combination edits from earlier save responses.

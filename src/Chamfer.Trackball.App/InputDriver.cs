@@ -14,6 +14,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public event Action? KeysChanged;
     public Func<bool> IsCapture=()=>false;
     public Func<bool> IsCad=()=>false;
+    public Func<IReadOnlySet<int>,bool> IsNavigationChord=_=>false;
     public Func<string> SelectedDevice=()=>"";
     readonly DeviceMapping mapping=new();readonly MouseGate gate=new();
     readonly System.Windows.Forms.Timer watchdog=new(){Interval=30};
@@ -82,10 +83,10 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if((e.Flags&16)!=0||e.Extra==(nuint)Win32.Marker)return Win32.CallNextHookEx(keyHook,code,w,l);
         var down=(int)w is 0x100 or 0x104;int k=(int)e.Key;
         if(down)physical.Add(k);else physical.Remove(k);
-        // Defer standalone Alt/backtick in CAD so a held navigation key does not type
-        // or open a menu. An unused tap is replayed. Other Alt shortcuts pass through.
-        bool trigger=k is 18 or 164 or 165 or 192;
-        if(down&&trigger&&IsCad()){deferred.Add(k);KeysChanged?.Invoke();return 1;}
+        // Defer the configured non-modifier navigation key (or Alt) only when
+        // that chord is active on the identified trackball. An unused tap is replayed.
+        bool trigger=k is not (16 or 17 or 160 or 161 or 162 or 163) && IsNavigationChord(Keys);
+        if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);KeysChanged?.Invoke();return 1;}
         if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)){
             if(deferred.Count>0){
                 foreach(var old in deferred.ToArray()){Win32.Key(old,true);deferred.Remove(old);usedDeferred.Remove(old);}
@@ -146,7 +147,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                             var data=(short)Marshal.ReadInt16(p,offset+6);
                             int dx=Marshal.ReadInt32(p,offset+12),dy=Marshal.ReadInt32(p,offset+16);
                             if(learning&&(flags&1)==0&&(Math.Abs((long)dx)+Math.Abs((long)dy)>1)&&device.Length>0){
-                                learning=false;Identified?.Invoke(device);connected=true;failed=false;DeviceStatus="Trackball identified. Click and wheel-side correction is on.";
+                                learning=false;Identified?.Invoke(device);connected=true;failed=false;DeviceStatus="Trackball identified. Original inputs are preserved; corrections are optional.";
                             }
                             bool target=device.Length>0&&device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
                             if(target){LastDevice=device;connected=true;if(!failed&&!learning)DeviceStatus="Trackball connected";}

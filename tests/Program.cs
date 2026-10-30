@@ -3,6 +3,8 @@ using System.Text.Json.Nodes;
 using Chamfer.Trackball.Core;
 int count=0;void Check(bool pass,string name){count++;if(!pass)throw new Exception("FAILED: "+name);Console.WriteLine("PASS "+name);}
 var defaults=ConfigStore.Defaults();
+Check(ConfigStore.I(defaults,"activeProgram")==0&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Idle,"Factory startup is an ordinary mouse");
+ConfigStore.LoadProgram(defaults,1);
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Ctrl alone passes through");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom,"Ctrl+Shift wins over Shift");
@@ -65,11 +67,23 @@ try{
  store.Save(preferences);store.Select(0);store.Select(1);
  Check(ConfigStore.I(store.Snapshot(),"orbitSens")==73,"Navigation speed survives program switches");
  Check(ConfigStore.S(store.Snapshot()["programs"]![1]!["gestures"]!["up"],"keys")=="F","Gesture edits survive saving");
- var reset=store.Reset();Check(ConfigStore.S(reset,"leftWheel")=="normal"&&ConfigStore.S(reset,"rightWheel")=="normal","Reset restores both wheels");
+ var dialSettings=store.Snapshot();dialSettings["circleZoom"]=true;dialSettings["circleSize"]=210;
+ dialSettings["orbitKeys"]="Alt+Q";dialSettings["panKeys"]="Ctrl+Space";dialSettings["zoomKeys"]="Shift+Z";
+ store.Save(dialSettings);store.Select(0);
+ Check(!ConfigStore.B(store.Snapshot(),"circleZoom"),"Normal program does not inherit circle zoom");
+ store.Select(1);var custom=new ConfigStore(path).Snapshot();
+ Check(ConfigStore.B(custom,"circleZoom")&&ConfigStore.I(custom,"circleSize")==210,"Circle settings survive program switches and restart");
+ Check(ModeResolver.Resolve(custom,new HashSet<int>{18,81})==NavMode.Orbit,"Custom orbit chord is used");
+ Check(ModeResolver.Resolve(custom,new HashSet<int>{17,32})==NavMode.PanZoom,"Custom pan chord is used");
+ Check(ModeResolver.Resolve(custom,new HashSet<int>{16,90})==NavMode.Zoom,"Custom zoom chord is used");
+ custom["trackballSwapButtons"]=true;custom["trackballSwapWheels"]=true;store.Save(custom);
+ var reset=store.Reset();
+ Check(ConfigStore.I(reset,"activeProgram")==0&&ModeResolver.Resolve(reset,new HashSet<int>{16})==NavMode.Idle,"Reset selects normal mouse without navigation");
+ Check(!ConfigStore.B(reset,"trackballSwapButtons")&&!ConfigStore.B(reset,"trackballSwapWheels"),"Reset disables device corrections as well as bindings");Check(ConfigStore.S(reset,"leftWheel")=="normal"&&ConfigStore.S(reset,"rightWheel")=="normal","Reset restores both wheels");
  Check(reset["programs"]!.AsArray().All(p=>p!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")),"Reset restores every mouse button");
  var bad=store.Snapshot();bad["orbitKeys"]="ctrl";bool rejected=false;try{store.Save(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"Saving Ctrl-only navigation is rejected");
- var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==21,"Legacy config migrates without Ctrl-only orbit");
+ var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==22,"Legacy config migrates without Ctrl-only orbit");
 }finally{Directory.Delete(dirPath,true);}
 
 var dm=new DeviceMapping();var leftDown=new MouseEdge(0x201);var rightDown=new MouseEdge(0x204);
@@ -99,4 +113,33 @@ Check(ConfigStore.S(ReleasePolicy.Latest(releases,true,2,"1.5.5"),"tag_name")=="
 Check(ReleasePolicy.Latest(releases,true,3,"1.5.5")==null,"Admin does not reinstall the current build");
 releases.Add(Rel("public-v1.0.1"));
 Check(ConfigStore.S(ReleasePolicy.Latest(releases,false,0,"1.0.0"),"tag_name")=="public-v1.0.1","Public updater offers explicitly published public versions");
+Check(BallNavigation.ToggleOrbitPan(NavMode.Idle,NavMode.Orbit)==NavMode.PanZoom,"First back tap switches free orbit to pan");
+Check(BallNavigation.ToggleOrbitPan(NavMode.PanZoom,NavMode.Orbit)==NavMode.Orbit,"Second back tap returns to orbit");
+Check(BallNavigation.ToggleOrbitPan(NavMode.Orbit,NavMode.Orbit)==NavMode.PanZoom,"Orbit/pan toggle never inserts a zoom mode");
+(float Wheel,int Captured) Trace(CircleZoom detector,Func<float,Vector2> shape,float end,int samples,long start=1000,float size=160){
+ var previous=shape(0);float wheel=0;int captured=0;
+ for(int i=1;i<=samples;i++){var at=shape(end*i/samples);var d=at-previous;previous=at;var step=detector.Add(d.X,d.Y,start+i*5,size);wheel+=step.Wheel;if(step.Consumed)captured++;}
+ return (wheel,captured);
+}
+var clockwise=new CircleZoom();
+var cw=Trace(clockwise,a=>new(30*MathF.Cos(a),30*MathF.Sin(a)),MathF.PI*6,540);
+Check(cw.Captured>200&&cw.Wheel>500,"Clockwise circles continuously zoom in after deliberate recognition");
+var ccw=Trace(new CircleZoom(),a=>new(30*MathF.Cos(a),-30*MathF.Sin(a)),MathF.PI*6,540);
+Check(ccw.Captured>200&&ccw.Wheel< -500,"Anticlockwise circles continuously zoom out");
+var line=Trace(new CircleZoom(),a=>new(a*10,0),30,300);
+Check(line.Captured==0&&line.Wheel==0,"Straight rolling never zooms");
+var curve=Trace(new CircleZoom(),a=>new(30*MathF.Cos(a),30*MathF.Sin(a)),MathF.PI,90);
+Check(curve.Captured==0,"A curved half-turn orbit is not a zoom");
+var broad=Trace(new CircleZoom(),a=>new(300*MathF.Cos(a),300*MathF.Sin(a)),MathF.PI*4,1500);
+Check(broad.Captured==0,"Large circular orbits stay outside the configured gesture size");
+var small=Trace(new CircleZoom(),a=>new(12*MathF.Cos(a),12*MathF.Sin(a)),MathF.PI*6,540);
+Check(small.Wheel>300,"Small dial circles are recognized");
+var figureEight=Trace(new CircleZoom(),a=>new(35*MathF.Sin(a),20*MathF.Sin(2*a)),MathF.PI*6,800);
+Check(figureEight.Captured==0,"Alternating figure-eight curvature does not activate dial zoom");
+clockwise.Add(6,0,3705);clockwise.Add(6,0,3710);clockwise.Add(6,0,3715);clockwise.Add(6,0,3720);clockwise.Add(6,0,3725);
+Check(!clockwise.Active,"Straight rolling returns from zoom to orbit/pan");
+Trace(clockwise,a=>new(30*MathF.Cos(a),30*MathF.Sin(a)),MathF.PI*4,360,4000);
+Check(clockwise.Active,"Continuous circles can re-enter zoom");
+Check(!clockwise.Add(3,0,7000).Consumed&&!clockwise.Active,"A pause clears the previous circle");
+clockwise.Add(float.NaN,1,7010);Check(!clockwise.Active,"Invalid movement cannot produce a zoom");
 Console.WriteLine(count+" regression checks passed.");

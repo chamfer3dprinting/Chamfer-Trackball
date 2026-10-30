@@ -39,3 +39,13 @@ Blender/Fusion adapters exchange real scene camera and cursor/selection pivot da
 The Windows workflow runs 70 core checks, interface and integration syntax validation, separate single-file publishes and real WebView2 smoke tests for both editions. Checks include logo/edition resources, public rejection of Admin commands, saved combinations and a loopback native camera/pivot handshake. It captures settings/guide screenshots in workflow artifacts. Do not put those images into public build logs.
 
 Verified source: 8af36c29100ce74929b2e24d4f5313566119e024. GitHub Actions run [41053380169](https://github.com/chamfer3dprinting/Chamfer-Trackball/actions/runs/41053380169) passed all 70 core checks, syntax checks, both single-file publishes, and both actual WebView2/bridge smoke tests. Admin build 14 asset SHA-256: c348a4ab982946e12a9d1307f76f6c9bf2738a22d6c1ad2822bd3b5216e456b2. Public candidate v1.0.1 build 14 was verified as a draft; no public release was activated. Physical M512 behavior and live CAD hosts remain unverified.
+
+## Ball navigation update · 2026-10-30
+
+Added an optional Ball navigation quick setup: free orbit, Back alternates orbit/pan, and deliberate clockwise/anticlockwise X/Y circles produce zoom. Circle recognition requires a small, almost-closed, consistently winding path; broad arcs, straight motion and figure-eights are rejected. It leaves zoom after straight motion, a pause, focus/program changes or held-key/button overrides. Circle size and existing Zoom sensitivity are editable per program.
+
+Normal mouse is the factory/reset startup program. Reset disables both optional device corrections; identification now preserves the correction choices instead of forcing swaps on. Windows settings are never changed. Existing saved configurations are not silently reset.
+
+Queued UI writes preserve edits made during an earlier save. Custom held navigation keys are deferred only for a matching chord in a ready identified-device CAD session, so they do not type while navigating; an unused tap is replayed. Orbit, pan and zoom remain independently recordable.
+
+Validation added: circle directions and continuous operation, rejection of straight/half-circle/large-circle/figure-eight paths, exit/re-entry and invalid-input handling; custom chords and circle settings across restart/program switches; normal reset and disabled corrections; concurrent-save regression; actual UI control presence. Cloud build and smoke-test results will be recorded after the run. Physical M512 gesture feel and live CAD hosts still need owner verification. This adds no independent hardware twist measurement or universal native adapter.

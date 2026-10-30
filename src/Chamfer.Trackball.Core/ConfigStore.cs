@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Chamfer.Trackball.Core;
 
 public sealed class ConfigStore {
-    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
     private readonly object gate=new();
     private readonly string path;
     private JsonObject config;
@@ -27,7 +27,7 @@ public sealed class ConfigStore {
                     if(S(p,"orbitKeys")=="ctrl")p["orbitKeys"]="shift";
                 }
             }
-            LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=21;
+            LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=22;
         }
         Validate(config);
     }
@@ -46,7 +46,7 @@ public sealed class ConfigStore {
         }
     }
     public void Select(int index){lock(gate){var n=(JsonObject)config.DeepClone();LoadProgram(n,index);Write(n);config=n;Revision++;}}
-    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown","selectedDevice","trackballSwapButtons","trackballSwapWheels"})if(config[k]!=null)n[k]=config[k]!.DeepClone();Write(n);config=n;Revision++;return Snapshot();}}
+    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown","selectedDevice"})if(config[k]!=null)n[k]=config[k]!.DeepClone();Write(n);config=n;Revision++;return Snapshot();}}
     private void Write(JsonObject n){
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var text=n.ToJsonString(new JsonSerializerOptions{WriteIndented=true});
@@ -68,7 +68,7 @@ public sealed class ConfigStore {
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
             foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=21;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=22;
     }
     public static void Validate(JsonObject c){
         foreach(var node in c["programs"]!.AsArray()){

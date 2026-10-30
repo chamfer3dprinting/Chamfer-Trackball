@@ -14,7 +14,7 @@ Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds 
 
 The requested physical layout is btn1 **Middle** top-left; btn2 **Back** top-right; btn3 **Left click** bottom-left; btn4 **Right click** bottom-right. The left wheel scrolls vertically and the other wheel retains horizontal scrolling. Scroll direction is preserved.
 
-In Buttons & keys, choose **Identify trackball**, then roll only the trackball. The raw device identity is saved privately in its existing settings file. The click and wheel-axis corrections then affect that device only. Other mouse buttons and wheels are replayed unchanged. No Windows-wide button swap or wheel setting is used. The checkboxes allow the owner to disable each correction independently.
+In Buttons & keys, choose **Identify trackball**, then roll only the trackball. The raw device identity is saved privately in its existing settings file. Identification preserves the original clicks and wheel axes. Optional click and wheel-axis corrections affect that device only when enabled. Other mouse buttons and wheels are replayed unchanged. No Windows-wide button swap or wheel setting is used. The checkboxes allow the owner to disable each correction independently.
 
 A hook withholds physical button/wheel edges; Raw Input supplies their device identity before the app applies or bypasses the mapping. Injected echoes are ignored. Button-up uses the mapping chosen for button-down, including across configuration changes. Unmatched events time out and replay unchanged, disabling correction for the session. Driver-level filtering is not installed. Physical device behavior on the owner's Windows system still requires verification.
 
@@ -26,7 +26,10 @@ The draggable, always-on-top guide shows the same four-button arrangement, curre
 - Hold **Ctrl+Shift** and roll: pan; use the wheel simultaneously for zoom.
 - Hold **Alt** and roll: snap to aligned face/edge/corner views.
 - Hold **backtick** and roll: navigate; add **Alt** for height.
-- Ctrl by itself remains normal. All held bindings are editable and saved; complete and incomplete button combinations survive restart.
+- Ctrl by itself remains normal. All held bindings, including separate orbit, pan and zoom chords, are editable and saved; complete and incomplete button combinations survive restart.
+- **Ball navigation** is an optional quick setup: roll to orbit; tap Back to switch only between orbit and pan; draw small clockwise/anticlockwise circles to zoom in/out. Straight rolling returns to orbit or pan. The Circle size and Zoom sensitivity settings tune the gesture. Held keys/buttons override circle recognition.
+
+Factory startup and Reset to normal select **Normal mouse**, with original buttons/wheels and no navigation bindings. Reset also disables optional device corrections. Identifying a trackball does not enable swaps automatically. Settings writes are queued so a slow save cannot replace a newer combination or binding edit.
 
 The M512's standard mouse report supplies X/Y and separate wheels. It cannot independently measure ball twist about a third axis. Camera rotation supports three axes using ball X/Y plus a wheel; this is not a claim of added hardware sensing.
 

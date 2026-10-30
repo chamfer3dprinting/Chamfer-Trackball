@@ -331,7 +331,7 @@ details .ver{margin-top:10px;font-weight:600}
         <h2>Quick setups</h2>
         <div class="presets">
           <button class="preset" data-preset="controller"><b>Your held-key setup</b><small>Shift + ball rotates. Ctrl+Shift + ball pans, with the wheel for simultaneous zoom. Alt + ball snaps and backtick navigates with a native integration. Release the keys for a normal mouse.</small></button><button class="preset" data-preset="ballonly"><b>Normal mouse</b><small>Original mouse clicks, pointing and scrolling. Navigation keys, custom combinations and wheel remapping are off.</small></button>
-          <button class="preset" data-preset="both"><b>Buttons + held keys</b><small>Hold Back + ball to orbit or Middle + ball to pan. Shift and Ctrl+Shift work too. Normal left and right clicks.</small></button>
+          <button class="preset" data-preset="ballnav"><b>Ball navigation</b><small>In 3D apps, roll to orbit. Tap Back to switch between orbit and pan. Draw small circles to zoom: clockwise in, anticlockwise out. Held keys below still work.</small></button><button class="preset" data-preset="both"><b>Buttons + held keys</b><small>Hold Back + ball to orbit or Middle + ball to pan. Shift and Ctrl+Shift work too. Normal left and right clicks.</small></button>
           
           
           
@@ -376,8 +376,14 @@ details .ver{margin-top:10px;font-weight:600}
         <div class="actlog" data-actlog><div class="mu">Hold a button on your trackball…</div></div>
       </div>
       <div class="card" style="margin-top:16px">
-        <h2>Hold keys + roll (Rotatrix style)</h2>
+        <h2>Hold keys + roll</h2>
         <div class="binds" id="keyBinds"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Circle zoom</h2>
+        <div class="opt"><div class="t">Draw circles to zoom<small>During ball-only orbit or pan, draw a small circle: clockwise zooms in, anticlockwise zooms out. Recognition needs most of a circle; keep circling for continuous zoom. Roll straight to return. Held keys and held buttons take priority.</small></div><label class="sw"><input type="checkbox" data-k="circleZoom"><span></span></label></div>
+        <div class="opt"><div class="t">Circle size<small>Increase this if your circles are larger; decrease it if broad curved orbits trigger zoom. Zoom speed uses Zoom sensitivity in Speed &amp; direction.</small></div><input type="range" min="60" max="400" step="10" data-k="circleSize"></div>
+        <p class="mu" style="font-size:12.5px">This recognizes the shape of a roll. Physical ball twist is not measured by the M512's standard mouse reports. Use the Ball navigation setup above to enable orbit, pan and circle zoom together.</p>
       </div>
       <div class="card" style="margin-top:16px" id="gestCard">
         <div class="row" style="margin-bottom:8px;gap:10px"><h2 style="margin:0">Ball gestures</h2><span class="spacer"></span><span class="mu" style="font-size:13px">Gestures for</span><select id="gestScope" style="min-width:220px"></select></div>
@@ -534,11 +540,12 @@ details .ver{margin-top:10px;font-weight:600}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let S=null, cfg=null, page="home", saveTimer=null, lastBtnSeen=0, recording=null;
+let savePending=false,saveFlight=null,editVersion=0;
 
 const BTN={left:"btn3 · Left click",right:"btn4 · Right click",middle:"btn1 · Middle key",back:"btn2 · Back",forward:"Forward button",rightWheel:"Left scroll wheel",leftWheel:"Right scroll wheel"};
 const BTN_SUB={left:"Bottom-left · always a normal click",right:"Bottom-right button",middle:"Top-left button",back:"Top-right button",forward:"",rightWheel:"Wheel on the left side",leftWheel:"Wheel on the right side"};
-const ACT={normal:"Normal (no change)",lockZoom:"Zoom (tap on/off: roll up / down)",zoomIn:"Zoom in (one step)",zoomOut:"Zoom out (one step)",sendLeft:"Left click",sendRight:"Right click",sendMiddle:"Middle click",sendX1:"Mouse button 4",sendX2:"Mouse button 5",orbit:"Orbit — hold & roll",pan:"Pan — hold & roll",zoom:"Zoom — hold & roll up/down",fit:"Fit / home view",lock3d:"3D mode on/off (trackball only)",lockRotate:"Orbit (tap on / tap off)",lockTranslate:"Pan (tap on / tap off)",lockTwist:"Twist (tap on/off)",panToggle:"Orbit → pan → zoom (3D modelling)",keys:"Keyboard shortcut…",macro:"Run a macro…",gestures:"Ball gestures — hold, roll, let go",nextProgram:"Next program (cycle)",program:"Go to a program…",disabled:"Off (does nothing)"};
-const ACT_DESC={normal:"Works exactly like your mouse normally does.",lockZoom:"Tap once: roll the ball up to zoom in, down to zoom out. Tap again, or click, for the normal mouse. Only in 3D apps.",zoomIn:"Each press zooms in one step (3D apps).",zoomOut:"Each press zooms out one step (3D apps).",sendLeft:"Acts as a left click.",sendRight:"Acts as a right click.",sendMiddle:"Acts as a middle (wheel) click — many CAD apps orbit or pan with it.",sendX1:"Acts as mouse button 4 (Back).",sendX2:"Acts as mouse button 5 (Forward).",orbit:"Hold it and roll the ball to spin the model (in 3D apps).",pan:"Hold it and roll the ball to slide the view (in 3D apps).",zoom:"Hold it and roll up or down to zoom (in 3D apps).",fit:"One press fits the whole model on screen (in 3D apps).",lockRotate:"Tap once: the ball rotates the model with the ball and wheel, nothing to hold; the wheel is the twist (rolls the view in Chamfer3D Studio). Tap again, or click, for the normal mouse. Only in 3D apps.",lockTwist:"Tap once: rolling the ball left / right twists (rolls) the model around the view, like turning a 3D mouse cap; the wheel moves in / out. Tap again, or click, for the normal mouse. Twist works in Chamfer3D Studio; in other apps rolling rotates.",lockTranslate:"Tap once: the ball slides the view; the wheel moves in / out (toward you or into the screen). Tap again, or click, for the normal mouse. Only in 3D apps.",panToggle:"In 3D modelling, each tap changes what rolling the ball does: orbit → pan → zoom (roll up = zoom in, down = out) → back to orbit. Hold it for half a second to stop moving the model: the ball moves the pointer so you can click things, and the next tap brings back orbit. Outside 3D apps it does nothing.",lock3d:"Tap once and the ball becomes a 3D controller, like a SpaceMouse — nothing to hold: roll to orbit, scroll to zoom, tap your pan button to make the ball pan (tap it again to orbit). Clicking still works. Tap again for a normal pointer.",keys:"One press types the shortcut you record — in every app.",macro:"One press plays the macro — in every app. Press again to stop a long one.",gestures:"Hold it, roll the ball in a direction and let go: that direction's command runs (set them in Ball gestures below). A quick press is a normal click.",nextProgram:"Each press moves to the next program, like a DPI button.",program:"One press switches straight to the program you pick.",disabled:"Does nothing at all."};
+const ACT={normal:"Normal (no change)",lockZoom:"Zoom (tap on/off: roll up / down)",zoomIn:"Zoom in (one step)",zoomOut:"Zoom out (one step)",sendLeft:"Left click",sendRight:"Right click",sendMiddle:"Middle click",sendX1:"Mouse button 4",sendX2:"Mouse button 5",orbit:"Orbit — hold & roll",pan:"Pan — hold & roll",zoom:"Zoom — hold & roll up/down",fit:"Fit / home view",lock3d:"3D mode on/off (trackball only)",lockRotate:"Orbit (tap on / tap off)",lockTranslate:"Pan (tap on / tap off)",lockTwist:"Twist (tap on/off)",panToggle:"Switch orbit / pan",keys:"Keyboard shortcut…",macro:"Run a macro…",gestures:"Ball gestures — hold, roll, let go",nextProgram:"Next program (cycle)",program:"Go to a program…",disabled:"Off (does nothing)"};
+const ACT_DESC={normal:"Works exactly like your mouse normally does.",lockZoom:"Tap once: roll the ball up to zoom in, down to zoom out. Tap again, or click, for the normal mouse. Only in 3D apps.",zoomIn:"Each press zooms in one step (3D apps).",zoomOut:"Each press zooms out one step (3D apps).",sendLeft:"Acts as a left click.",sendRight:"Acts as a right click.",sendMiddle:"Acts as a middle (wheel) click — many CAD apps orbit or pan with it.",sendX1:"Acts as mouse button 4 (Back).",sendX2:"Acts as mouse button 5 (Forward).",orbit:"Hold it and roll the ball to spin the model (in 3D apps).",pan:"Hold it and roll the ball to slide the view (in 3D apps).",zoom:"Hold it and roll up or down to zoom (in 3D apps).",fit:"One press fits the whole model on screen (in 3D apps).",lockRotate:"Tap once: the ball rotates the model with the ball and wheel, nothing to hold; the wheel is the twist (rolls the view in Chamfer3D Studio). Tap again, or click, for the normal mouse. Only in 3D apps.",lockTwist:"Tap once: rolling the ball left / right twists (rolls) the model around the view, like turning a 3D mouse cap; the wheel moves in / out. Tap again, or click, for the normal mouse. Twist works in Chamfer3D Studio; in other apps rolling rotates.",lockTranslate:"Tap once: the ball slides the view; the wheel moves in / out (toward you or into the screen). Tap again, or click, for the normal mouse. Only in 3D apps.",panToggle:"Each tap switches between orbit and pan inside a 3D app. Circle zoom, when enabled, works in either mode. A click returns to the pointer. This action does nothing outside 3D apps.",lock3d:"Tap once and the ball becomes a 3D controller, like a SpaceMouse — nothing to hold: roll to orbit, scroll to zoom, tap your pan button to make the ball pan (tap it again to orbit). Clicking still works. Tap again for a normal pointer.",keys:"One press types the shortcut you record — in every app.",macro:"One press plays the macro — in every app. Press again to stop a long one.",gestures:"Hold it, roll the ball in a direction and let go: that direction's command runs (set them in Ball gestures below). A quick press is a normal click.",nextProgram:"Each press moves to the next program, like a DPI button.",program:"One press switches straight to the program you pick.",disabled:"Does nothing at all."};
 const MACT={normal:"Same as usual",lockZoom:"Zoom (tap on/off)",zoomIn:"Zoom in (one step)",zoomOut:"Zoom out (one step)",sendLeft:"Left click",sendRight:"Right click",sendMiddle:"Middle click",sendX1:"Mouse button 4",sendX2:"Mouse button 5",fit:"Fit / home view (Snap view)",keys:"Keyboard shortcut…",macro:"Run a macro…",nextProgram:"Next program",program:"Go to a program…",lockRotate:"Orbit (tap on / tap off)",lockTranslate:"Pan (tap on / tap off)",disabled:"Off (does nothing)"};
 const CACT={lockRotate:"Orbit (stays on while lit)",lockTranslate:"Pan (stays on while lit)",lockTwist:"Twist (stays on while lit)",lockZoom:"Zoom in / out with the ball (stays on while lit)",zoomIn:"Zoom in (one step)",zoomOut:"Zoom out (one step)",fit:"Snap view (fit / home)",keys:"Keyboard shortcut…",macro:"Run a macro…",nextProgram:"Next program",program:"Go to a program…",sendLeft:"Left click",sendRight:"Right click",sendMiddle:"Middle click",sendX1:"Mouse button 4",sendX2:"Mouse button 5",disabled:"Nothing"};
 const CMD={none:"— Nothing —",keys:"Keyboard shortcut…",macro:"Run a macro…",fit:"Fit view (3D apps)",nextProgram:"Next program",program:"Go to a program…",click:"Left click",doubleClick:"Double click",rightClick:"Right click",middleClick:"Middle click"};
@@ -591,8 +598,22 @@ $("#cBg").addEventListener("input",e=>{cfg.theme.background=e.target.value;apply
 $("#cReset").onclick=()=>{cfg.theme.accent=S.defaults.theme.accent;cfg.theme.background=S.defaults.theme.background;applyTheme();save()};
 
 /* ---------- saving ---------- */
-function save(now){clearTimeout(saveTimer);saveTimer=setTimeout(doSave,now?0:250)}
-async function doSave(){try{const n=await call("ctSave",cfg);if(n){const theme=cfg.theme;cfg=n;cfg.theme=theme}flashSaved()}catch(err){toast(String(err.message||err),true);const st=await call("ctState");cfg=st.config;renderAll()}}
+function save(now){editVersion++;savePending=true;clearTimeout(saveTimer);saveTimer=setTimeout(doSave,now?0:250)}
+async function doSave(){
+  clearTimeout(saveTimer);editVersion++;savePending=true;
+  if(saveFlight)return saveFlight;
+  saveFlight=(async()=>{
+    while(savePending){
+      savePending=false;const version=editVersion,snapshot=JSON.parse(JSON.stringify(cfg));
+      try{const n=await call("ctSave",snapshot);
+        if(version===editVersion&&n){const theme=cfg.theme;cfg=n;cfg.theme=theme}
+        else if(version!==editVersion)savePending=true;
+        flashSaved();
+      }catch(err){savePending=false;toast(String(err.message||err),true);const st=await call("ctState");cfg=st.config;renderAll();break}
+    }
+  })();
+  try{await saveFlight}finally{saveFlight=null}
+}
 function flashSaved(){$$(".saved").forEach(s=>{s.textContent="✓ Saved";s.style.opacity=1;clearTimeout(s._t);s._t=setTimeout(()=>s.style.opacity=0,1400)})}
 
 /* ---------- controls page ---------- */
@@ -711,13 +732,14 @@ async function applyPreset(p){
   if(!await modal("Apply setup?","Your button, wheel and held-key choices for this program will be replaced.",[["Cancel","",false],["Apply","primary",true]]))return;
   const d=JSON.parse(JSON.stringify(S.defaults));
   const buttons=Object.fromEntries(["middle","back","right","forward"].map(b=>[b,{action:"normal",tap:"click"}]));
-  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:"none",snapKeys:p==="ballonly"?"none":"alt",navigateKeys:p==="ballonly"?"none":"backtick",ball:"pointer"});
+  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:"none",snapKeys:p==="ballonly"?"none":"alt",navigateKeys:p==="ballonly"?"none":"backtick",ball:"pointer",circleZoom:false,circleSize:160});
+  if(p==="ballnav"){cfg.ball="orbit";cfg.circleZoom=true;cfg.buttons.back={action:"panToggle",tap:"click"};}
   if(p==="both"){cfg.buttons.back={action:"orbit",tap:"click"};cfg.buttons.middle={action:"pan",tap:"click"};}
-  renderBinds();renderCheat();save(true);toast("Setup saved");
+  renderBinds();renderCheat();await doSave();toast("Setup saved");
 }
 $("#resetControls").onclick=async()=>{if(await modal("Reset buttons & keys?","All buttons, wheels, keys and combinations of this program go back to how they come.",[["Cancel","",false],["Reset","primary",true]])){
   const name=(cfg.programs[cfg.activeProgram]||{}).name;const pd=(S.programDefaults||[]).find(p=>p.name===name);const d=JSON.parse(JSON.stringify(pd||S.defaults));
-  Object.assign(cfg,{buttons:d.buttons,leftWheel:d.leftWheel,rightWheel:d.rightWheel,orbitKeys:d.orbitKeys,panKeys:d.panKeys,zoomKeys:d.zoomKeys,snapKeys:d.snapKeys||"none",navigateKeys:d.navigateKeys||"none",modeButtons:d.modeButtons||{},combos:d.combos||[],wheelPrograms:d.wheelPrograms||[0,1,0,1],leftWheelUpKeys:"",leftWheelDownKeys:"",rightWheelUpKeys:"",rightWheelDownKeys:""});
+  Object.assign(cfg,{ball:d.ball||"pointer",circleZoom:!!d.circleZoom,circleSize:d.circleSize||160,buttons:d.buttons,leftWheel:d.leftWheel,rightWheel:d.rightWheel,orbitKeys:d.orbitKeys,panKeys:d.panKeys,zoomKeys:d.zoomKeys,snapKeys:d.snapKeys||"none",navigateKeys:d.navigateKeys||"none",modeButtons:d.modeButtons||{},combos:d.combos||[],wheelPrograms:d.wheelPrograms||[0,1,0,1],leftWheelUpKeys:"",leftWheelDownKeys:"",rightWheelUpKeys:"",rightWheelDownKeys:""});
   if(!pd)Object.assign(cfg,{buttonWheelZoom:d.buttonWheelZoom,returnCursor:d.returnCursor,shortcutsEverywhere:d.shortcutsEverywhere});renderBinds();renderCheat();save(true)}};
 $("#resetAll").onclick=async()=>{if(!await modal("Reset everything?","Every program, button, wheel, combination, speed and the guide go back to normal settings. Your macros and look are kept.",[["Cancel","",false],["Reset","primary",true]]))return;
   try{const n=await call("ctResetAll");const theme=cfg.theme;cfg=n;cfg.theme=theme;renderAll();toast("Everything is back to normal settings")}catch(err){toast(String(err.message||err),true)}};
@@ -902,7 +924,7 @@ document.addEventListener("visibilitychange",reportPad);
 /* ---------- live status ---------- */
 const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Rolling",Snap:"Snap to angle",Navigate:"Navigating",Gestures:"Gesture"};
 async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
-  if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;clearTimeout(saveTimer);reloadConfig()}
+  if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;if(!savePending&&!saveFlight)reloadConfig()}
   let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}
   if(s.zoom){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(s.zoom/700)));changed=true}if(s.fit){padReset();changed=true}
   if(changed&&page==="home")drawPad();

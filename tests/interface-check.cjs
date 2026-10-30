@@ -15,3 +15,21 @@ const png=Buffer.from(fs.readFileSync('src/Chamfer.Trackball.App/logo.base64','u
 assert.equal(png.subarray(1,4).toString(),'PNG');assert.equal(png.readUInt32BE(16),128);
 const ico=fs.readFileSync('src/Chamfer.Trackball.App/logo.ico');assert.equal(ico.readUInt16LE(2),1);assert.ok(ico.readUInt16LE(4)>4);
 console.log('Device identification, release authentication and original logo resources verified.');
+
+for(const key of ['zoomKeys','circleZoom','circleSize','data-preset="ballnav"'])assert.ok(html.includes(key));
+assert.ok(!html.includes('Orbit → pan → zoom'));
+(async()=>{
+ let cfg={combos:[]},firstResolve,sent=[],flashSaved=()=>{},toast=()=>{},renderAll=()=>{},saveTimer=null;
+ const call=async(name,value)=>{if(name==='ctState')return {config:cfg};sent.push(structuredClone(value));if(sent.length===1)await new Promise(r=>firstResolve=r);return value;};
+ const run=new Function('call','flashSaved','toast','renderAll','get','set',`
+ let cfg=get(),saveTimer=null;let savePending=false,saveFlight=null,editVersion=0;
+ ${html.slice(html.indexOf('function save(now)'),html.indexOf('function flashSaved',html.indexOf('function save(now)')))}
+ return {save:doSave,edit(v){cfg=v;editVersion++;savePending=true},get(){return cfg}};
+ `);
+ const state=run(call,flashSaved,toast,renderAll,()=>cfg,v=>cfg=v);
+ const first=state.save();state.edit({combos:[{buttons:[1,2],bind:{action:'keys',keys:'Alt+Q'}}]});
+ const second=state.save();firstResolve();await Promise.all([first,second]);
+ assert.equal(sent.length,2);assert.equal(sent[1].combos[0].bind.keys,'Alt+Q');
+ assert.equal(state.get().combos[0].buttons.length,2);
+ console.log('Rapid combination edits survive an earlier in-flight save.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

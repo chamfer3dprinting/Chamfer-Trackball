@@ -1,5 +1,5 @@
 {
-  "configVersion": 21,
+  "configVersion": 22,
   "enabled": true,
   "buttons": {
     "middle": {
@@ -29,8 +29,8 @@
     0,
     1
   ],
-  "orbitKeys": "shift",
-  "panKeys": "ctrl+shift",
+  "orbitKeys": "none",
+  "panKeys": "none",
   "zoomKeys": "none",
   "buttonWheelZoom": true,
   "returnCursor": true,
@@ -665,7 +665,9 @@
       "modeButtons": {},
       "combos": [],
       "snapKeys": "none",
-      "navigateKeys": "none"
+      "navigateKeys": "none",
+      "circleZoom": false,
+      "circleSize": 160
     },
     {
       "name": "3D modelling",
@@ -717,10 +719,12 @@
       "modeButtons": {},
       "combos": [],
       "snapKeys": "alt",
-      "navigateKeys": "backtick"
+      "navigateKeys": "backtick",
+      "circleZoom": false,
+      "circleSize": 160
     }
   ],
-  "activeProgram": 1,
+  "activeProgram": 0,
   "programKeys": "",
   "programToast": true,
   "macros": [
@@ -744,11 +748,13 @@
     "smooth": true,
     "glide": 5
   },
-  "snapKeys": "alt",
-  "navigateKeys": "backtick",
+  "snapKeys": "none",
+  "navigateKeys": "none",
   "version": "1.5.6",
   "selectedDevice": "",
   "allowEmulation": true,
   "trackballSwapButtons": false,
-  "trackballSwapWheels": false
+  "trackballSwapWheels": false,
+  "circleZoom": false,
+  "circleSize": 160
 }

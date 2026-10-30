@@ -34,7 +34,7 @@ internal sealed class GuideForm:Form{
    bool down=states[i]!.GetValue<bool>();var a=ConfigStore.S(s["bindings"]?[names[i]],"action","normal");
    using var pen=new Pen(down?Color.FromArgb(53,198,220):Color.FromArgb(140,146,151),1);
    g.DrawRectangle(pen,x,y,39,21);g.DrawString("btn"+(i+1),font,down?accent:text,x+4,y+2);
-   string label=a=="normal"?defaults[i]:a switch{"keys"=>ConfigStore.S(s["bindings"]?[names[i]],"keys"),"panToggle"=>"Cycle 3D modes","lock3d"=>"3D on/off",_=>a};
+   string label=a=="normal"?defaults[i]:a switch{"keys"=>ConfigStore.S(s["bindings"]?[names[i]],"keys"),"panToggle"=>"Orbit / pan","lock3d"=>"3D on/off",_=>a};
    g.DrawString(label,tiny,text,new RectangleF(x+47,y+3,109,21));
   }
   var mode=ConfigStore.S(s,"mode");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>"Navigate","Snap"=>"Snap to angle",_=>mode};
