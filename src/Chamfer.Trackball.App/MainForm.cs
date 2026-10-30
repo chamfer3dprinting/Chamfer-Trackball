@@ -15,6 +15,7 @@ internal sealed class MainForm:Form{
     readonly NotifyIcon tray=new(){Icon=Brand.Icon,Text="Chamfer Trackball",Visible=true};
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer native;readonly Controller controller;
     readonly string settingsPath;readonly GuideForm guide;readonly AdminService admin;
+    readonly System.Windows.Forms.Timer updateTimer=new(){Interval=900000};
     bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Editable source rebuild: Shift orbit, Ctrl+Shift pan/zoom, Alt snap and backtick navigation with native integrations.")};
     string updateUrl="",updateHash="";
     readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(30)};
@@ -26,7 +27,8 @@ internal sealed class MainForm:Form{
         Controls.Add(web);http.DefaultRequestHeaders.UserAgent.ParseAdd("ChamferTrackball/"+BuildInfo.Version);
         var menu=new ContextMenuStrip();menu.Items.Add("Open",null,(_,_)=>{Show();WindowState=FormWindowState.Normal;Activate();});menu.Items.Add("Show control guide",null,(_,_)=>{var c=store.Snapshot();c["modePanel"]=true;store.Save(c);});menu.Items.Add("Quit",null,(_,_)=>Exit());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>{Show();Activate();};
         Shown+=async(_,_)=>{await Initialize();if(startTray)Hide();};
-        FormClosing+=(_,e)=>{if(!quit){e.Cancel=true;Hide();return;}guide.Dispose();admin.Dispose();controller.Dispose();input.Dispose();native.Dispose();tray.Dispose();http.Dispose();};
+        updateTimer.Tick+=async(_,_)=>{if(!smoke&&ConfigStore.B(store.Snapshot(),"autoUpdateCheck",true))await CheckUpdates();};updateTimer.Start();
+        FormClosing+=(_,e)=>{if(!quit){e.Cancel=true;Hide();return;}updateTimer.Dispose();guide.Dispose();admin.Dispose();controller.Dispose();input.Dispose();native.Dispose();tray.Dispose();http.Dispose();};
     }
     async Task Initialize(){
         try{
@@ -50,6 +52,7 @@ internal sealed class MainForm:Form{
             };
             if(smoke)web.CoreWebView2.NavigationCompleted+=async(_,e)=>{if(e.IsSuccess&&web.Source?.AbsoluteUri==AppUrl)await SmokeTest();};
             web.CoreWebView2.Navigate(AppUrl);
+            if(!smoke&&ConfigStore.B(store.Snapshot(),"autoUpdateCheck",true))_ = CheckUpdates();
         }catch(Exception ex){if(smoke){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}MessageBox.Show("Cannot open the interface. Ensure Microsoft Edge WebView2 Runtime is installed. "+ex.Message);Exit();}
     }
     async void HandleMessage(object? sender,CoreWebView2WebMessageReceivedEventArgs e){
@@ -101,6 +104,7 @@ internal sealed class MainForm:Form{
     bool StartupEnabled(){using var k=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");return k?.GetValue("ChamferTrackball")!=null;}
     bool SetStartup(bool enabled){using var k=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");if(enabled)k.SetValue("ChamferTrackball","\""+Environment.ProcessPath+"\" --tray");else k.DeleteValue("ChamferTrackball",false);return enabled;}
     async Task CheckUpdates(){
+        if(ConfigStore.S(update,"stage") is "checking" or "downloading" or "restarting")return;
         update["stage"]="checking";
         try{
             using var response=await http.GetAsync("https://api.github.com/repos/chamfer3dprinting/Chamfer-Trackball/releases?per_page=100");response.EnsureSuccessStatusCode();
@@ -150,6 +154,8 @@ internal sealed class MainForm:Form{
     async Task SmokeTest(){
         try{
             await NativeSmokeTest();
+            if(BuildInfo.Admin){var state=admin.State();if(state==null)throw new Exception("Admin state unavailable.");}
+            else{bool denied=false;try{admin.State();}catch(UnauthorizedAccessException){denied=true;}if(!denied)throw new Exception("Public edition accepted an Admin command.");}
             using(var image=new Bitmap(guide.Width,guide.Height)){guide.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-guide-smoke.png"));}
             await Task.Delay(1200);
             var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(!['1.5.5','1.0.1'].includes(state.version))throw Error('version');if(!document.querySelector('.brand img').src.startsWith('data:image/png;base64,')||document.querySelector('.brand img').naturalWidth<64)throw Error('logo missing');if(state.edition==='admin'&&document.querySelector('#navAdmin').hidden)throw Error('admin missing');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");

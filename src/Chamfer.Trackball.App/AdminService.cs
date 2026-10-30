@@ -46,7 +46,7 @@ internal sealed class AdminService:IDisposable{
   foreach(var r in releases.Where(r=>ReleasePolicy.CandidateTag(ConfigStore.S(r,"tag_name"))).OrderByDescending(r=>r?["created_at"]?.GetValue<string>()).GroupBy(r=>ConfigStore.S(r,"tag_name").Split("-build.")[0][11..]).Select(g=>g.First())){
    var version=ConfigStore.S(r,"tag_name").Split("-build.")[0][11..];
    var pub=publicRows.FirstOrDefault(p=>ConfigStore.S(p,"tag_name")=="public-v"+version);
-   seen.Add(version);versions.Add(new{version,date=ConfigStore.S(r,"created_at").Split('T')[0],@public=pub!=null,latest=pub!=null&&ReferenceEquals(pub,latest),thisApp=version=="1.0.1",canShip=token.Length>0&&r?["assets"]?.AsArray().Any(a=>ConfigStore.S(a,"name")=="ChamferTrackball.exe")==true,notes=new[]{ConfigStore.S(r,"body")}});
+   seen.Add(version);versions.Add(new{version,date=ConfigStore.S(r,"created_at").Split('T')[0],@public=pub!=null,latest=pub!=null&&ReferenceEquals(pub,latest),thisApp=false,canShip=token.Length>0&&r?["assets"]?.AsArray().Any(a=>ConfigStore.S(a,"name")=="ChamferTrackball.exe")==true,notes=new[]{ConfigStore.S(r,"body")}});
   }
   foreach(var pub in publicRows.Where(p=>!seen.Contains(ConfigStore.S(p,"tag_name")[8..])))
    versions.Add(new{version=ConfigStore.S(pub,"tag_name")[8..],date=ConfigStore.S(pub,"created_at").Split('T')[0],@public=true,latest=ReferenceEquals(pub,latest),thisApp=false,canShip=false,notes=new[]{ConfigStore.S(pub,"body")}});

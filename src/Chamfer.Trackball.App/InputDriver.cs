@@ -156,6 +156,10 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                                     Motion?.Invoke(dx,dy,device);
                                 }else if(motionBlocked)Win32.Mouse(1,dx,dy);
                                 motionBlocked=false;
+                            }else if((flags&1)!=0&&motionBlocked){
+                                // Absolute mice/tablets must also keep pointing during
+                                // trackball navigation. Preserve the reported coordinate space.
+                                Win32.Mouse(0x8001u|((flags&2)!=0?0x4000u:0u),dx,dy);motionBlocked=false;
                             }
                             foreach(var (flag,msg,value) in new (int,int,int)[]{(1,0x201,0),(2,0x202,0),(4,0x204,0),(8,0x205,0),(16,0x207,0),(32,0x208,0),(64,0x20b,1),(128,0x20c,1),(256,0x20b,2),(512,0x20c,2),(1024,0x20a,data),(2048,0x20e,data)})
                                 if((buttons&flag)!=0)Edge(device,new(msg,value));

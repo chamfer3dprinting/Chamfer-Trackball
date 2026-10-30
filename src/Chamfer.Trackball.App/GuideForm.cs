@@ -7,7 +7,7 @@ internal sealed class GuideForm:Form{
  readonly Image logo=Brand.Image();bool compact,dragging;Point drag;string last="";
  public GuideForm(Controller controller,ConfigStore store){
   this.controller=controller;this.store=store;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;
-  DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,282);BackColor=Color.FromArgb(39,43,46);ForeColor=Color.FromArgb(220,225,230);
+  DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,300);BackColor=Color.FromArgb(39,43,46);ForeColor=Color.FromArgb(220,225,230);
   Icon=Brand.Icon;Text="Chamfer Trackball guide";StartPosition=FormStartPosition.Manual;
   var area=Screen.PrimaryScreen!.WorkingArea;Location=new(area.Right-Width-18,area.Bottom-Height-18);
   var c=store.Snapshot();int x=ConfigStore.I(c,"guideX",Location.X),y=ConfigStore.I(c,"guideY",Location.Y);
@@ -15,7 +15,7 @@ internal sealed class GuideForm:Form{
   timer.Tick+=(_,_)=>{var cfg=store.Snapshot();if(ConfigStore.B(cfg,"modePanel",true)){if(!Visible)Show();var now=controller.GuideState().ToJsonString();if(now!=last){last=now;Invalidate();}}else if(Visible)Hide();};
   timer.Start();
  }
- protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ClientSize=new((int)(330*DeviceDpi/96f),(int)((compact?70:282)*DeviceDpi/96f));}
+ protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ClientSize=new((int)(330*DeviceDpi/96f),(int)((compact?70:300)*DeviceDpi/96f));}
  protected override bool ShowWithoutActivation=>true;
  protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x08000000|0x80;return p;}}
  protected override void OnPaint(PaintEventArgs e){
@@ -47,7 +47,8 @@ internal sealed class GuideForm:Form{
   foreach(int yy in new[]{218,227,236}){g.DrawLine(line,37-(yy-218)/2,yy,128+(yy-218)/2,yy);g.DrawLine(line,194-(yy-218)/2,yy,287+(yy-218)/2,yy);}
   string roll=mode switch{"Idle"=>"Pointer","Orbit"=>"Orbit","PanZoom"=>"Pan","Zoom"=>"Zoom","Snap"=>"Snap","Navigate"=>"Move",_=>mode};
   string wheel=mode=="Orbit"?"Roll":mode=="Idle"?"Scroll":"Zoom";
-  g.DrawString("Roll: "+roll,font,text,34,253);g.DrawString("Wheel: "+wheel,font,text,204,253);
+  g.DrawString("Roll: "+roll+"   ·   Wheel: "+wheel,font,text,53,249);
+  g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);
  }
  protected override void OnMouseDown(MouseEventArgs e){
   base.OnMouseDown(e);float scale=DeviceDpi/96f;float x=e.X/scale,y=e.Y/scale;
