@@ -6,7 +6,7 @@ Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds 
 
 - **Admin v1.5.5** keeps the owner's requested version number, with a unique increasing build number and source revision for each change. About & updates follows `admin-v1.5.5-build.N` owner prereleases.
 - **Public v1.0.1** is an unpublished candidate. Verified binaries are stored in GitHub draft releases `candidate-v1.0.1-build.N`.
-- Only **Release for public** in the authenticated Admin app creates and activates `public-v1.0.1`. Public apps ignore every Admin, candidate, draft and legacy preview release.
+- After a public release, the next source build automatically advances the public patch version (1.0.1 → 1.0.2), while remaining a draft. Only **Release for public** in the authenticated Admin app creates and activates `public-v1.0.1`. Public apps ignore every Admin, candidate, draft and legacy preview release.
 - Existing tags and binaries are retained. A changed binary always receives a new build tag. Update downloads must match GitHub's SHA-256 digest.
 - Admin release operations require the owner's GitHub token with repository Contents read/write access. The token is encrypted for the current Windows user using DPAPI and is never included in source, logs, settings JSON or executables. The public edition rejects Admin commands.
 

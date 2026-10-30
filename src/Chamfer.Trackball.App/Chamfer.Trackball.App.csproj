@@ -7,7 +7,8 @@
     <Nullable>enable</Nullable>
     <Edition Condition="'$(Edition)'==''">Public</Edition>
     <Version Condition="'$(Edition)'=='Admin'">1.5.5</Version>
-    <Version Condition="'$(Edition)'!='Admin'">1.0.1</Version>
+    <PublicVersion Condition="'$(PublicVersion)'==''">1.0.1</PublicVersion>
+    <Version Condition="'$(Edition)'!='Admin'">$(PublicVersion)</Version>
     <DefineConstants Condition="'$(Edition)'=='Admin'">$(DefineConstants);ADMIN</DefineConstants>
     <ApplicationIcon>logo.ico</ApplicationIcon>
     <AssemblyName>ChamferTrackball</AssemblyName>
@@ -24,6 +25,7 @@
     <EmbeddedResource Include="ui.html"/>
     <EmbeddedResource Include="logo.base64"/>
     <EmbeddedResource Include="logo.ico"/>
+    <AssemblyMetadata Include="PublicCandidateVersion" Value="$(PublicVersion)"/>
     <AssemblyMetadata Include="BuildNumber" Value="$(BuildNumber)"/>
     <AssemblyMetadata Include="SourceRevision" Value="$(SourceRevision)"/>
     <EmbeddedResource Include="../../integrations/**/*" Link="integrations/%(RecursiveDir)%(Filename)%(Extension)"/>

@@ -512,7 +512,7 @@ details .ver{margin-top:10px;font-weight:600}
 
     <!-- ADMIN (admin build only) -->
     <section class="page" data-page="admin">
-      <h1>Admin</h1><p class="sub">Your Admin app is v1.5.5. Each verified change has a new build in About &amp; updates. Public v1.0.1 stays unpublished until you choose <b>Release for public</b>.</p>
+      <h1>Admin</h1><p class="sub" id="adIntro">Your Admin app is v1.5.5. Each verified change has a new build in About &amp; updates. Public v1.0.1 stays unpublished until you choose <b>Release for public</b>.</p>
       <div id="adMsg" class="note" style="margin-bottom:14px" hidden></div>
       <div class="card" style="margin-bottom:16px">
         <h2>Releasing</h2>
@@ -1069,7 +1069,7 @@ $("#openMouse").onclick=()=>call("ctOpenMouseSettings");
 function renderAll(){$("#accelNote").hidden=!S.pointerAccel;applyTheme();renderEnabled();renderPrograms();renderBinds();renderGestures();renderMacros();renderCheat();renderApps();renderNotes();
   $("#setPath").textContent=S.settingsPath;$("#startup").checked=S.startup;$("#welcome").hidden=!!cfg.welcomeDone}
 async function boot(){S=await call("ctState");cfg=JSON.parse(JSON.stringify(S.config));
-  if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false}
+  if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false;$("#adIntro").textContent="Admin v"+S.version+" · build "+S.build+". Public candidate v"+S.publicVersion+" stays unpublished until you choose Release for public. Each verified change gets a new Admin build."}
   renderAll();goTo("home");poll();pollLog();refreshUpd();
   if(S.justUpdated){goTo("about");toast("Updated to v"+S.version)}}
 function waitBridge(n){if(window.ctState)boot().catch(e=>toast(String(e),true));else if(n>0)setTimeout(()=>waitBridge(n-1),50);else toast("App connection failed. Restart Chamfer Trackball.",true)}

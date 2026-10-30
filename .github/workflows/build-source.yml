@@ -33,13 +33,86 @@ jobs:
         run: |
           node tests/interface-check.cjs
           python -m py_compile integrations/blender/chamfer_trackball.py integrations/fusion/ChamferTrackball.py
+      - name: Choose the next unpublished public version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tags = gh api --paginate "repos/${{ github.repository }}/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not check the public release history' }
+          $publicVersions = @($tags | Where-Object { $_ -match '^public-v[0-9]+[.][0-9]+[.][0-9]+
+        shell: pwsh
+        run: |
+          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Admin -p:PublicVersion=$env:PUBLIC_VERSION -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/admin"
+          if ($LASTEXITCODE -ne 0) { throw 'Admin build failed' }
+          Rename-Item -LiteralPath "$env:RUNNER_TEMP/admin/ChamferTrackball.exe" -NewName 'ChamferTrackball-Admin.exe'
+          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Public -p:PublicVersion=$env:PUBLIC_VERSION -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/public"
+          if ($LASTEXITCODE -ne 0) { throw 'Public build failed' }
+      - name: Prepare WebView2 for UI verification
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:RUNNER_TEMP/WebView2Setup.exe"
+          Start-Process -FilePath "$env:RUNNER_TEMP/WebView2Setup.exe" -ArgumentList '/silent /install' -WindowStyle Hidden -Wait
+      - name: Verify both actual interfaces and bridge
+        shell: pwsh
+        run: |
+          foreach ($edition in @('admin','public')) {
+            $asset = if ($edition -eq 'admin') { 'ChamferTrackball-Admin.exe' } else { 'ChamferTrackball.exe' }
+            foreach ($suffix in @('ok','error')) {
+              $resultPath = Join-Path $env:RUNNER_TEMP "chamfer-ui-smoke.$suffix"
+              if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+            }
+            $process = Start-Process -FilePath "$env:RUNNER_TEMP/$edition/$asset" -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:RUNNER_TEMP/$edition-smoke.stdout" -RedirectStandardError "$env:RUNNER_TEMP/$edition-smoke.stderr"
+            if (-not $process.WaitForExit(90000)) { Stop-Process -Id $process.Id; throw "$edition UI smoke test timed out" }
+            if ($process.ExitCode -ne 0 -or -not (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.ok")) {
+              if (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.error") { Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.error" }
+              Get-Content "$env:RUNNER_TEMP/$edition-smoke.stdout", "$env:RUNNER_TEMP/$edition-smoke.stderr" -ErrorAction SilentlyContinue
+              Write-Output "App exit code: $($process.ExitCode)"
+              Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='.NET Runtime'} -MaxEvents 1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Message
+              throw "$edition actual UI verification failed"
+            }
+            Copy-Item -LiteralPath "$env:RUNNER_TEMP/chamfer-ui-smoke.png" -Destination "$env:RUNNER_TEMP/$edition-ui.png"
+            Copy-Item -LiteralPath "$env:RUNNER_TEMP/chamfer-guide-smoke.png" -Destination "$env:RUNNER_TEMP/$edition-guide.png"
+            Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.ok"
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification
+          path: |
+            ${{ runner.temp }}/chamfer-ui-smoke.*
+            ${{ runner.temp }}/*-ui.png
+            ${{ runner.temp }}/*-guide.png
+            ${{ runner.temp }}/*-smoke.stdout
+            ${{ runner.temp }}/*-smoke.stderr
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChamferTrackball-Admin-exe
+          path: ${{ runner.temp }}/admin/ChamferTrackball-Admin.exe
+      - name: Store verified Admin build and unpublished public candidate
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          SOURCE_REVISION: ${{ github.sha }}
+          ADMIN_EXE: ${{ runner.temp }}/admin/ChamferTrackball-Admin.exe
+          PUBLIC_VERSION: ${{ env.PUBLIC_VERSION }}
+          PUBLIC_EXE: ${{ runner.temp }}/public/ChamferTrackball.exe
+        run: node .github/store-build.mjs
+ } | ForEach-Object { [Version]($_.Substring(8)) })
+          $latestPublic = $publicVersions | Sort-Object -Descending | Select-Object -First 1
+          $nextPublic = [Version]'1.0.1'
+          if ($latestPublic -and $latestPublic -ge $nextPublic) { $nextPublic = [Version]::new($latestPublic.Major, $latestPublic.Minor, $latestPublic.Build + 1) }
+          "PUBLIC_VERSION=$($nextPublic.ToString(3))" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "Public candidate: $($nextPublic.ToString(3)). It will remain a draft."
       - name: Build separate Admin and public executables
         shell: pwsh
         run: |
-          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Admin -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/admin"
+          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Admin -p:PublicVersion=$env:PUBLIC_VERSION -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/admin"
           if ($LASTEXITCODE -ne 0) { throw 'Admin build failed' }
           Rename-Item -LiteralPath "$env:RUNNER_TEMP/admin/ChamferTrackball.exe" -NewName 'ChamferTrackball-Admin.exe'
-          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Public -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/public"
+          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Public -p:PublicVersion=$env:PUBLIC_VERSION -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/public"
           if ($LASTEXITCODE -ne 0) { throw 'Public build failed' }
       - name: Prepare WebView2 for UI verification
         shell: pwsh
