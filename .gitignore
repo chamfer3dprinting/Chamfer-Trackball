@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/__pycache__/
+*.user
+*.suo
+settings.json
+settings.json.*
+RebuiltWebView/

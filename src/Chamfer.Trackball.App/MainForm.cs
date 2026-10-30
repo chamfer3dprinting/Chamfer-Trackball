@@ -21,7 +21,7 @@ internal sealed class MainForm:Form{
         this.smoke=smoke;
         Text="Chamfer Trackball";ClientSize=new(1106,754);MinimumSize=new(920,640);StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(20,23,27);
         settingsPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"ChamferTrackball","settings.json");
-        store=new(settingsPath);input=new();native=new();controller=new(store,input,native);
+        store=new(settingsPath);native=new();if(native.Error.Length>0){native.Dispose();throw new InvalidOperationException(native.Error);}input=new();controller=new(store,input,native);
         Controls.Add(web);http.DefaultRequestHeaders.UserAgent.ParseAdd("ChamferTrackball/"+ConfigStore.Version);
         var menu=new ContextMenuStrip();menu.Items.Add("Open",null,(_,_)=>{Show();WindowState=FormWindowState.Normal;Activate();});menu.Items.Add("Quit",null,(_,_)=>Exit());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>{Show();Activate();};
         Shown+=async(_,_)=>await Initialize();
@@ -37,7 +37,7 @@ internal sealed class MainForm:Form{
             web.CoreWebView2.Settings.AreDefaultContextMenusEnabled=false;
             web.CoreWebView2.NavigationStarting+=(_,e)=>{if(e.Uri!="about:blank")e.Cancel=true;};
             web.CoreWebView2.NewWindowRequested+=(_,e)=>{e.Handled=true;if(Uri.TryCreate(e.Uri,UriKind.Absolute,out var u)&&u.Scheme=="https")Process.Start(new ProcessStartInfo(u.AbsoluteUri){UseShellExecute=true});};
-            web.CoreWebView2.WebMessageReceived+=Handle;
+            web.CoreWebView2.WebMessageReceived+=HandleMessage;
             string[] names=["ctState","ctSave","ctStatus","ctResetAll","ctProgram","ctLog","ctQuit","ctHide","ctStartup","ctPadRect","ctRow","ctTitleBar","ctOpenMouseSettings","ctOpenSettingsFile","ctTestMacro","ctUpdState","ctUpdCheck","ctUpdInstall","ctInstallIntegration","ctAddProfile"];
             var js="(()=>{const pending=new Map();let seq=0;chrome.webview.addEventListener('message',e=>{const m=e.data;const p=pending.get(m.id);if(!p)return;pending.delete(m.id);m.error?p[1](new Error(m.error)):p[0](m.result);});for(const n of "+JsonSerializer.Serialize(names)+")window[n]=(...args)=>new Promise((ok,no)=>{const id=++seq;pending.set(id,[ok,no]);chrome.webview.postMessage({id,name:n,args});});})();";
             await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(js);
@@ -47,7 +47,7 @@ internal sealed class MainForm:Form{
             web.NavigateToString(await reader.ReadToEndAsync());
         }catch(Exception ex){if(smoke){Console.Error.WriteLine(ex);Environment.Exit(1);}MessageBox.Show("Cannot open the interface. Ensure Microsoft Edge WebView2 Runtime is installed. "+ex.Message);Exit();}
     }
-    async void Handle(object? sender,CoreWebView2WebMessageReceivedEventArgs e){
+    async void HandleMessage(object? sender,CoreWebView2WebMessageReceivedEventArgs e){
         if(e.Source!="about:blank"||e.WebMessageAsJson.Length>1024*1024)return;
         long id=0;
         try{
@@ -92,11 +92,12 @@ internal sealed class MainForm:Form{
             var releases=JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsArray();
             var latest=releases.Where(r=>!ConfigStore.B(r,"draft")).Select(r=>(Node:r,Version:System.Version.TryParse(ConfigStore.S(r,"tag_name").TrimStart('v'),out var v)?v:null)).Where(r=>r.Version!=null).OrderByDescending(r=>r.Version).FirstOrDefault();
             update["stage"]="latest";
-            if(latest.Node!=null&&latest.Version!>new Version(ConfigStore.Version)){
+            var version=latest.Version;
+            if(latest.Node!=null&&version!=null&&version>new Version(ConfigStore.Version)){
                 var asset=latest.Node["assets"]?.AsArray().FirstOrDefault(x=>ConfigStore.S(x,"name")=="ChamferTrackball.exe");
                 var url=ConfigStore.S(asset,"browser_download_url");var digest=ConfigStore.S(asset,"digest");
                 if(url.StartsWith("https://github.com/chamfer3dprinting/Chamfer-Trackball/releases/download/",StringComparison.Ordinal)&&digest.StartsWith("sha256:")&&digest.Length==71){
-                    updateUrl=url;updateHash=digest[7..];update["stage"]="available";update["latest"]=latest.Version.ToString();update["notes"]=new JsonArray(ConfigStore.S(latest.Node,"body"));
+                    updateUrl=url;updateHash=digest[7..];update["stage"]="available";update["latest"]=version.ToString();update["notes"]=new JsonArray(ConfigStore.S(latest.Node,"body"));
                 }
             }
         }catch(Exception ex){update["stage"]="error";update["error"]=ex.Message;}

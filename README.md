@@ -1,29 +1,67 @@
 # Chamfer Trackball
 
-Windows app by **Chamfer3D** that turns the **Nulea M512** trackball into a 3D controller for
-CAD — orbit, pan and zoom with the ball (Rotatrix style), plus programs, ball gestures and macros.
+Windows trackball navigation, with editable application source and reproducible builds.
+The current source rebuild is **v1.5.6**. Previous release history is retained.
 
 ## Download
 
-**[⬇ Download the latest version](https://github.com/chamfer3dprinting/Chamfer-Trackball/releases/latest)** — `ChamferTrackball.exe`
+Download **ChamferTrackball.exe** from [Releases](https://github.com/chamfer3dprinting/Chamfer-Trackball/releases).
+The single executable includes the application, .NET runtime, interface and integration
+payloads. Microsoft Edge WebView2 Runtime is also required (normally already installed
+on Windows). Quit the previous Trackball app before opening the rebuilt version.
 
-1. Download `ChamferTrackball.exe` and open it. No installer needed.
-2. Updates install inside the app: **Settings → About & updates → Update now**.
+## Controls
 
-Works with Chamfer3D Studio, Autodesk Fusion, Blender, Onshape, FreeCAD, SOLIDWORKS,
-Inventor, Rhino, SketchUp, Tinkercad, slicers and more.
+Ordinary mouse clicks, pointing and scrolling remain normal outside a held navigation
+mode. Defaults in the 3D modelling program:
 
-## How this folder is organised
+| Hold | Ball | Wheel |
+| --- | --- | --- |
+| Shift | Orbit | Camera roll with a native integration |
+| Ctrl+Shift | Pan | Zoom simultaneously |
+| Alt | Snap to one of 26 aligned views | — |
+| Backtick | Move through the scene | Turn |
+| Backtick+Alt | Move sideways / change height | Turn |
 
-Everything lives here, like Chamfer3D Studio — one folder for public and admin versions.
+All held-key bindings can be changed and saved. Ctrl alone is never a navigation
+trigger. The Normal mouse program has all navigation bindings off.
 
-| Where | What it is |
-|---|---|
-| [Releases → **Latest**](https://github.com/chamfer3dprinting/Chamfer-Trackball/releases/latest) (`public-vX.Y.Z`) | The version everyone gets. Only `ChamferTrackball.exe`. |
-| [Releases → **Pre-release**](https://github.com/chamfer3dprinting/Chamfer-Trackball/releases) (`vX.Y.Z`) | Every version as it is made, for the owner. Contains `ChamferTrackball.exe` and `ChamferTrackball-Admin.exe`. Not offered to users. |
-| [`release-notes/`](release-notes) | What changed in each version. |
+The Nulea M512's ordinary mouse input reports X/Y. An independent third control uses
+a wheel; this software does not add a physical twist sensor.
 
-A version becomes public only when the owner presses **Release for public** in the Admin app.
-**Withdraw** takes it back down. The source code is kept privately and is not in this folder.
+## Application compatibility
 
-Version numbers go up one step per update: v1.0.0 → v1.0.1 → … → v1.0.9 → v1.1.0 → … → v1.9.9 → v2.0.0.
+- **Blender 4.2+ and Autodesk Fusion:** native adapters are included inside the executable.
+  Under CAD apps, install the adapter, then enable it in the host application's add-on
+  settings. They use real camera and cursor/selection pivot data and change the view only.
+- **Chamfer3D Studio:** retains the existing local WebSocket motion protocol for orbit,
+  pan, roll and zoom. Its older v1 link does not support the rebuilt Alt snap / fly modes.
+- **Other 3D applications:** configurable orbit, pan and wheel-zoom mouse emulation.
+  Existing profiles cover common CAD, modelling and slicer applications. Add a custom
+  executable and edit its controls in CAD apps. Native snapping, pivot and fly navigation
+  require a host adapter; mouse emulation cannot query arbitrary scene geometry.
+
+Support is declared by capability; do not describe every application as having native
+integration. The included integrations still require physical testing in the owner's
+installed CAD applications.
+
+## Source and validation
+
+- `src/Chamfer.Trackball.Core`: settings persistence/migration, chord precedence,
+  combinations and pivot-based camera mathematics.
+- `src/Chamfer.Trackball.App`: Windows Raw Input, input routing, WebView2 interface,
+  loopback native adapter service, tray, update validation and integration installation.
+- `integrations/`: included Blender and Fusion adapters, with host APIs used only on
+  their main threads.
+- `tests/`: regression checks and interface script checks.
+- `.github/workflows/build-source.yml`: Windows build, actual embedded-interface
+  smoke test and SHA-256-verified executable prerelease.
+- `release-notes/`: version history.
+
+Build with .NET 10 SDK:
+```
+dotnet run --project tests/Chamfer.Trackball.Tests.csproj -c Release
+dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true
+```
+
+Source is now kept here. No Claude session or private source export is required.

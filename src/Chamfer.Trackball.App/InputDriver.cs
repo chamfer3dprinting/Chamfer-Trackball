@@ -44,7 +44,10 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         bool trigger=k is 18 or 164 or 165 or 192;
         if(down&&trigger&&IsCad()){deferred.Add(k);KeysChanged?.Invoke();return 1;}
         if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)){
-            foreach(var old in deferred.ToArray()){Win32.Key(old,true);deferred.Remove(old);usedDeferred.Remove(old);}
+            if(deferred.Count>0){
+                foreach(var old in deferred.ToArray()){Win32.Key(old,true);deferred.Remove(old);usedDeferred.Remove(old);}
+                Win32.Key(k,true);KeysChanged?.Invoke();return 1;
+            }
         }
         KeysChanged?.Invoke();
         if(!down&&deferred.Remove(k)){
@@ -63,7 +66,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                 foreach(var key in deferred)usedDeferred.Add(key);
                 return 1;
             }
-            if(MouseEvent?.Invoke(msg,unchecked((short)(e.Data>>16)))==true)return 1;
+            if(MouseEvent?.Invoke(msg,unchecked((short)(e.Data>>16)))==true){foreach(var key in deferred)usedDeferred.Add(key);return 1;}
         }catch(Exception ex){System.Diagnostics.Debug.WriteLine(ex);}
         return Win32.CallNextHookEx(mouseHook,code,w,l);
     }

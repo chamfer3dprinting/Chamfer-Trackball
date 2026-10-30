@@ -30,7 +30,7 @@ internal sealed class Controller:IDisposable{
     public void Log(string text,string kind="ok"){logs.Enqueue(new(){["seq"]=++seq,["time"]=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),["text"]=text,["kind"]=kind});while(logs.Count>100)logs.Dequeue();}
     public JsonArray LogAfter(long s)=>new(logs.Where(x=>ConfigStore.D(x,"seq")>s).Select(x=>x.DeepClone()).ToArray());
     void Tick(object? sender,EventArgs e){
-        if(revision!=store.Revision){End();cfg=store.Snapshot();revision=store.Revision;latched=NavMode.Idle;combos.Clear();}
+        if(revision!=store.Revision){End();cfg=store.Snapshot();revision=store.Revision;foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
         var w=Win32.GetForegroundWindow();
         if(w!=foregroundWindow){
             End();latched=NavMode.Idle;combos.Clear();pressed.Clear();intercepted.Clear();comboUsed.Clear();foregroundWindow=w;
@@ -79,10 +79,10 @@ internal sealed class Controller:IDisposable{
     }
     void End(){
         server.End(native);native=null;pendingX=pendingY=pendingWheel=0;
-        foreach(var b in sentButtons.ToArray())Button(b,false);sentButtons.Clear();
-        foreach(var k in sentMods.ToArray())Win32.Key(k,false);sentMods.Clear();
+        foreach(var b in sentButtons.ToArray())try{Button(b,false);}catch(InvalidOperationException){ }sentButtons.Clear();
+        foreach(var k in sentMods.ToArray())try{Win32.Key(k,false);}catch(InvalidOperationException){ }sentMods.Clear();
         // Restore only modifiers the person is still physically holding.
-        if(emulating)foreach(var k in input.Keys.Where(x=>x is 16 or 17 or 18))Win32.Key(k,true);
+        if(emulating)foreach(var k in input.Keys.Where(x=>x is 16 or 17 or 18))try{Win32.Key(k,true);}catch(InvalidOperationException){ }
         emulating=false;
         mode=NavMode.Idle;
     }
@@ -130,14 +130,14 @@ internal sealed class Controller:IDisposable{
         bool wheel=msg is 0x20a or 0x20e;
         if(wheel&&mode!=NavMode.Idle){pendingWheel+=data;Flush();return true;}
         if(wheel){
-            var prefix=msg==0x20a?"right":"left";var action=ConfigStore.S(cfg,prefix+"Wheel","normal");
-            if(action=="normal"||!IsCad&&!ConfigStore.B(cfg,"shortcutsEverywhere"))return false;
-            if(action=="invert"){Win32.Mouse(msg==0x20a?0x800u:0x1000u,0,0,-data);return true;}
-            if(action=="disabled")return true;
-            if(action=="zoom"&&IsCad){Win32.Mouse(0x800,0,0,data);return true;}
-            if(action is "program" or "goProgram"){int i=action=="program"?ConfigStore.I(cfg,"activeProgram")+(data>0?1:-1):ConfigStore.I(cfg,prefix+"Wheel"+(data>0?"UpProgram":"DownProgram"));int count=cfg["programs"]!.AsArray().Count;store.Select((i%count+count)%count);return true;}
-            if(action=="keys"){Shortcut(ConfigStore.S(cfg,prefix+"Wheel"+(data>0?"UpKeys":"DownKeys")));return true;}
-            if(action=="cycle"&&IsCad){latched=latched switch{NavMode.Idle=>NavMode.Orbit,NavMode.Orbit=>NavMode.PanZoom,NavMode.PanZoom=>NavMode.Roll,_=>NavMode.Idle};Change(latched);return true;}
+            var prefix=msg==0x20a?"right":"left";var wheelAction=ConfigStore.S(cfg,prefix+"Wheel","normal");
+            if(wheelAction=="normal"||!IsCad&&!ConfigStore.B(cfg,"shortcutsEverywhere"))return false;
+            if(wheelAction=="invert"){Win32.Mouse(msg==0x20a?0x800u:0x1000u,0,0,-data);return true;}
+            if(wheelAction=="disabled")return true;
+            if(wheelAction=="zoom"&&IsCad){Win32.Mouse(0x800,0,0,data);return true;}
+            if(wheelAction is "program" or "goProgram"){int i=wheelAction=="program"?ConfigStore.I(cfg,"activeProgram")+(data>0?1:-1):ConfigStore.I(cfg,prefix+"Wheel"+(data>0?"UpProgram":"DownProgram"));int count=cfg["programs"]!.AsArray().Count;store.Select((i%count+count)%count);return true;}
+            if(wheelAction=="keys"){Shortcut(ConfigStore.S(cfg,prefix+"Wheel"+(data>0?"UpKeys":"DownKeys")));return true;}
+            if(wheelAction=="cycle"&&IsCad){latched=latched switch{NavMode.Idle=>NavMode.Orbit,NavMode.Orbit=>NavMode.PanZoom,NavMode.PanZoom=>NavMode.Roll,_=>NavMode.Idle};Change(latched);return true;}
             return false;
         }
         var (id,down)=msg switch{0x201=>(3,true),0x202=>(3,false),0x204=>(4,true),0x205=>(4,false),0x207=>(1,true),0x208=>(1,false),0x20b=>(data==1?2:5,true),0x20c=>(data==1?2:5,false),_=>(0,false)};

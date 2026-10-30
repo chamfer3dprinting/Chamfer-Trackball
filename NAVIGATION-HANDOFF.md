@@ -87,3 +87,19 @@ before continuing; its private project has not been synchronized by this commit.
 
 References: [Rotatrix hardware](https://rotatrix.com/) and
 [OpenAxis integration overview](https://openaxis.rotatrix.com/).
+
+
+## Codex source rebuild — 2026-10-30
+
+The owner authorized rebuilding the missing editable source in this same repository,
+without creating development folders on the PC, and requested only an executable as
+the download. Source, tests, a Windows build workflow, the existing interface and native
+Blender/Fusion adapters have now been added for v1.5.6. The original handoff above records
+the earlier configuration-only state; its source blocker is superseded by this rebuild.
+
+The first CI run passed 31 core regression checks and interface/Python syntax checks;
+a Windows compile error is being corrected. No new executable has been released yet.
+Native adapters and physical M512 behavior still need testing in the owner's actual
+applications. Pan/zoom uses ball X/Y plus a wheel for depth; no physical twist sensor
+is claimed. Existing Chamfer3D v1 motion support remains; Alt snap/fly require a newer
+host adapter there. Consult the README for precise compatibility and source layout.
