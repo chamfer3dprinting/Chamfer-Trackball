@@ -17,6 +17,8 @@ _stop = threading.Event()
 _thread = None
 _session = ""
 _context = None
+_ortho_height = 1.0
+_view_distance = 1.0
 
 def _put(q, value):
     try:
@@ -70,7 +72,7 @@ def _region_at(screen_x, screen_y):
     return None
 
 def _begin(command):
-    global _session, _context
+    global _session, _context, _ortho_height, _view_distance
     context = _region_at(command.get("x", 0), command.get("y", 0))
     if not context:
         _session = ""
@@ -103,6 +105,7 @@ def _begin(command):
         pass
     fov = 2 * math.atan(16 / max(1e-6, space.lens) * region.height / max(1, region.width))
     ortho = max(1e-6, 2 / max(1e-9, abs(rv.window_matrix[1][1])))
+    _ortho_height, _view_distance = ortho, max(1e-6, rv.view_distance)
     _put(_outgoing, {"t": "scene", "session": _session, "eye": list(eye), "target": list(target), "up": list(up), "pivot": list(pivot), "verticalFov": fov, "orthoHeight": ortho, "width": region.width, "height": region.height, "orthographic": rv.view_perspective == "ORTHO"})
 
 def _apply(command):
@@ -121,7 +124,7 @@ def _apply(command):
     previous_height = max(1e-6, 2 / max(1e-9, abs(rv.window_matrix[1][1])))
     distance = max(1e-6, (eye-target).length)
     if rv.view_perspective == "ORTHO":
-        distance = rv.view_distance * float(command["orthoHeight"]) / previous_height
+        distance = _view_distance * float(command["orthoHeight"]) / _ortho_height
     rv.view_rotation = Matrix((right, up, back)).transposed().to_quaternion()
     rv.view_location = target
     rv.view_distance = max(1e-6, distance)
