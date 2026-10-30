@@ -1,0 +1,11 @@
+{
+  "action": "publish",
+  "version": "1.0.1",
+  "candidateTag": "candidate-v1.0.1-build.18",
+  "candidateReleaseId": 429104061,
+  "assetId": 692305720,
+  "sourceRevision": "09f4117eadd6a6c7108422d20a176eae7c91e829",
+  "sha256": "a8e9f8b36053ecf70bcc0e3dbe634d09fd3fcb5c017345d768a048df53f1a9a7",
+  "verifiedRunId": 41068244612,
+  "requestedOn": "2026-10-30"
+}

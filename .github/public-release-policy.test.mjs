@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import {validateRequest,validateRun,validateCandidate,verifyBytes,verifyPublicAsset} from './public-release-policy.mjs';
+const bytes=Buffer.from('MZ-public-release-test'),r={action:'publish',version:'1.0.1',candidateTag:'candidate-v1.0.1-build.18',candidateReleaseId:1,assetId:2,verifiedRunId:3,sourceRevision:'a'.repeat(40),sha256:crypto.createHash('sha256').update(bytes).digest('hex')};
+validateRequest(r);assert.throws(()=>validateRequest({...r,version:'1.0.2'}));
+const run={repository:{full_name:'owner/repo'},head_sha:r.sourceRevision,conclusion:'success',status:'completed',path:'.github/workflows/build-source.yml',event:'push',head_branch:'main'};
+validateRun(run,r,'owner/repo');assert.throws(()=>validateRun({...run,conclusion:'failure'},r,'owner/repo'));assert.throws(()=>validateRun({...run,head_sha:'b'.repeat(40)},r,'owner/repo'));
+const asset={id:2,name:'ChamferTrackball.exe',digest:'sha256:'+r.sha256},candidate={id:1,tag_name:r.candidateTag,target_commitish:r.sourceRevision,assets:[asset]};
+validateCandidate(candidate,r);assert.throws(()=>validateCandidate({...candidate,assets:[{...asset,digest:'sha256:'+'0'.repeat(64)}]},r));
+verifyBytes(bytes,r);assert.throws(()=>verifyBytes(Buffer.from('MZ-changed'),r));assert.throws(()=>verifyBytes(Buffer.from('not-windows'),r));
+const pub={tag_name:'public-v1.0.1',target_commitish:r.sourceRevision,assets:[asset]};verifyPublicAsset(pub,r);
+assert.throws(()=>verifyPublicAsset({...pub,target_commitish:'b'.repeat(40)},r));
+assert.throws(()=>verifyPublicAsset({...pub,tag_name:'public-v1.0.2'},r));
+console.log('Pinned source, successful verification, candidate identity and public executable checks passed.');

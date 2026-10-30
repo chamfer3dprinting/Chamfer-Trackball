@@ -1,0 +1,32 @@
+name: Release verified public app
+on:
+  push:
+    branches: [main]
+    paths: ['.github/public-release.json', '.github/workflows/release-public.yml', '.github/publish-public.mjs', '.github/public-release-policy.mjs', '.github/public-release-policy.test.mjs']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: chamfer-public-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify release policy and script
+        run: |
+          node --check .github/publish-public.mjs
+          node .github/public-release-policy.test.mjs
+      - name: Publish only the requested verified candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/publish-public.mjs
