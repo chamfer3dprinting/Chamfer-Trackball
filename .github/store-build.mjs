@@ -9,7 +9,8 @@ async function api(method,route,body,raw=false){
 }
 const head=await api('GET','/git/ref/heads/main');if(head.object.sha!==sha){console.log('Newer source is being verified; skip older build.');process.exit(0);}
 const publicVersion=process.env.PUBLIC_VERSION;if(!/^\d+\.\d+\.\d+$/.test(publicVersion))throw Error('Invalid public candidate version');
-const notes=fs.readFileSync('release-notes/admin-v1.5.5.md','utf8').replaceAll('v1.0.1','v'+publicVersion);
+const adminVersion=process.env.ADMIN_VERSION;if(!/^\d+\.\d+\.\d+$/.test(adminVersion))throw Error('Invalid Admin application version');
+const notes=fs.readFileSync('release-notes/current.md','utf8').replaceAll('{{ADMIN_VERSION}}',adminVersion).replaceAll('{{PUBLIC_VERSION}}',publicVersion);
 async function store(tag,title,path,name,draft){
  const bytes=fs.readFileSync(path),digest='sha256:'+crypto.createHash('sha256').update(bytes).digest('hex');
  if(bytes[0]!==77||bytes[1]!==90)throw Error('Missing Windows executable');
@@ -20,4 +21,8 @@ async function store(tag,title,path,name,draft){
 }
 // Never activate the public channel as a side effect of an Admin update.
 await store('candidate-v'+publicVersion+'-build.'+build,'Unpublished public v'+publicVersion+' · build '+build,process.env.PUBLIC_EXE,'ChamferTrackball.exe',true);
-await store('admin-v1.5.5-build.'+build,'Chamfer Trackball Admin v1.5.5 · build '+build,process.env.ADMIN_EXE,'ChamferTrackball-Admin.exe',false);
+await store('admin-v'+adminVersion,'Chamfer Trackball Admin v'+adminVersion,process.env.ADMIN_EXE,'ChamferTrackball-Admin.exe',false);
+// The installed build-17 updater only recognizes tags ending in -build.N.
+// This compatibility alias carries the exact same versioned executable so the owner
+// can use the existing Update button to migrate without a manual reinstall.
+if(process.env.LEGACY_BRIDGE==='true')await store('admin-v'+adminVersion+'-build.'+build,'Update older Admin apps to v'+adminVersion,process.env.ADMIN_EXE,'ChamferTrackball-Admin.exe',false);

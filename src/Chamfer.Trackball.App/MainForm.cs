@@ -62,7 +62,7 @@ internal sealed class MainForm:Form{
         try{
             var message=JsonNode.Parse(e.WebMessageAsJson)!.AsObject();id=message["id"]!.GetValue<long>();var args=message["args"]!.AsArray();object? result=null;
             switch(ConfigStore.S(message,"name")){
-                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Ball navigation: orbit/pan toggle, circle zoom and customizable held keys.","Normal mouse reset and queued saving preserve your settings."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
+                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Ball navigation: orbit/pan toggle, circle zoom and customizable held keys.","Normal mouse reset and queued saving preserve your settings.","Updates now advance the application version; click Update to download, install and restart."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
                 case "ctSave":store.Save(args[0]!.AsObject());result=store.Snapshot();break;
                 case "ctStatus":result=controller.Status();break;
                 case "ctResetAll":result=store.Reset();break;
@@ -107,8 +107,14 @@ internal sealed class MainForm:Form{
         if(ConfigStore.S(update,"stage") is "checking" or "downloading" or "restarting")return;
         update["stage"]="checking";
         try{
-            using var response=await http.GetAsync("https://api.github.com/repos/chamfer3dprinting/Chamfer-Trackball/releases?per_page=100");response.EnsureSuccessStatusCode();
-            var releases=JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsArray();
+            var releases=new JsonArray();
+            for(int page=1;page<=100;page++){
+                using var response=await http.GetAsync("https://api.github.com/repos/chamfer3dprinting/Chamfer-Trackball/releases?per_page=100&page="+page);response.EnsureSuccessStatusCode();
+                var batch=JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsArray();
+                foreach(var release in batch)releases.Add(release!.DeepClone());
+                if(batch.Count<100)break;
+                if(page==100)throw new IOException("Too many releases to inspect safely.");
+            }
             var latest=ReleasePolicy.Latest(releases,BuildInfo.Admin,long.TryParse(BuildInfo.Revision,out var build)?build:0,BuildInfo.Version);
             update["stage"]="latest";updateUrl="";updateHash="";update.Remove("latest");update.Remove("error");
             if(latest!=null){
@@ -116,20 +122,23 @@ internal sealed class MainForm:Form{
                 var url=ConfigStore.S(asset,"browser_download_url");var digest=ConfigStore.S(asset,"digest");
                 if(url.StartsWith("https://github.com/chamfer3dprinting/Chamfer-Trackball/releases/download/",StringComparison.Ordinal)&&digest.StartsWith("sha256:")&&digest.Length==71){
                     updateUrl=url;updateHash=digest[7..];update["stage"]="available";
-                    update["latest"]=BuildInfo.Admin?ConfigStore.S(latest,"tag_name")[7..].Replace("-build."," · build "):ConfigStore.S(latest,"tag_name")[8..];
+                    update["latest"]=ReleasePolicy.VersionText(ConfigStore.S(latest,"tag_name"),BuildInfo.Admin);
                     update["notes"]=new JsonArray(ConfigStore.S(latest,"body"));
                 }else throw new IOException("The new release is missing its verified executable.");
             }
         }catch(Exception ex){update["stage"]="error";update["error"]=ex.Message;}
     }
     async Task InstallUpdate(){
+        if(ConfigStore.S(update,"stage") is "downloading" or "installing" or "restarting")return;
         if(updateUrl.Length==0)throw new InvalidOperationException("Check for an update first.");
+        try{
         update["stage"]="downloading";update["percent"]=0;
         var bytes=await http.GetByteArrayAsync(updateUrl);
         if(!Convert.ToHexString(SHA256.HashData(bytes)).Equals(updateHash,StringComparison.OrdinalIgnoreCase))throw new IOException("The download did not match GitHub's SHA-256 digest.");
         var target=Path.Combine(Path.GetTempPath(),"ChamferTrackball-update-"+Guid.NewGuid().ToString("N")+".exe");await File.WriteAllBytesAsync(target,bytes);
         var p=new ProcessStartInfo(target){UseShellExecute=false};p.ArgumentList.Add("--install-update");p.ArgumentList.Add(target);p.ArgumentList.Add(Environment.ProcessPath!);p.ArgumentList.Add(Environment.ProcessId.ToString());
         Process.Start(p);update["stage"]="restarting";Exit();
+        }catch(Exception ex){update["stage"]="error";update["error"]=ex.Message;throw;}
     }
     async Task NativeSmokeTest(){
         using var client=new HttpClient{Timeout=TimeSpan.FromSeconds(3)};
@@ -153,13 +162,14 @@ internal sealed class MainForm:Form{
     }
     async Task SmokeTest(){
         try{
-            if(BuildInfo.Admin?BuildInfo.Version!="1.5.5":BuildInfo.Version!=BuildInfo.PublicVersion)throw new Exception("Edition version metadata mismatch.");
+            if(!System.Text.RegularExpressions.Regex.IsMatch(BuildInfo.Version,@"^\d+\.\d+\.\d+$")||(!BuildInfo.Admin&&BuildInfo.Version!=BuildInfo.PublicVersion))throw new Exception("Edition version metadata mismatch.");
             await NativeSmokeTest();
+            await ReleaseSmoke.Run();
             if(BuildInfo.Admin){var state=admin.State();if(state==null)throw new Exception("Admin state unavailable.");}
             else{bool denied=false;try{admin.State();}catch(UnauthorizedAccessException){denied=true;}if(!denied)throw new Exception("Public edition accepted an Admin command.");}
             using(var image=new Bitmap(guide.Width,guide.Height)){guide.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-guide-smoke.png"));}
             await Task.Delay(1200);
-            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(!state.version||state.version.split('.').length!==3)throw Error('version');if(!document.querySelector('.brand img').src.startsWith('data:image/png;base64,')||document.querySelector('.brand img').naturalWidth<64)throw Error('logo missing');if(state.edition==='admin'&&document.querySelector('#navAdmin').hidden)throw Error('admin missing');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');if(!document.querySelector('[data-preset=ballnav]')||!document.querySelector('[data-k=circleZoom]')||!document.querySelector('[data-hold=zoomKeys]'))throw Error('missing ball navigation controls');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");
+            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(!state.version||state.version.split('.').length!==3)throw Error('version');if(!document.querySelector('.brand img').src.startsWith('data:image/png;base64,')||document.querySelector('.brand img').naturalWidth<64)throw Error('logo missing');if(state.edition==='admin'&&document.querySelector('#navAdmin').hidden)throw Error('admin missing');renderNotes();if(document.querySelector('#sideVer').textContent!=='v'+state.version||document.querySelector('#abVer').textContent.includes('build'))throw Error('version label uses internal build');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');if(!document.querySelector('[data-preset=ballnav]')||!document.querySelector('[data-k=circleZoom]')||!document.querySelector('[data-hold=zoomKeys]'))throw Error('missing ball navigation controls');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");
             // ExecuteScriptAsync returns a Promise object for async expressions. Confirm
             // persisted state from C# after the bridge has completed, then inspect DOM.
             string outcome="null";

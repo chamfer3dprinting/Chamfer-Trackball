@@ -4,7 +4,7 @@ Editable C# application, tests, embedded UI, Blender/Fusion adapters, logo and r
 
 ## Current owner requirements
 
-- Admin displays **v1.5.5**, with unique increasing build revisions and source metadata. Do not overwrite the old v1.5.5 tag or any executable.
+- Superseding owner request: Admin displays a real increasing **vX.Y.Z** application version. Existing tags/executables are retained; internal build/source metadata is for diagnostics only.
 - The first public candidate is **v1.0.1**, stored as a GitHub draft. Publishing is the owner's explicit Admin action. Later source builds choose the next public patch after the previous public release.
 - btn1 Middle top-left; btn2 Back top-right; btn3 Left click bottom-left; btn4 Right click bottom-right.
 - Left wheel scrolls up/down; the other retains horizontal scrolling. Preserve wheel direction.
@@ -51,3 +51,9 @@ Queued UI writes preserve edits made during an earlier save. Custom held navigat
 Validation added: circle directions and continuous operation, rejection of straight/half-circle/large-circle/figure-eight paths, exit/re-entry and invalid-input handling; custom chords and circle settings across restart/program switches; normal reset and disabled corrections; concurrent-save regression; actual UI control presence. Cloud build and actual UI smoke tests passed; see the verified build below. Physical M512 gesture feel and live CAD hosts still need owner verification. This adds no independent hardware twist measurement or universal native adapter.
 
 Verified Admin build 17: [Windows workflow run](https://github.com/chamfer3dprinting/Chamfer-Trackball/actions/runs/41057812611) passed 94 core regressions, the concurrent-save regression, interface/integration syntax checks, both single-file publishes and both real WebView2 smoke tests. Source: `57fbb9559096cc44f8d977cd5bcb0183e8a3994a`. Admin asset SHA-256: `5746b8aaa57b2136ae9312436d7fa6a1456155ccbcac5c1a4d9f0f46e6c4501f`. Public candidate v1.0.1 build 17 remains a draft. Physical gesture feel and live CAD hosts still require owner verification.
+
+## Semantic versions and Admin release · 2026-10-30
+
+The owner superseded the fixed v1.5.5/build-number display. Admin now uses the assembly's three-part version, selected above all reserved Admin/legacy version tags. About/sidebars hide internal build numbers. Update is one click in the new interface: save current settings, verify the download, replace the app and restart. A compatibility release entry serves older build-number clients with the exact same new executable.
+
+Admin and updater queries paginate the full release history. Candidate selection chooses the latest verified candidate revision for the chosen public version. Reserved/withdrawn public tags cannot be reused for a different binary. The authenticated production release service is exercised against an in-memory GitHub API during executable smoke tests: candidate discovery, byte/digest checks, draft upload, activation, public updater discovery, duplicate protection, withdrawal/re-release and failure handling. No live public release is activated by these tests. Cloud validation results will be recorded after the run.

@@ -6,7 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Edition Condition="'$(Edition)'==''">Public</Edition>
-    <Version Condition="'$(Edition)'=='Admin'">1.5.5</Version>
+    <AdminVersion Condition="'$(AdminVersion)'==''">1.5.7</AdminVersion>
+    <Version Condition="'$(Edition)'=='Admin'">$(AdminVersion)</Version>
     <PublicVersion Condition="'$(PublicVersion)'==''">1.0.1</PublicVersion>
     <Version Condition="'$(Edition)'!='Admin'">$(PublicVersion)</Version>
     <DefineConstants Condition="'$(Edition)'=='Admin'">$(DefineConstants);ADMIN</DefineConstants>

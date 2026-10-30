@@ -1,0 +1,8 @@
+- Admin v{{ADMIN_VERSION}} uses a real increasing application version. About, the sidebar and update notifications display vX.X.X.
+- Click Update to download the verified executable, replace the installed app and restart on the new version. Current programs, combinations and bindings are retained.
+- Update selection compares version numbers: it never offers the current version or a downgrade. Internal build/source metadata remains available for diagnostics only.
+- Existing build-number Admin apps receive a compatible update entry carrying the same v{{ADMIN_VERSION}} executable.
+- Ball navigation, orbit/pan switching, circle zoom, customizable held keys, normal mouse defaults and reliable saving remain included.
+- Admin and public update channels remain separate. Public candidate v{{PUBLIC_VERSION}} stays unpublished until Release for public is chosen in Admin.
+- Physical M512 gestures and live CAD hosts still need owner testing; standard X/Y input does not measure independent ball twist.
+- Admin release controls inspect the full release history, verify the candidate and uploaded executable, and retain an existing version's original binary when re-releasing after withdrawal.

@@ -518,7 +518,7 @@ details .ver{margin-top:10px;font-weight:600}
 
     <!-- ADMIN (admin build only) -->
     <section class="page" data-page="admin">
-      <h1>Admin</h1><p class="sub" id="adIntro">Your Admin app is v1.5.5. Each verified change has a new build in About &amp; updates. Public v1.0.1 stays unpublished until you choose <b>Release for public</b>.</p>
+      <h1>Admin</h1><p class="sub" id="adIntro">Each delivered update has a new version in About &amp; updates. Public candidates stay unpublished until you choose <b>Release for public</b>.</p>
       <div id="adMsg" class="note" style="margin-bottom:14px" hidden></div>
       <div class="card" style="margin-bottom:16px">
         <h2>Releasing</h2>
@@ -833,7 +833,7 @@ $("#welcomeOk").onclick=()=>{cfg.welcomeDone=true;$("#welcome").hidden=true;save
 let updTimer=null;
 function noteList(arr){return arr.map(n=>`<li>${esc(n)}</li>`).join("")}
 function renderNotes(){const n=S.notes||[];const cur=n.find(x=>x.version===S.version)||n[0];
-  $("#abVer").textContent="v"+S.version+(S.edition==="admin"?" Admin":"")+(S.build&&S.build!=="0"?" · build "+S.build:"");$("#sideVer").textContent="v"+S.version+(S.build&&S.build!=="0"?" · build "+S.build:"");
+  $("#abVer").textContent="v"+S.version+(S.edition==="admin"?" Admin":"");$("#sideVer").textContent="v"+S.version;
   $("#curSum").textContent="What's new in v"+(cur?cur.version:S.version);$("#curList").innerHTML=cur?noteList(cur.notes):"";
   const older=n.filter(x=>x!==cur);$("#oldDetails").hidden=!older.length;
   $("#oldList").innerHTML=older.map(x=>`<div class="ver">v${esc(x.version)} <span class="mu" style="font-weight:400">· ${esc(x.date)}</span></div><ul>${noteList(x.notes)}</ul>`).join("")}
@@ -857,8 +857,12 @@ async function refreshUpd(){let u;try{u=await call("ctUpdState")}catch{return}
   $("#updDot").classList.toggle("show",u.stage==="available");
   clearTimeout(updTimer);if(["checking","downloading","installing","restarting"].includes(u.stage)||page==="about")updTimer=setTimeout(refreshUpd,u.stage==="downloading"?250:1500)}
 $("#updBtn").onclick=async()=>{if($("#updBtn").dataset.connect==="1"){goTo("admin");return}const st=$("#updBtn").dataset.stage,lt=$("#updBtn").dataset.latest;
-  if(st==="available"||(st==="error"&&lt&&lt!==S.version)){if(!await modal("Install v"+lt+"?","Chamfer Trackball will download the update, install it and restart. It takes a few seconds.",[["Not now","",false],["Update now","primary",true]]))return;call("ctUpdInstall")}
-  else call("ctUpdCheck");setTimeout(refreshUpd,120)};
+  try{
+    if(st==="available"||(st==="error"&&lt&&lt!==S.version)){
+      $("#updBtn").disabled=true;await doSave();await call("ctUpdInstall");
+    }else await call("ctUpdCheck");
+  }catch(err){toast(String(err.message||err),true)}
+  setTimeout(refreshUpd,120)};
 
 /* ---------- admin ---------- */
 let adTimer=null;
@@ -1091,7 +1095,7 @@ $("#openMouse").onclick=()=>call("ctOpenMouseSettings");
 function renderAll(){$("#accelNote").hidden=!S.pointerAccel;applyTheme();renderEnabled();renderPrograms();renderBinds();renderGestures();renderMacros();renderCheat();renderApps();renderNotes();
   $("#setPath").textContent=S.settingsPath;$("#startup").checked=S.startup;$("#welcome").hidden=!!cfg.welcomeDone}
 async function boot(){S=await call("ctState");cfg=JSON.parse(JSON.stringify(S.config));
-  if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false;$("#adIntro").textContent="Admin v"+S.version+" · build "+S.build+". Public candidate v"+S.publicVersion+" stays unpublished until you choose Release for public. Each verified change gets a new Admin build."}
+  if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false;$("#adIntro").textContent="Admin v"+S.version+". Public candidate v"+S.publicVersion+" stays unpublished until you choose Release for public. Click Update in About & updates to install a newer Admin version."}
   renderAll();goTo("home");poll();pollLog();refreshUpd();
   if(S.justUpdated){goTo("about");toast("Updated to v"+S.version)}}
 function waitBridge(n){if(window.ctState)boot().catch(e=>toast(String(e),true));else if(n>0)setTimeout(()=>waitBridge(n-1),50);else toast("App connection failed. Restart Chamfer Trackball.",true)}

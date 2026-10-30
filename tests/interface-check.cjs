@@ -33,3 +33,16 @@ assert.ok(!html.includes('Orbit → pan → zoom'));
  assert.equal(state.get().combos[0].buttons.length,2);
  console.log('Rapid combination edits survive an earlier in-flight save.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+assert.ok(!html.includes('" · build "+S.build'));
+assert.ok(html.includes('$("#sideVer").textContent="v"+S.version'));
+const updateStart=html.indexOf('$("#updBtn").onclick='),updateEnd=html.indexOf('/* ---------- admin',updateStart);
+assert.ok(updateStart>0&&updateEnd>updateStart);
+(async()=>{
+ const calls=[],button={dataset:{stage:'available',latest:'1.5.7'}};
+ const context={$:()=>button,S:{version:'1.5.5'},doSave:async()=>calls.push('save'),call:async n=>calls.push(n),toast:()=>{},setTimeout:()=>{},refreshUpd:()=>{},goTo:()=>{},modal:()=>{throw Error('Update click must install directly')}};
+ vm.runInNewContext(html.slice(updateStart,updateEnd),context);
+ await button.onclick();assert.deepEqual(calls,['save','ctUpdInstall']);assert.equal(button.disabled,true);
+ calls.length=0;button.dataset.stage='latest';await button.onclick();assert.deepEqual(calls,['ctUpdCheck']);
+ console.log('One Update click saves settings and invokes installation; Check again only checks.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

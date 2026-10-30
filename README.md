@@ -4,10 +4,10 @@ Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds 
 
 ## Editions and release channels
 
-- **Admin v1.5.5** keeps the owner's requested version number, with a unique increasing build number and source revision for each change. About & updates follows `admin-v1.5.5-build.N` owner prereleases.
+- **Admin versions advance for each delivered update**, for example v1.5.7 → v1.5.8. The sidebar, About and update notifications display the real executable version. About & updates follows `admin-vX.Y.Z` owner prereleases. Internal build/source metadata stays available for diagnostics.
 - **Public v1.0.1** is an unpublished candidate. Verified binaries are stored in GitHub draft releases `candidate-v1.0.1-build.N`.
-- After a public release, the next source build automatically advances the public patch version (1.0.1 → 1.0.2), while remaining a draft. Only **Release for public** in the authenticated Admin app creates and activates `public-v1.0.1`. Public apps ignore every Admin, candidate, draft and legacy preview release.
-- Existing tags and binaries are retained. A changed binary always receives a new build tag. Update downloads must match GitHub's SHA-256 digest.
+- After a public release, the next source build automatically advances the public patch version (1.0.1 → 1.0.2), while remaining a draft. Withdrawn/reserved public tags also reserve their version so a later binary cannot reuse it. Only **Release for public** in the authenticated Admin app creates and activates `public-v1.0.1`. Public apps ignore every Admin, candidate, draft and legacy preview release.
+- Existing tags and binaries are retained. A changed binary always receives a new build tag. Update downloads must match GitHub's SHA-256 digest. Click Update to save the current settings, download, install and restart. Semantic version comparisons reject current-version reinstalls and downgrades. Compatibility entries let existing build-number Admin apps install the new version through their existing Update button.
 - Admin release operations require the owner's GitHub token with repository Contents read/write access. The token is encrypted for the current Windows user using DPAPI and is never included in source, logs, settings JSON or executables. The public edition rejects Admin commands.
 
 ## Buttons, wheels and guide
@@ -50,3 +50,9 @@ Verified build 14: [Windows workflow run](https://github.com/chamfer3dprinting/C
 ## Ball navigation verification · 2026-10-30
 
 Verified Admin build 17: [Windows workflow run](https://github.com/chamfer3dprinting/Chamfer-Trackball/actions/runs/41057812611) passed 94 core regressions, the concurrent-save regression, interface/integration syntax checks, both single-file publishes and both real WebView2 smoke tests. Source: `57fbb9559096cc44f8d977cd5bcb0183e8a3994a`. Admin asset SHA-256: `5746b8aaa57b2136ae9312436d7fa6a1456155ccbcac5c1a4d9f0f46e6c4501f`. Public candidate v1.0.1 build 17 remains a draft. Physical gesture feel and live CAD hosts still require owner verification.
+
+## Versioning and public release checks · 2026-10-30
+
+The owner requested visible vX.Y.Z updates instead of build-number updates. Admin and public editions retain separate release channels. The cloud workflow chooses a new Admin patch after all reserved Admin/legacy version tags, stamps that value into the executable, then creates the matching public candidate. Public versions advance after any reserved public tag, including withdrawn releases.
+
+Admin Release for public lists candidates across paginated history, verifies the download, uploads the unchanged public binary into a draft, verifies GitHub's digest, then publishes. Withdraw returns the release to a draft; re-release preserves the original binary. Isolated tests exercise the actual release service with simulated authenticated GitHub responses, including public update discovery and permission/digest failures. Live publishing remains the owner's Admin action. Cloud validation results are recorded after the run.
