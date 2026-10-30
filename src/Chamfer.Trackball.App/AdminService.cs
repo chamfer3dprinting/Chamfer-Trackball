@@ -7,6 +7,7 @@ namespace Chamfer.Trackball.App;
 internal sealed class AdminService:IDisposable{
  const string Repo="chamfer3dprinting/Chamfer-Trackball";
  readonly HttpClient http;
+ string pending="",pendingId="";DateTime lastPoll;
  readonly string path;string token="";JsonArray releases=[];string error="",message="";bool loaded,busy;
  public AdminService(string settingsDirectory){
   http=new(){Timeout=TimeSpan.FromSeconds(60)};
