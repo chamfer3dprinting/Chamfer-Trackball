@@ -150,7 +150,7 @@ public string AppName{get;private set;}="";
     }
     bool MouseEvent(int msg,int data){
         bool wheel=msg is 0x20a or 0x20e;
-        if(wheel&&mode!=NavMode.Idle){if(circle.Active)pendingDial+=data;else pendingWheel+=data;Flush();return true;}
+        if(wheel&&mode!=NavMode.Idle){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pendingDial+=data;else pendingWheel+=data;Flush();return true;}
         if(wheel){
             var prefix=msg==0x20a?"right":"left";var wheelAction=ConfigStore.S(cfg,prefix+"Wheel","normal");
             if(wheelAction=="normal")return false;

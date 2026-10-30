@@ -5,16 +5,22 @@ namespace Chamfer.Trackball.Core;
 // it does not measure a third physical rotation axis.
 public sealed class CircleZoom {
     readonly List<Vector2> points=[];
-    Vector2 position,sampled,previous;
-    long lastTime;int straight;bool hasHeading;
+    Vector2 position,sampled,previous,straightAnchor;float straightTravel;
+    long lastTime;bool hasHeading;
     public bool Active {get;private set;}
-    public void Reset(){points.Clear();position=sampled=previous=Vector2.Zero;lastTime=0;straight=0;hasHeading=Active=false;}
+    public void Reset(){points.Clear();position=sampled=previous=Vector2.Zero;lastTime=0;straightTravel=0;straightAnchor=Vector2.Zero;hasHeading=Active=false;}
     public (bool Consumed,float Wheel) Add(float dx,float dy,long now,float maxDiameter=160){
         if(!float.IsFinite(dx)||!float.IsFinite(dy)||!float.IsFinite(maxDiameter)){Reset();return (false,0);}
         if(lastTime!=0&&(now<lastTime||now-lastTime>300))Reset();
         lastTime=now;
         var delta=new Vector2(dx,dy);if(delta.LengthSquared()==0)return (Active,0);
         if(delta.Length()>Math.Clamp(maxDiameter,60,400)){Reset();return (false,0);}
+        if(Active){
+            var heading=Vector2.Normalize(delta);
+            if(straightTravel==0||Vector2.Dot(heading,straightAnchor)<.995f){straightAnchor=heading;straightTravel=delta.Length();}
+            else straightTravel+=delta.Length();
+            if(straightTravel>=Math.Max(18,maxDiameter*.18f)){Reset();return (false,0);}
+        }
         position+=delta;
         float wheel=0;bool consumed=Active;
         const float step=6;
@@ -27,11 +33,9 @@ public sealed class CircleZoom {
                 // A sharp kink, reversal or sustained straight roll returns control
                 // immediately; no queued orbit motion is replayed after zoom.
                 if(MathF.Abs(turn)>1.05f){Reset();return (false,0);}
-                straight=MathF.Abs(turn)<.055f?straight+1:0;
-                if(straight>=3){Reset();return (false,0);}
                 wheel+=turn*(480/(2*MathF.PI));consumed=true;
             }else if(IsCircle(Math.Clamp(maxDiameter,60,400))){
-                Active=true;straight=0;consumed=true;
+                Active=true;straightTravel=0;consumed=true;
                 wheel+=turn*(480/(2*MathF.PI));
             }
         }
