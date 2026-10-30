@@ -71,4 +71,32 @@ try{
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
  Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==21,"Legacy config migrates without Ctrl-only orbit");
 }finally{Directory.Delete(dirPath,true);}
+
+var dm=new DeviceMapping();var leftDown=new MouseEdge(0x201);var rightDown=new MouseEdge(0x204);
+Check(dm.Map("mouse","ball",leftDown,true,true)==leftDown,"Other mouse keeps left click");
+Check(dm.Map("mouse","ball",new(0x202),true,true)==new MouseEdge(0x202),"Other mouse keeps left release");
+Check(dm.Map("ball","ball",rightDown,true,true)==leftDown,"Trackball btn3 signal becomes left click");
+Check(dm.Map("ball","other",new(0x205),false,false)==new MouseEdge(0x202),"Mapped release remains paired across settings/device changes");
+Check(dm.Map("ball","ball",leftDown,true,true)==rightDown,"Trackball btn4 signal becomes right click");
+Check(dm.Map("ball","ball",new(0x202),true,true)==new MouseEdge(0x205),"Right click receives matching release");
+foreach(var delta in new[]{-240,-120,60,120,240}){
+ Check(dm.Map("ball","ball",new(0x20a,delta),true,true)==new MouseEdge(0x20e,delta),"Trackball vertical-to-horizontal axis retains direction "+delta);
+ Check(dm.Map("ball","ball",new(0x20e,delta),true,true)==new MouseEdge(0x20a,delta),"Trackball horizontal-to-vertical axis retains direction "+delta);
+ Check(dm.Map("mouse","ball",new(0x20a,delta),true,true)==new MouseEdge(0x20a,delta),"Ordinary mouse wheel unchanged "+delta);
+}
+Check(dm.Map("ball","",leftDown,true,true)==leftDown,"Unidentified devices are never guessed");
+dm.ReleaseAll();
+dm.Map("ball","ball",rightDown,true,false);Check(dm.ReleaseAll().Single()==new MouseEdge(0x202)&&dm.HeldCount==0,"Disconnect clears held mapped buttons");
+var gate=new MouseGate();gate.Block(leftDown,10);gate.Block(new(0x20a,-120),11);
+Check(!gate.Take(new(0x20e,-120))&&gate.Count==2,"Different wheel axis cannot consume a physical-event ticket");
+Check(gate.Take(leftDown)&&!gate.Take(leftDown),"A raw event can replay only once");
+Check(!gate.Expired(160)&&gate.Expired(162),"Unmatched physical input times out");
+Check(gate.Drain().Single()==new MouseEdge(0x20a,-120)&&gate.Count==0,"Fail-open replays the original physical input unchanged");
+JsonObject Rel(string tag,bool draft=false,bool preview=false)=>new(){["tag_name"]=tag,["draft"]=draft,["prerelease"]=preview};
+var releases=new JsonArray(Rel("v99.0.0"),Rel("admin-v1.5.5-build.2",preview:true),Rel("admin-v1.5.5-build.3",preview:true),Rel("public-v1.0.0"),Rel("public-v1.0.1",draft:true),Rel("candidate-v1.0.1-build.3",draft:true));
+Check(ReleasePolicy.Latest(releases,false,0,"1.0.0")==null,"Public updater ignores admin previews, candidates and drafts");
+Check(ConfigStore.S(ReleasePolicy.Latest(releases,true,2,"1.5.5"),"tag_name")=="admin-v1.5.5-build.3","Admin updater follows build revisions at the requested v1.5.5");
+Check(ReleasePolicy.Latest(releases,true,3,"1.5.5")==null,"Admin does not reinstall the current build");
+releases.Add(Rel("public-v1.0.1"));
+Check(ConfigStore.S(ReleasePolicy.Latest(releases,false,0,"1.0.0"),"tag_name")=="public-v1.0.1","Public updater offers explicitly published public versions");
 Console.WriteLine(count+" regression checks passed.");

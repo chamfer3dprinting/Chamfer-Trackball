@@ -2,9 +2,9 @@ name: Build editable Trackball source
 on:
   push:
     branches: [main]
-    paths: ['src/**', 'tests/**', 'integrations/**', '.github/workflows/build-source.yml']
+    paths: ['src/**', 'tests/**', 'integrations/**', '.github/workflows/build-source.yml', '.github/store-build.mjs']
   pull_request:
-    paths: ['src/**', 'tests/**', 'integrations/**', '.github/workflows/build-source.yml']
+    paths: ['src/**', 'tests/**', 'integrations/**', '.github/workflows/build-source.yml', '.github/store-build.mjs']
   workflow_dispatch:
 permissions:
   contents: write
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify-and-build:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -33,51 +33,62 @@ jobs:
         run: |
           node tests/interface-check.cjs
           python -m py_compile integrations/blender/chamfer_trackball.py integrations/fusion/ChamferTrackball.py
-      - name: Build single executable
-        run: dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:EnableCompressionInSingleFile=true -o "${{ runner.temp }}/trackball"
+      - name: Build separate Admin and public executables
+        shell: pwsh
+        run: |
+          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Admin -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/admin"
+          if ($LASTEXITCODE -ne 0) { throw 'Admin build failed' }
+          Rename-Item -LiteralPath "$env:RUNNER_TEMP/admin/ChamferTrackball.exe" -NewName 'ChamferTrackball-Admin.exe'
+          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Public -p:BuildNumber=${{ github.run_number }} -p:SourceRevision=${{ github.sha }} -p:EnableCompressionInSingleFile=true -o "$env:RUNNER_TEMP/public"
+          if ($LASTEXITCODE -ne 0) { throw 'Public build failed' }
       - name: Prepare WebView2 for UI verification
         shell: pwsh
         run: |
           Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:RUNNER_TEMP/WebView2Setup.exe"
           Start-Process -FilePath "$env:RUNNER_TEMP/WebView2Setup.exe" -ArgumentList '/silent /install' -WindowStyle Hidden -Wait
-      - name: Verify actual settings interface and bridge
+      - name: Verify both actual interfaces and bridge
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:RUNNER_TEMP/chamfer-ui-smoke.stdout" -RedirectStandardError "$env:RUNNER_TEMP/chamfer-ui-smoke.stderr"
-          if (-not $process.WaitForExit(90000)) { Stop-Process -Id $process.Id; throw 'UI smoke test timed out' }
-          if ($process.ExitCode -ne 0 -or -not (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.ok")) {
-            if (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.error") { Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.error" }
-            Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.stdout", "$env:RUNNER_TEMP/chamfer-ui-smoke.stderr" -ErrorAction SilentlyContinue
-            Write-Output "App exit code: $($process.ExitCode)"
-            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='.NET Runtime'} -MaxEvents 1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Message
-            throw 'Actual UI verification failed'
+          foreach ($edition in @('admin','public')) {
+            $asset = if ($edition -eq 'admin') { 'ChamferTrackball-Admin.exe' } else { 'ChamferTrackball.exe' }
+            foreach ($suffix in @('ok','error')) {
+              $resultPath = Join-Path $env:RUNNER_TEMP "chamfer-ui-smoke.$suffix"
+              if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath }
+            }
+            $process = Start-Process -FilePath "$env:RUNNER_TEMP/$edition/$asset" -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:RUNNER_TEMP/$edition-smoke.stdout" -RedirectStandardError "$env:RUNNER_TEMP/$edition-smoke.stderr"
+            if (-not $process.WaitForExit(90000)) { Stop-Process -Id $process.Id; throw "$edition UI smoke test timed out" }
+            if ($process.ExitCode -ne 0 -or -not (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.ok")) {
+              if (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.error") { Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.error" }
+              Get-Content "$env:RUNNER_TEMP/$edition-smoke.stdout", "$env:RUNNER_TEMP/$edition-smoke.stderr" -ErrorAction SilentlyContinue
+              Write-Output "App exit code: $($process.ExitCode)"
+              Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='.NET Runtime'} -MaxEvents 1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Message
+              throw "$edition actual UI verification failed"
+            }
+            Copy-Item -LiteralPath "$env:RUNNER_TEMP/chamfer-ui-smoke.png" -Destination "$env:RUNNER_TEMP/$edition-ui.png"
+            Copy-Item -LiteralPath "$env:RUNNER_TEMP/chamfer-guide-smoke.png" -Destination "$env:RUNNER_TEMP/$edition-guide.png"
+            Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.ok"
           }
-          Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.ok"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: verification
           path: |
             ${{ runner.temp }}/chamfer-ui-smoke.*
+            ${{ runner.temp }}/*-ui.png
+            ${{ runner.temp }}/*-guide.png
+            ${{ runner.temp }}/*-smoke.stdout
+            ${{ runner.temp }}/*-smoke.stderr
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
-          name: ChamferTrackball-exe
-          path: ${{ runner.temp }}/trackball/ChamferTrackball.exe
-      - name: Store verified executable as owner prerelease
+          name: ChamferTrackball-Admin-exe
+          path: ${{ runner.temp }}/admin/ChamferTrackball-Admin.exe
+      - name: Store verified Admin build and unpublished public candidate
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          $head = gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha'
-          if ($head -ne '${{ github.sha }}') { Write-Output 'A newer source revision is being verified; this older build will not publish.'; exit 0 }
-          $tag = 'v1.5.6'
-          $existing = gh release view $tag --json tagName 2>$null
-          if ($LASTEXITCODE -eq 0) { throw 'This version already exists; advance the version before publishing a different executable.' }
-          gh release create $tag "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" --target "${{ github.sha }}" --prerelease --title "Chamfer Trackball v1.5.6" --notes-file release-notes/v1.5.6.md
-          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
-          $release = gh api "repos/${{ github.repository }}/releases/tags/$tag" | ConvertFrom-Json
-          $asset = $release.assets | Where-Object name -eq 'ChamferTrackball.exe'
-          $hash = (Get-FileHash "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($asset.digest -ne "sha256:$hash") { throw 'GitHub executable digest mismatch' }
+          BUILD_NUMBER: ${{ github.run_number }}
+          SOURCE_REVISION: ${{ github.sha }}
+          ADMIN_EXE: ${{ runner.temp }}/admin/ChamferTrackball-Admin.exe
+          PUBLIC_EXE: ${{ runner.temp }}/public/ChamferTrackball.exe
+        run: node .github/store-build.mjs

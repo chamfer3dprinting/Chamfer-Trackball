@@ -310,7 +310,15 @@ details .ver{margin-top:10px;font-weight:600}
 
     <!-- CONTROLS -->
     <section class="page" data-page="controls">
-      <div class="row"><div><h1>Buttons &amp; keys</h1><p class="sub">Choose what each part of your trackball does. Press any button on your trackball to find it below.</p></div><span class="spacer"></span><span class="saved" id="saved1"></span></div>
+      <div class="row"><div><h1>Buttons &amp; keys</h1><p class="sub">Choose what each part of your trackball does. Press any button on your trackball to find it below.</p>
+<div class="card" style="margin-bottom:16px" id="deviceCorrection">
+  <h2>Trackball only</h2><p class="mu">Identify the trackball once by rolling its ball. Corrections and 3D controls then use that device.</p>
+  <div class="row" style="margin:12px 0"><button class="btn primary" id="identifyTrackball">Identify trackball</button><button class="btn sm" id="cancelIdentify">Cancel</button><span class="mu" id="deviceIdentity">Loading…</span></div>
+  <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapButtons"> Swap trackball left / right clicks (btn3 = Left, btn4 = Right)</label>
+  <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapWheels"> Left wheel = up / down; right wheel = horizontal (keep scroll direction)</label>
+  <label class="row" style="margin:8px 0"><input type="checkbox" data-k="modePanel"> Show floating control guide</label>
+</div>
+</div><span class="spacer"></span><span class="saved" id="saved1"></span></div>
       <div class="card" style="margin-bottom:16px">
         <div class="row" style="margin-bottom:6px"><h2 style="margin:0">Programs</h2><span class="spacer"></span><button class="btn sm" id="progRename">Rename</button><button class="btn sm" id="progCopy">Duplicate</button><button class="btn sm danger" id="progDel">Delete</button></div>
         <p class="mu" style="margin:0 0 10px;font-size:12.5px">Each program is a full set of buttons, wheels, keys and ball gestures — like the DPI button, but for what the buttons do. Click one to use and edit it.</p>
@@ -378,7 +386,7 @@ details .ver{margin-top:10px;font-weight:600}
       </div>
       <div class="card" style="margin-top:16px">
         <h2>Extras</h2>
-        <div class="opt"><div class="t">Show the guide<small>A panel in the bottom-right of your screen that stays there: the program, the mode, what btn1–btn4 do, what you're doing (Orbit, Pan, Zoom, Twist) and the arrow you're rolling or turning. Drag it anywhere and it stays there; close it with its × and it comes back bottom-right on the next mode or program switch. It replaces the program notification.</small></div><label class="sw"><input type="checkbox" data-k="modePanel"><span></span></label></div>
+        <div class="opt"><div class="t">Show the guide<small>A panel in the bottom-right of your screen that stays there: the program, the mode, what btn1–btn4 do, what you're doing (Orbit, Pan, Zoom, Twist) and the arrow you're rolling or turning. Drag it anywhere and it stays there; close it with its × and restore it from the tray menu or this switch. It replaces the program notification.</small></div><label class="sw"><input type="checkbox" data-k="modePanel"><span></span></label></div>
         <div class="opt"><div class="t">Show the pivot<small>While rotating, a dot marks the spot the model turns around: whatever is under your pointer when you start. In Chamfer3D Studio it's the surface you point at; other apps use their own orbit setting.</small></div><label class="sw"><input type="checkbox" data-k="showPivot"><span></span></label></div>
         <div class="opt"><div class="t">Twist with the wheel<small>On: while Rotate is on (tap top-right), turning the wheel twists (rolls) the model in Chamfer3D Studio. Off: the wheel zooms instead. The Normal mouse program never twists.</small></div><label class="sw"><input type="checkbox" data-k="twist"><span></span></label></div>
         <div class="opt"><div class="t">Flash a small symbol when orbit and pan swap<small>Just ↻ (orbit) or ✥ (pan) by the pointer for a moment — no words.</small></div><label class="sw"><input type="checkbox" data-k="modeIcon"><span></span></label></div>
@@ -504,7 +512,7 @@ details .ver{margin-top:10px;font-weight:600}
 
     <!-- ADMIN (admin build only) -->
     <section class="page" data-page="admin">
-      <h1>Admin</h1><p class="sub">Only you see this page. Your private versions go up with every update (v1.0.0 → v1.0.1 …). Users only get a version when you press <b>Release for public</b>.</p>
+      <h1>Admin</h1><p class="sub">Your Admin app is v1.5.5. Each verified change has a new build in About &amp; updates. Public v1.0.1 stays unpublished until you choose <b>Release for public</b>.</p>
       <div id="adMsg" class="note" style="margin-bottom:14px" hidden></div>
       <div class="card" style="margin-bottom:16px">
         <h2>Releasing</h2>
@@ -551,7 +559,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#modal").classLi
 
 /* ---------- navigation ---------- */
 function goTo(p){page=p;$$("nav button").forEach(b=>b.classList.toggle("on",b.dataset.go===p));$$(".page").forEach(s=>s.classList.toggle("on",s.dataset.page===p));
-  $("#main").scrollTop=0;if(p==="about")refreshUpd();if(p==="admin")refreshAdmin(true);setTimeout(reportPad,30)}
+  $("#main").scrollTop=0;if(p==="about")refreshUpd();if(p==="admin"){call("adminRefresh").then(()=>refreshAdmin(true)).catch(e=>toast(String(e.message||e),true));refreshAdmin(true);}setTimeout(reportPad,30)}
 window.goTo=goTo;
 document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g)goTo(g.dataset.go)});
 
@@ -588,6 +596,13 @@ async function doSave(){try{const n=await call("ctSave",cfg);if(n){const theme=c
 function flashSaved(){$$(".saved").forEach(s=>{s.textContent="✓ Saved";s.style.opacity=1;clearTimeout(s._t);s._t=setTimeout(()=>s.style.opacity=0,1400)})}
 
 /* ---------- controls page ---------- */
+document.addEventListener("click",async e=>{
+ if(e.target.id==="identifyTrackball"){await call("ctIdentify");toast("Roll only the trackball now");}
+ if(e.target.id==="cancelIdentify")await call("ctCancelIdentify");
+});
+async function devicePoll(){try{const d=await call("ctDeviceState");$("#deviceIdentity").textContent=d.status}catch{}setTimeout(devicePoll,700)}
+setTimeout(devicePoll,1000);
+
 function opts(map,val){return Object.entries(map).map(([k,v])=>`<option value="${k}"${k===val?" selected":""}>${esc(v)}</option>`).join("")}
 function kbd(spec){if(!spec)return'<span class="mu">Not set</span>';return spec.split(",").map(c=>'<span class="kbd">'+c.split("+").map(k=>`<i>${esc(k)}</i>`).join("")+"</span>").join(" then ")}
 function renderBinds(){
@@ -796,7 +811,7 @@ $("#welcomeOk").onclick=()=>{cfg.welcomeDone=true;$("#welcome").hidden=true;save
 let updTimer=null;
 function noteList(arr){return arr.map(n=>`<li>${esc(n)}</li>`).join("")}
 function renderNotes(){const n=S.notes||[];const cur=n.find(x=>x.version===S.version)||n[0];
-  $("#abVer").textContent="v"+S.version;$("#sideVer").textContent="v"+S.version;
+  $("#abVer").textContent="v"+S.version+(S.edition==="admin"?" Admin":"")+(S.build&&S.build!=="0"?" · build "+S.build:"");$("#sideVer").textContent="v"+S.version+(S.build&&S.build!=="0"?" · build "+S.build:"");
   $("#curSum").textContent="What's new in v"+(cur?cur.version:S.version);$("#curList").innerHTML=cur?noteList(cur.notes):"";
   const older=n.filter(x=>x!==cur);$("#oldDetails").hidden=!older.length;
   $("#oldList").innerHTML=older.map(x=>`<div class="ver">v${esc(x.version)} <span class="mu" style="font-weight:400">· ${esc(x.date)}</span></div><ul>${noteList(x.notes)}</ul>`).join("")}
@@ -828,13 +843,17 @@ let adTimer=null;
 async function refreshAdmin(loop){if(S.edition!=="admin")return;let a;try{a=await call("adminState")}catch{return}
   const m=$("#adMsg");m.hidden=!(a.error||a.message);m.className="note"+(a.error?" err":" okn");m.textContent=a.error||a.message||"";
   const busy=a.busy;
-  $("#adConn").innerHTML=a.connected?`<div class="row"><span class="ok" style="white-space:nowrap">● Ready</span><span class="mu">Releases go straight to ${esc(a.repo)} (GitHub token saved on this PC).</span><span class="spacer"></span><button class="btn sm danger" id="tokClear">Remove token</button></div>`
-    :`<div class="row"><span class="ok" style="white-space:nowrap">● Ready</span><span class="mu">Press <b>Release for public</b> on a version. No sign-in needed. It goes public within about 5–15 minutes, and this page updates by itself.</span></div>`;
-  if(a.connected)$("#tokClear").onclick=async()=>{if(await modal("Remove the saved token?","Releasing keeps working without it.",[["Cancel","",false],["Remove","primary",true]]))call("adminClearToken").then(()=>refreshAdmin())};
+  $("#adConn").innerHTML=a.connected?`<div class="row"><span class="ok">● GitHub connected</span><span class="mu">${esc(a.repo)} · credentials encrypted for your Windows account</span><span class="spacer"></span><button class="btn sm danger" id="tokClear">Disconnect</button></div>`:
+    `<p class="mu">Connect your GitHub account to publish or withdraw versions. Create a fine-grained token for <b>Chamfer-Trackball</b> with <b>Contents: read and write</b>.</p><div class="row" style="margin-top:10px"><button class="btn" id="tokOpen">Open GitHub</button><input id="tokValue" type="password" autocomplete="off" placeholder="Paste GitHub access token" style="flex:1;min-width:180px"><button class="btn primary" id="tokConnect">Connect</button></div>`;
+  if(a.connected)$("#tokClear").onclick=async()=>{if(await modal("Disconnect GitHub?","You will need to reconnect before publishing or withdrawing a version.",[["Cancel","",false],["Disconnect","primary",true]])){await call("adminClearToken");refreshAdmin()}};
+  else{
+    $("#tokOpen").onclick=()=>window.open("https://github.com/settings/personal-access-tokens/new?name=Chamfer%20Trackball&description=Manage%20Chamfer%20Trackball%20releases&target_name=chamfer3dprinting");
+    $("#tokConnect").onclick=async()=>{const input=$("#tokValue"),token=input.value;input.value="";try{await call("adminConnect",token);toast("GitHub connected");refreshAdmin()}catch(e){toast(String(e.message||e),true)}};
+  }
   if(!a.loaded)$("#adVers").innerHTML=`<p class="mu">${busy==="loading"?"Loading versions…":"No versions loaded yet."}</p>`;
   else if(!a.versions.length)$("#adVers").innerHTML='<p class="mu">No versions in the GitHub folder yet.</p>';
   else $("#adVers").innerHTML=`<table class="vt"><tr><th>Version</th><th>Date</th><th>Status</th><th></th></tr>${a.versions.map(v=>{
-      const st=v.public?`<span class="tag pub">Public</span>${v.latest?' <span class="tag latest">Latest for users</span>':""}`:'<span class="tag priv">Private only</span>';
+      const st=v.public?`<span class="tag pub">Public</span>${v.latest?' <span class="tag latest">Latest for users</span>':""}`:'<span class="tag priv">Unpublished</span>';
       const me=v.thisApp?' <span class="mu" style="font-size:12px">(this app)</span>':"";
       const pend=a.pending&&a.pending.endsWith(" "+v.version)?a.pending.split(" ")[0]:"";
       let act="";if(busy&&busy.endsWith("v"+v.version))act=`<span class="mu">${esc(busy[0].toUpperCase()+busy.slice(1))}…</span>`;
@@ -848,8 +867,8 @@ async function refreshAdmin(loop){if(S.edition!=="admin")return;let a;try{a=awai
 $("#adRefresh").onclick=()=>{call("adminRefresh");setTimeout(()=>refreshAdmin(true),100)};
 document.addEventListener("click",async e=>{const r=e.target.dataset.rel,w=e.target.dataset.wd;
   if(r){const a=await call("adminState"),v=a.versions.find(x=>x.version===r);
-    if(await modal("Release v"+r+" for public?",`Everyone using Chamfer Trackball will see <b>“v${esc(r)} is ready to install”</b> in Settings → About and can install it with one click. Only the app (.exe) is published.${v&&v.notes.length?`<ul style="margin:12px 0 0">${noteList(v.notes)}</ul>`:""}`,[["Cancel","",false],["Release for public","primary",true]])){call("adminRelease",r);setTimeout(()=>refreshAdmin(true),100)}}
-  if(w&&await modal("Withdraw v"+w+"?","Users won't be offered this version any more. People who already installed it keep it. It stays in your private versions.",[["Cancel","",false],["Withdraw","primary",true]])){call("adminWithdraw",w);setTimeout(()=>refreshAdmin(true),100)}});
+    if(await modal("Release v"+r+" for public?",`Everyone using Chamfer Trackball will see <b>“v${esc(r)} is ready to install”</b> in Settings → About and can install it with one click. Only the app (.exe) is published.${v&&v.notes.length?`<ul style="margin:12px 0 0">${noteList(v.notes)}</ul>`:""}`,[["Cancel","",false],["Release for public","primary",true]])){call("adminRelease",r).catch(e=>toast(String(e.message||e),true));setTimeout(()=>refreshAdmin(true),100)}}
+  if(w&&await modal("Withdraw v"+w+"?","Users won't be offered this version any more. People who already installed it keep it. Its release history and executable stay in GitHub as a draft.",[["Cancel","",false],["Withdraw","primary",true]])){call("adminWithdraw",w).catch(e=>toast(String(e.message||e),true));setTimeout(()=>refreshAdmin(true),100)}});
 
 /* ---------- test pad ---------- */
 const pad={rot:[1,0,0,0,1,0,0,0,1],px:0,py:0,s:1};
@@ -881,7 +900,7 @@ addEventListener("resize",()=>{padColors=null;reportPad()});$("#main").addEventL
 document.addEventListener("visibilitychange",reportPad);
 
 /* ---------- live status ---------- */
-const MODEN={Idle:"Idle",Orbit:"Orbiting",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Rolling",Gestures:"Gesture"};
+const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Rolling",Snap:"Snap to angle",Navigate:"Navigating",Gestures:"Gesture"};
 async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
   if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;clearTimeout(saveTimer);reloadConfig()}
   let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}

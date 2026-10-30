@@ -12,21 +12,21 @@ namespace Chamfer.Trackball.App;
 internal sealed class MainForm:Form{
     const string AppUrl="https://chamfer-trackball.invalid/";
     readonly WebView2 web=new(){Dock=DockStyle.Fill};
-    readonly NotifyIcon tray=new(){Icon=SystemIcons.Application,Text="Chamfer Trackball",Visible=true};
+    readonly NotifyIcon tray=new(){Icon=Brand.Icon,Text="Chamfer Trackball",Visible=true};
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer native;readonly Controller controller;
-    readonly string settingsPath;
-    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]="public",["stage"]="latest",["version"]=ConfigStore.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Editable source rebuild: Shift orbit, Ctrl+Shift pan/zoom, Alt snap and backtick navigation with native integrations.")};
+    readonly string settingsPath;readonly GuideForm guide;readonly AdminService admin;
+    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Editable source rebuild: Shift orbit, Ctrl+Shift pan/zoom, Alt snap and backtick navigation with native integrations.")};
     string updateUrl="",updateHash="";
     readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(30)};
     public MainForm(bool smoke=false,bool startTray=false){
         this.smoke=smoke;
-        Text="Chamfer Trackball";ClientSize=new(1106,754);MinimumSize=new(920,640);StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(20,23,27);
+        Text="Chamfer Trackball"+(BuildInfo.Admin?" Admin":"");Icon=Brand.Icon;ClientSize=new(1106,754);MinimumSize=new(920,640);StartPosition=FormStartPosition.CenterScreen;BackColor=Color.FromArgb(20,23,27);
         settingsPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"ChamferTrackball","settings.json");
-        store=new(settingsPath);native=new();if(native.Error.Length>0){native.Dispose();throw new InvalidOperationException(native.Error);}input=new();controller=new(store,input,native);
-        Controls.Add(web);http.DefaultRequestHeaders.UserAgent.ParseAdd("ChamferTrackball/"+ConfigStore.Version);
-        var menu=new ContextMenuStrip();menu.Items.Add("Open",null,(_,_)=>{Show();WindowState=FormWindowState.Normal;Activate();});menu.Items.Add("Quit",null,(_,_)=>Exit());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>{Show();Activate();};
+        store=new(settingsPath);native=new();if(native.Error.Length>0){native.Dispose();throw new InvalidOperationException(native.Error);}input=new();controller=new(store,input,native);guide=new(controller,store);admin=new(Path.GetDirectoryName(settingsPath)!);
+        Controls.Add(web);http.DefaultRequestHeaders.UserAgent.ParseAdd("ChamferTrackball/"+BuildInfo.Version);
+        var menu=new ContextMenuStrip();menu.Items.Add("Open",null,(_,_)=>{Show();WindowState=FormWindowState.Normal;Activate();});menu.Items.Add("Show control guide",null,(_,_)=>{var c=store.Snapshot();c["modePanel"]=true;store.Save(c);});menu.Items.Add("Quit",null,(_,_)=>Exit());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>{Show();Activate();};
         Shown+=async(_,_)=>{await Initialize();if(startTray)Hide();};
-        FormClosing+=(_,e)=>{if(!quit){e.Cancel=true;Hide();return;}controller.Dispose();input.Dispose();native.Dispose();tray.Dispose();http.Dispose();};
+        FormClosing+=(_,e)=>{if(!quit){e.Cancel=true;Hide();return;}guide.Dispose();admin.Dispose();controller.Dispose();input.Dispose();native.Dispose();tray.Dispose();http.Dispose();};
     }
     async Task Initialize(){
         try{
@@ -39,11 +39,11 @@ internal sealed class MainForm:Form{
             web.CoreWebView2.NavigationStarting+=(_,e)=>{if(e.Uri!=AppUrl)e.Cancel=true;};
             web.CoreWebView2.NewWindowRequested+=(_,e)=>{e.Handled=true;if(Uri.TryCreate(e.Uri,UriKind.Absolute,out var u)&&u.Scheme=="https")Process.Start(new ProcessStartInfo(u.AbsoluteUri){UseShellExecute=true});};
             web.CoreWebView2.WebMessageReceived+=HandleMessage;
-            string[] names=["ctState","ctSave","ctStatus","ctResetAll","ctProgram","ctLog","ctQuit","ctHide","ctStartup","ctPadRect","ctRow","ctTitleBar","ctOpenMouseSettings","ctOpenSettingsFile","ctTestMacro","ctUpdState","ctUpdCheck","ctUpdInstall","ctInstallIntegration","ctAddProfile"];
+            string[] names=["ctState","ctSave","ctStatus","ctResetAll","ctProgram","ctLog","ctQuit","ctHide","ctStartup","ctPadRect","ctRow","ctTitleBar","ctOpenMouseSettings","ctOpenSettingsFile","ctTestMacro","ctUpdState","ctUpdCheck","ctUpdInstall","ctInstallIntegration","ctAddProfile","ctIdentify","ctCancelIdentify","ctDeviceState","adminState","adminRefresh","adminConnect","adminClearToken","adminRelease","adminWithdraw"];
             var js="(()=>{const pending=new Map();let seq=0;chrome.webview.addEventListener('message',e=>{const m=e.data;const p=pending.get(m.id);if(!p)return;pending.delete(m.id);m.error?p[1](new Error(m.error)):p[0](m.result);});for(const n of "+JsonSerializer.Serialize(names)+")window[n]=(...args)=>new Promise((ok,no)=>{const id=++seq;pending.set(id,[ok,no]);chrome.webview.postMessage({id,name:n,args});});})();";
             await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(js);
             using var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("ChamferTrackball.ui.html")??throw new IOException("Interface resource is missing.");
-            using var reader=new StreamReader(s);var html=Encoding.UTF8.GetBytes(await reader.ReadToEndAsync());
+            using var reader=new StreamReader(s);var html=Encoding.UTF8.GetBytes((await reader.ReadToEndAsync()).Replace("{{MARK}}",Brand.DataUrl));
             web.CoreWebView2.AddWebResourceRequestedFilter(AppUrl+"*",CoreWebView2WebResourceContext.All);
             web.CoreWebView2.WebResourceRequested+=(_,e)=>{
                 if(e.Request.Uri==AppUrl)e.Response=env.CreateWebResourceResponse(new MemoryStream(html,false),200,"OK","Content-Type: text/html; charset=utf-8");
@@ -59,7 +59,7 @@ internal sealed class MainForm:Form{
         try{
             var message=JsonNode.Parse(e.WebMessageAsJson)!.AsObject();id=message["id"]!.GetValue<long>();var args=message["args"]!.AsArray();object? result=null;
             switch(ConfigStore.S(message,"name")){
-                case "ctState":result=new{version=ConfigStore.Version,edition="public",config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
+                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Saved combinations and editable Shift / Ctrl+Shift / Alt / backtick controls."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
                 case "ctSave":store.Save(args[0]!.AsObject());result=store.Snapshot();break;
                 case "ctStatus":result=controller.Status();break;
                 case "ctResetAll":result=store.Reset();break;
@@ -73,6 +73,15 @@ internal sealed class MainForm:Form{
                 case "ctOpenMouseSettings":Process.Start(new ProcessStartInfo("ms-settings:mousetouchpad"){UseShellExecute=true});result=true;break;
                 case "ctOpenSettingsFile":Process.Start(new ProcessStartInfo("notepad.exe"){ArgumentList={settingsPath},UseShellExecute=false});result=true;break;
                 case "ctTestMacro":controller.PlayMacro(args[0]!.AsObject());result=true;break;
+                case "ctIdentify":input.Identify();result=true;break;
+                case "ctCancelIdentify":input.CancelIdentify();result=true;break;
+                case "ctDeviceState":result=new{ready=input.Ready,status=input.DeviceStatus};break;
+                case "adminState":result=admin.State();break;
+                case "adminRefresh":await admin.Refresh();result=admin.State();break;
+                case "adminConnect":await admin.Connect(args[0]!.GetValue<string>());result=admin.State();break;
+                case "adminClearToken":admin.Clear();result=true;break;
+                case "adminRelease":await admin.Release(args[0]!.GetValue<string>());result=true;break;
+                case "adminWithdraw":await admin.Withdraw(args[0]!.GetValue<string>());result=true;break;
                 case "ctUpdState":result=update.DeepClone();break;
                 case "ctUpdCheck":await CheckUpdates();result=update.DeepClone();break;
                 case "ctUpdInstall":await InstallUpdate();result=true;break;
@@ -94,17 +103,18 @@ internal sealed class MainForm:Form{
     async Task CheckUpdates(){
         update["stage"]="checking";
         try{
-            using var response=await http.GetAsync("https://api.github.com/repos/chamfer3dprinting/Chamfer-Trackball/releases?per_page=20");response.EnsureSuccessStatusCode();
+            using var response=await http.GetAsync("https://api.github.com/repos/chamfer3dprinting/Chamfer-Trackball/releases?per_page=100");response.EnsureSuccessStatusCode();
             var releases=JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsArray();
-            var latest=releases.Where(r=>!ConfigStore.B(r,"draft")).Select(r=>(Node:r,Version:System.Version.TryParse(ConfigStore.S(r,"tag_name").TrimStart('v'),out var v)?v:null)).Where(r=>r.Version!=null).OrderByDescending(r=>r.Version).FirstOrDefault();
-            update["stage"]="latest";
-            var version=latest.Version;
-            if(latest.Node!=null&&version!=null&&version>new Version(ConfigStore.Version)){
-                var asset=latest.Node["assets"]?.AsArray().FirstOrDefault(x=>ConfigStore.S(x,"name")=="ChamferTrackball.exe");
+            var latest=ReleasePolicy.Latest(releases,BuildInfo.Admin,long.TryParse(BuildInfo.Revision,out var build)?build:0,BuildInfo.Version);
+            update["stage"]="latest";updateUrl="";updateHash="";update.Remove("latest");update.Remove("error");
+            if(latest!=null){
+                var asset=latest["assets"]?.AsArray().FirstOrDefault(x=>ConfigStore.S(x,"name")==BuildInfo.Asset);
                 var url=ConfigStore.S(asset,"browser_download_url");var digest=ConfigStore.S(asset,"digest");
                 if(url.StartsWith("https://github.com/chamfer3dprinting/Chamfer-Trackball/releases/download/",StringComparison.Ordinal)&&digest.StartsWith("sha256:")&&digest.Length==71){
-                    updateUrl=url;updateHash=digest[7..];update["stage"]="available";update["latest"]=version.ToString();update["notes"]=new JsonArray(ConfigStore.S(latest.Node,"body"));
-                }
+                    updateUrl=url;updateHash=digest[7..];update["stage"]="available";
+                    update["latest"]=BuildInfo.Admin?ConfigStore.S(latest,"tag_name")[7..].Replace("-build."," · build "):ConfigStore.S(latest,"tag_name")[8..];
+                    update["notes"]=new JsonArray(ConfigStore.S(latest,"body"));
+                }else throw new IOException("The new release is missing its verified executable.");
             }
         }catch(Exception ex){update["stage"]="error";update["error"]=ex.Message;}
     }
@@ -140,8 +150,9 @@ internal sealed class MainForm:Form{
     async Task SmokeTest(){
         try{
             await NativeSmokeTest();
+            using(var image=new Bitmap(guide.Width,guide.Height)){guide.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-guide-smoke.png"));}
             await Task.Delay(1200);
-            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(state.version!=='1.5.6')throw Error('version');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");
+            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(!['1.5.5','1.0.1'].includes(state.version))throw Error('version');if(!document.querySelector('.brand img').src.startsWith('data:image/png;base64,')||document.querySelector('.brand img').naturalWidth<64)throw Error('logo missing');if(state.edition==='admin'&&document.querySelector('#navAdmin').hidden)throw Error('admin missing');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");
             // ExecuteScriptAsync returns a Promise object for async expressions. Confirm
             // persisted state from C# after the bridge has completed, then inspect DOM.
             string outcome="null";
@@ -149,10 +160,11 @@ internal sealed class MainForm:Form{
             var diagnostic=await web.CoreWebView2.ExecuteScriptAsync("JSON.stringify({url:location.href,ctState:typeof window.ctState,cfg:typeof cfg,toast:document.querySelector('#toast')?.textContent,body:document.body.innerText.slice(0,1800),result:window.__smokeResult})");
             using(var screenshot=File.Create(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png")))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,screenshot);
             var ready=await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-hold=snapKeys]')!==null&&document.querySelector('[data-hold=navigateKeys]')!==null&&document.querySelector('[data-install-integration=blender]')!==null");
-            if(ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
+            var passed=await web.CoreWebView2.ExecuteScriptAsync("window.__smokeResult?.ok===true");
+            if(passed!="true"||ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, held key controls, integration installer and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, floating guide, held controls, integration installer and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }

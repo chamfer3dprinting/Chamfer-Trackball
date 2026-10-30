@@ -5,7 +5,11 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.5.6</Version>
+    <Edition Condition="'$(Edition)'==''">Public</Edition>
+    <Version Condition="'$(Edition)'=='Admin'">1.5.5</Version>
+    <Version Condition="'$(Edition)'!='Admin'">1.0.1</Version>
+    <DefineConstants Condition="'$(Edition)'=='Admin'">$(DefineConstants);ADMIN</DefineConstants>
+    <ApplicationIcon>logo.ico</ApplicationIcon>
     <AssemblyName>ChamferTrackball</AssemblyName>
     <RootNamespace>ChamferTrackball</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
@@ -18,6 +22,11 @@
     <ProjectReference Include="../Chamfer.Trackball.Core/Chamfer.Trackball.Core.csproj"/>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35"/>
     <EmbeddedResource Include="ui.html"/>
+    <EmbeddedResource Include="logo.base64"/>
+    <EmbeddedResource Include="logo.ico"/>
+    <AssemblyMetadata Include="BuildNumber" Value="$(BuildNumber)"/>
+    <AssemblyMetadata Include="SourceRevision" Value="$(SourceRevision)"/>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0"/>
     <EmbeddedResource Include="../../integrations/**/*" Link="integrations/%(RecursiveDir)%(Filename)%(Extension)"/>
   </ItemGroup>
 </Project>

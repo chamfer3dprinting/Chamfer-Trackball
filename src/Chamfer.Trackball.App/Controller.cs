@@ -18,12 +18,16 @@ internal sealed class Controller:IDisposable{
     Rectangle pad;bool padVisible;Point padOrigin;
     double ox,oy,px,py,zoom,rawX,rawY;bool fit;string lastBtn="",lastAction="";DateTime lastBtnTime;
     CancellationTokenSource? macro;
-    public string Mode=>mode.ToString();public string AppName{get;private set;}="";
+    public string Mode=>mode.ToString();
+    public JsonObject GuideState()=>new(){["mode"]=Mode,["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
     public bool IsCad=>profile!=null&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
     public Controller(ConfigStore store,InputDriver input,NativeServer server){
         this.store=store;this.input=input;this.server=server;cfg=store.Snapshot();
         input.IsCad=()=>IsCad;input.IsCapture=()=>mode!=NavMode.Idle;input.SelectedDevice=()=>ConfigStore.S(cfg,"selectedDevice");
+        input.SwapButtons=()=>ConfigStore.B(cfg,"trackballSwapButtons");input.SwapWheels=()=>ConfigStore.B(cfg,"trackballSwapWheels");input.Enabled=()=>ConfigStore.B(cfg,"enabled");
+        input.Identified+=device=>{var n=store.Snapshot();n["selectedDevice"]=device;n["trackballSwapButtons"]=true;n["trackballSwapWheels"]=true;store.Save(n);cfg=store.Snapshot();Log("Trackball identified; correction applies only to this device.");};
         input.KeysChanged+=KeysChanged;input.Motion+=Motion;input.MouseEvent+=MouseEvent;
         timer.Tick+=Tick;timer.Start();Tick(null,EventArgs.Empty);
     }
@@ -45,6 +49,7 @@ internal sealed class Controller:IDisposable{
         }else if(profile!=null&&ConfigStore.S(profile,"id")=="demo"){
             if(!padVisible||!Win32.GetCursorPos(out var cursor2)||!new Rectangle(padOrigin.X+pad.X,padOrigin.Y+pad.Y,pad.Width,pad.Height).Contains(cursor2.X,cursor2.Y)){End();profile=null;}
         }
+        if(!input.Ready){if(mode!=NavMode.Idle)End();Integration=input.DeviceStatus;return;}
         if(!IsCad){if(mode!=NavMode.Idle)End();Integration=server.Error.Length>0?server.Error:"Normal mouse";return;}
         var desired=Resolve();
         if(stoppedByClick){if(desired==NavMode.Idle)stoppedByClick=false;else desired=NavMode.Idle;}
@@ -63,9 +68,9 @@ internal sealed class Controller:IDisposable{
         if(latched!=NavMode.Idle)return latched;
         return ConfigStore.S(cfg,"ball","pointer") switch{"orbit"=>NavMode.Orbit,"pan"=>NavMode.PanZoom,"zoom"=>NavMode.Zoom,_=>NavMode.Idle};
     }
-    void KeysChanged(){if(!IsCad)return;var n=Resolve();if(n!=mode)Change(n);if(n==NavMode.Idle)stoppedByClick=false;}
+    void KeysChanged(){if(!IsCad||!input.Ready)return;var n=Resolve();if(n!=mode)Change(n);if(n==NavMode.Idle)stoppedByClick=false;}
     void Change(NavMode next){
-        End();if(next==NavMode.Idle||!IsCad)return;
+        End();if(next==NavMode.Idle||!IsCad||!input.Ready)return;
         if(next==NavMode.Gestures){mode=next;return;}
         native=server.Find(ConfigStore.S(profile,"id"),foregroundPid);
         bool demo=ConfigStore.S(profile,"id")=="demo";
@@ -223,7 +228,7 @@ internal sealed class Controller:IDisposable{
         }catch(OperationCanceledException){ }catch(Exception ex){Log(ex.Message,"err");}finally{if(macro==cancellation)macro=null;cancellation.Dispose();}
     }
     public JsonObject Status(){
-        var result=new JsonObject{["mode"]=mode==NavMode.PanZoom?"Pan":mode==NavMode.Snap?"Orbit":mode==NavMode.Navigate?"Pan":mode.ToString(),["navigationMode"]=mode.ToString(),["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?"cad":"mouse",["device"]=input.LastDevice.Length>0?"Trackball · X/Y input":"Waiting for trackball movement",["integration"]=Integration,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
+        var result=new JsonObject{["mode"]=mode.ToString(),["navigationMode"]=mode.ToString(),["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?"cad":"mouse",["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
         ox=oy=px=py=zoom=rawX=rawY=0;fit=false;return result;
     }
     public void Pad(int x,int y,int w,int h,bool visible,Point origin){pad=new(x,y,w,h);padVisible=visible;padOrigin=origin;}

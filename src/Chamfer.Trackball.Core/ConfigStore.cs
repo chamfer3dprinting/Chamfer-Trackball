@@ -3,7 +3,6 @@ using System.Text.Json.Nodes;
 namespace Chamfer.Trackball.Core;
 
 public sealed class ConfigStore {
-    public const string Version="1.5.6";
     private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
     private readonly object gate=new();
     private readonly string path;
@@ -47,7 +46,7 @@ public sealed class ConfigStore {
         }
     }
     public void Select(int index){lock(gate){var n=(JsonObject)config.DeepClone();LoadProgram(n,index);Write(n);config=n;Revision++;}}
-    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown"})if(config[k]!=null)n[k]=config[k]!.DeepClone();Write(n);config=n;Revision++;return Snapshot();}}
+    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown","selectedDevice","trackballSwapButtons","trackballSwapWheels"})if(config[k]!=null)n[k]=config[k]!.DeepClone();Write(n);config=n;Revision++;return Snapshot();}}
     private void Write(JsonObject n){
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var text=n.ToJsonString(new JsonSerializerOptions{WriteIndented=true});
