@@ -143,9 +143,9 @@ internal sealed class MainForm:Form{
             if(ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, held key controls, integration installer and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, held key controls, integration installer and saved combination verified.");
             Exit();
-        }catch(Exception ex){File.WriteAllText(Path.Combine(Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Environment.Exit(1);}
+        }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }
     void Exit(){quit=true;Close();}
 }
