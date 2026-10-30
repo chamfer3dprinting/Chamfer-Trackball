@@ -1,0 +1,78 @@
+name: Build editable Trackball source
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'tests/**', 'integrations/**', '.github/workflows/build-source.yml']
+  pull_request:
+    paths: ['src/**', 'tests/**', 'integrations/**', '.github/workflows/build-source.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: trackball-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-and-build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Core regression checks
+        run: dotnet run --project tests/Chamfer.Trackball.Tests.csproj -c Release
+      - name: Interface syntax and integration syntax
+        shell: pwsh
+        run: |
+          node tests/interface-check.cjs
+          python -m py_compile integrations/blender/chamfer_trackball.py integrations/fusion/ChamferTrackball.py
+      - name: Build single executable
+        run: dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:EnableCompressionInSingleFile=true -o "${{ runner.temp }}/trackball"
+      - name: Prepare WebView2 for UI verification
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:RUNNER_TEMP/WebView2Setup.exe"
+          Start-Process -FilePath "$env:RUNNER_TEMP/WebView2Setup.exe" -ArgumentList '/silent /install' -WindowStyle Hidden -Wait
+      - name: Verify actual settings interface and bridge
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden
+          if (-not $process.WaitForExit(90000)) { Stop-Process -Id $process.Id; throw 'UI smoke test timed out' }
+          if ($process.ExitCode -ne 0 -or -not (Test-Path "$env:TEMP/chamfer-ui-smoke.ok")) {
+            if (Test-Path "$env:TEMP/chamfer-ui-smoke.error") { Get-Content "$env:TEMP/chamfer-ui-smoke.error" }
+            throw 'Actual UI verification failed'
+          }
+          Get-Content "$env:TEMP/chamfer-ui-smoke.ok"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification
+          path: |
+            ${{ runner.temp }}/chamfer-ui-smoke.*
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChamferTrackball-exe
+          path: ${{ runner.temp }}/trackball/ChamferTrackball.exe
+      - name: Store verified executable as owner prerelease
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = 'v1.5.6'
+          $existing = gh release view $tag --json tagName 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'This version already exists; advance the version before publishing a different executable.' }
+          gh release create $tag "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" --target "${{ github.sha }}" --prerelease --title "Chamfer Trackball v1.5.6" --notes-file release-notes/v1.5.6.md
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
+          $release = gh api "repos/${{ github.repository }}/releases/tags/$tag" | ConvertFrom-Json
+          $asset = $release.assets | Where-Object name -eq 'ChamferTrackball.exe'
+          $hash = (Get-FileHash "$env:RUNNER_TEMP/trackball/ChamferTrackball.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($asset.digest -ne "sha256:$hash") { throw 'GitHub executable digest mismatch' }

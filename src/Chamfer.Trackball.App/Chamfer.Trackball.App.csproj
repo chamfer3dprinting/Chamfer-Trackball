@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.5.6</Version>
+    <AssemblyName>ChamferTrackball</AssemblyName>
+    <RootNamespace>ChamferTrackball</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Chamfer.Trackball.Core/Chamfer.Trackball.Core.csproj"/>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35"/>
+    <EmbeddedResource Include="ui.html"/>
+    <EmbeddedResource Include="../../integrations/**/*" Link="integrations/%(RecursiveDir)%(Filename)%(Extension)"/>
+  </ItemGroup>
+</Project>

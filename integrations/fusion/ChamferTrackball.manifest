@@ -1,0 +1,12 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "author": "Chamfer3D",
+  "description": {
+    "": "Direct camera navigation and cursor pivot for Chamfer Trackball"
+  },
+  "version": "1.5.6",
+  "runOnStartup": true,
+  "supportedOS": "windows",
+  "editEnabled": true
+}

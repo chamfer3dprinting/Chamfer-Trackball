@@ -1,0 +1,752 @@
+{
+  "configVersion": 21,
+  "enabled": true,
+  "buttons": {
+    "middle": {
+      "action": "normal",
+      "tap": "click"
+    },
+    "back": {
+      "action": "normal",
+      "tap": "click"
+    },
+    "right": {
+      "action": "normal",
+      "tap": "click"
+    },
+    "forward": {
+      "action": "normal",
+      "tap": "click"
+    }
+  },
+  "rightWheel": "normal",
+  "leftWheel": "normal",
+  "modeButtons": {},
+  "combos": [],
+  "wheelPrograms": [
+    0,
+    1,
+    0,
+    1
+  ],
+  "orbitKeys": "shift",
+  "panKeys": "ctrl+shift",
+  "zoomKeys": "none",
+  "buttonWheelZoom": true,
+  "returnCursor": true,
+  "shortcutsEverywhere": false,
+  "clickSlop": 8,
+  "showLabel": false,
+  "modeIcon": true,
+  "twist": true,
+  "modePanel": true,
+  "showPivot": true,
+  "guideCorner": "bottom-right",
+  "pointerSpeed": 10,
+  "ball": "pointer",
+  "trackballDpi": 1600,
+  "preciseSlow": true,
+  "smooth": true,
+  "glide": 5,
+  "orbitSens": 50,
+  "panSens": 50,
+  "zoomSens": 50,
+  "invertOrbitX": false,
+  "invertOrbitY": false,
+  "invertPan": false,
+  "invertZoom": false,
+  "theme": {
+    "mode": "dark",
+    "accent": "#35c6dc",
+    "background": "#14171b"
+  },
+  "autoUpdateCheck": true,
+  "trayHintShown": true,
+  "welcomeDone": true,
+  "profiles": [
+    {
+      "id": "chamfer3d",
+      "name": "Chamfer3D Studio",
+      "enabled": true,
+      "exe": [
+        "chamfer3d*",
+        "chamfer studio*",
+        "chamfer-studio*",
+        "chamferstudio*",
+        "windowsapp1.exe"
+      ],
+      "title": [
+        "chamfer3d studio",
+        "chamfer studio",
+        "studio.chamfer3dprinting"
+      ],
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": true,
+      "fit": "F",
+      "note": "Windows app (any version, also named Chamfer Studio) and the web app in any browser."
+    },
+    {
+      "id": "fusion",
+      "name": "Autodesk Fusion",
+      "enabled": true,
+      "exe": [
+        "fusion360.exe",
+        "fusion*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": true,
+      "fit": "F6",
+      "note": "Fusion default navigation."
+    },
+    {
+      "id": "blender",
+      "name": "Blender",
+      "enabled": true,
+      "exe": [
+        "blender*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Home",
+      "note": "Blender 4.x default keymap."
+    },
+    {
+      "id": "onshape",
+      "name": "Onshape",
+      "enabled": true,
+      "exe": [
+        "onshape*"
+      ],
+      "title": [
+        "onshape"
+      ],
+      "orbit": {
+        "buttons": [
+          "right"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": true,
+      "fit": "F",
+      "note": "Onshape in the browser or its Windows app."
+    },
+    {
+      "id": "freecad",
+      "name": "FreeCAD",
+      "enabled": true,
+      "exe": [
+        "freecad*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle",
+          "left"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "V,F",
+      "note": "FreeCAD 1.0 'CAD' navigation style."
+    },
+    {
+      "id": "inventor",
+      "name": "Autodesk Inventor",
+      "enabled": true,
+      "exe": [
+        "inventor.exe"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "F6",
+      "note": "Inventor 2022+ default."
+    },
+    {
+      "id": "rhino",
+      "name": "Rhino",
+      "enabled": true,
+      "exe": [
+        "rhino.exe",
+        "rhino*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "right"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "right"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Ctrl+Shift+E",
+      "note": "Rhino 7 / 8 (perspective viewport)."
+    },
+    {
+      "id": "solidworks",
+      "name": "SOLIDWORKS",
+      "enabled": true,
+      "exe": [
+        "sldworks.exe"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "ctrl"
+        ]
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "F",
+      "note": "SOLIDWORKS default mouse controls."
+    },
+    {
+      "id": "tinkercad",
+      "name": "Tinkercad",
+      "enabled": true,
+      "exe": null,
+      "title": [
+        "tinkercad"
+      ],
+      "orbit": {
+        "buttons": [
+          "right"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": true,
+      "fit": "F",
+      "note": "Tinkercad in the browser."
+    },
+    {
+      "id": "sketchup",
+      "name": "SketchUp",
+      "enabled": true,
+      "exe": [
+        "sketchup*"
+      ],
+      "title": [
+        "sketchup"
+      ],
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Shift+Z",
+      "note": "SketchUp desktop and SketchUp for Web."
+    },
+    {
+      "id": "shapr3d",
+      "name": "Shapr3D",
+      "enabled": true,
+      "exe": [
+        "shapr3d*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "right"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": true,
+      "fit": "",
+      "note": "Shapr3D for Windows."
+    },
+    {
+      "id": "autocad",
+      "name": "AutoCAD",
+      "enabled": true,
+      "exe": [
+        "acad.exe"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Z,Enter,E,Enter",
+      "note": "AutoCAD 3D views. Fit types ZOOM → Extents."
+    },
+    {
+      "id": "creo",
+      "name": "PTC Creo",
+      "enabled": true,
+      "exe": [
+        "xtop.exe"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "shift"
+        ]
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "",
+      "note": "Creo Parametric default mouse controls."
+    },
+    {
+      "id": "3dsmax",
+      "name": "3ds Max",
+      "enabled": true,
+      "exe": [
+        "3dsmax.exe"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "alt"
+        ]
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Z",
+      "note": "3ds Max default viewport controls."
+    },
+    {
+      "id": "maya",
+      "name": "Maya",
+      "enabled": true,
+      "exe": [
+        "maya.exe"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "left"
+        ],
+        "mods": [
+          "alt"
+        ]
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "alt"
+        ]
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "A",
+      "note": "Maya default (Alt) camera controls."
+    },
+    {
+      "id": "cinema4d",
+      "name": "Cinema 4D",
+      "enabled": true,
+      "exe": [
+        "cinema 4d*",
+        "cinema4d*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "left"
+        ],
+        "mods": [
+          "alt"
+        ]
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": [
+          "alt"
+        ]
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "H",
+      "note": "Cinema 4D default (Alt) camera controls."
+    },
+    {
+      "id": "bambu",
+      "name": "Bambu Studio",
+      "enabled": true,
+      "exe": [
+        "bambu-studio*",
+        "bambustudio*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "left"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Z",
+      "note": "Start orbiting over empty space — a left drag on a part moves it."
+    },
+    {
+      "id": "orca",
+      "name": "OrcaSlicer",
+      "enabled": true,
+      "exe": [
+        "orca-slicer*",
+        "orcaslicer*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "left"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Z",
+      "note": "Start orbiting over empty space — a left drag on a part moves it."
+    },
+    {
+      "id": "prusa",
+      "name": "PrusaSlicer",
+      "enabled": true,
+      "exe": [
+        "prusa-slicer*",
+        "prusaslicer*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "left"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "Z",
+      "note": "Start orbiting over empty space — a left drag on a part moves it."
+    },
+    {
+      "id": "cura",
+      "name": "UltiMaker Cura",
+      "enabled": true,
+      "exe": [
+        "ultimaker-cura*",
+        "cura.exe",
+        "ultimaker cura*"
+      ],
+      "title": null,
+      "orbit": {
+        "buttons": [
+          "right"
+        ],
+        "mods": null
+      },
+      "pan": {
+        "buttons": [
+          "middle"
+        ],
+        "mods": null
+      },
+      "wheelZoomInvert": false,
+      "smoothZoom": false,
+      "fit": "",
+      "note": "Cura default camera controls."
+    }
+  ],
+  "programs": [
+    {
+      "name": "Normal mouse",
+      "buttons": {
+        "middle": {
+          "action": "normal",
+          "tap": "click"
+        },
+        "back": {
+          "action": "normal",
+          "tap": "click"
+        },
+        "right": {
+          "action": "normal",
+          "tap": "click"
+        },
+        "forward": {
+          "action": "normal",
+          "tap": "click"
+        }
+      },
+      "rightWheel": "normal",
+      "leftWheel": "normal",
+      "wheelPrograms": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "orbitKeys": "none",
+      "panKeys": "none",
+      "zoomKeys": "none",
+      "gestures": {},
+      "pointerSpeed": 10,
+      "ball": "pointer",
+      "feel": {
+        "orbitSens": 50,
+        "panSens": 50,
+        "zoomSens": 50,
+        "invertOrbitX": false,
+        "invertOrbitY": false,
+        "invertPan": false,
+        "invertZoom": false,
+        "preciseSlow": true,
+        "clickSlop": 8,
+        "smooth": true,
+        "glide": 5
+      },
+      "modeButtons": {},
+      "combos": [],
+      "snapKeys": "none",
+      "navigateKeys": "none"
+    },
+    {
+      "name": "3D modelling",
+      "buttons": {
+        "middle": {
+          "action": "normal",
+          "tap": "click"
+        },
+        "back": {
+          "action": "normal",
+          "tap": "click"
+        },
+        "right": {
+          "action": "normal",
+          "tap": "click"
+        },
+        "forward": {
+          "action": "normal",
+          "tap": "click"
+        }
+      },
+      "rightWheel": "normal",
+      "leftWheel": "normal",
+      "wheelPrograms": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "orbitKeys": "shift",
+      "panKeys": "ctrl+shift",
+      "zoomKeys": "none",
+      "gestures": {},
+      "pointerSpeed": 10,
+      "ball": "pointer",
+      "feel": {
+        "orbitSens": 50,
+        "panSens": 50,
+        "zoomSens": 50,
+        "invertOrbitX": false,
+        "invertOrbitY": false,
+        "invertPan": false,
+        "invertZoom": false,
+        "preciseSlow": true,
+        "clickSlop": 8,
+        "smooth": true,
+        "glide": 5
+      },
+      "modeButtons": {},
+      "combos": [],
+      "snapKeys": "alt",
+      "navigateKeys": "backtick"
+    }
+  ],
+  "activeProgram": 1,
+  "programKeys": "",
+  "programToast": true,
+  "macros": [
+    {
+      "id": "m1",
+      "name": "Macro 1",
+      "steps": []
+    }
+  ],
+  "gestures": {},
+  "feel": {
+    "orbitSens": 50,
+    "panSens": 50,
+    "zoomSens": 50,
+    "invertOrbitX": false,
+    "invertOrbitY": false,
+    "invertPan": false,
+    "invertZoom": false,
+    "preciseSlow": true,
+    "clickSlop": 8,
+    "smooth": true,
+    "glide": 5
+  },
+  "snapKeys": "alt",
+  "navigateKeys": "backtick",
+  "version": "1.5.6",
+  "selectedDevice": "",
+  "allowEmulation": true
+}

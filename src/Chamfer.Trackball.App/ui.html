@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamfer Trackball</title>
+<style>
+:root{
+  --bg:#14171b; --panel:#1b1f25; --panel2:#222831; --line:#2d343e; --text:#e8edf2; --muted:#94a0ad;
+  --accent:#35c6dc; --accent2:#7fe4f0; --accentInk:#06252b; --silver:#c7cdd4; --good:#43d18a; --warn:#f2b84b; --bad:#ff6b6b;
+  --shadow:0 10px 30px rgba(0,0,0,.35); --r:14px; --glow:rgba(53,198,220,.18);
+  --cube1:#46d3e6; --cube2:#9aa3ad; --cube3:#6f7882; --grid:#2a3038;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#eef2f5; --panel:#ffffff; --panel2:#f4f7f9; --line:#d9e0e6; --text:#16202a; --muted:#5b6876;
+  --accent:#0e9fb5; --accent2:#0b7f91; --accentInk:#ffffff; --silver:#59636e; --good:#14935a; --warn:#b97a0b; --bad:#d23c3c;
+  --shadow:0 8px 24px rgba(20,40,60,.10); --glow:rgba(14,159,181,.14);
+  --cube1:#2bc0d6; --cube2:#b9c1c9; --cube3:#8d97a1; --grid:#dde3e8;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:232px 1fr;height:100%}
+/* sidebar */
+aside{background:linear-gradient(180deg,var(--panel),var(--bg));border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 14px;gap:6px;min-height:0}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 6px 14px}
+.brand img{width:44px;height:44px;border-radius:11px;box-shadow:0 0 0 1px var(--line),0 6px 18px var(--glow)}
+.brand b{display:block;font-size:16px;letter-spacing:.2px}
+.brand span{color:var(--muted);font-size:12px}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;border:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+.pill.admin{border-color:var(--warn);color:var(--warn)}
+nav{display:flex;flex-direction:column;gap:2px;overflow:auto}
+nav button{display:flex;align-items:center;gap:11px;background:none;border:0;border-radius:10px;padding:9px 11px;text-align:left;color:var(--muted);cursor:pointer;position:relative}
+nav button svg{width:18px;height:18px;flex:none}
+nav button:hover{background:var(--panel2);color:var(--text)}
+nav button.on{background:var(--glow);color:var(--text)}
+nav button.on::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--accent)}
+nav .dot{margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);display:none}
+nav .dot.show{display:block}
+.side-foot{margin-top:auto;padding:12px 8px 2px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.side-foot small{color:var(--muted)}
+/* main */
+main{overflow:auto;padding:26px 30px 40px;min-width:0}
+.page{display:none;max-width:1040px;margin:0 auto;animation:fade .18s ease}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+h1{font-size:24px;margin:0 0 4px;font-weight:650;letter-spacing:.1px}
+.sub{color:var(--muted);margin:0 0 20px}
+h2{font-size:12.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);margin:0 0 12px;font-weight:700}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:16px}
+.g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:1.25fr 1fr}
+@media (max-width:1100px){.g2{grid-template-columns:1fr}}
+.stat{display:flex;gap:12px;align-items:center}
+.stat .ic{width:40px;height:40px;border-radius:11px;background:var(--glow);display:grid;place-items:center;color:var(--accent);flex:none}
+.stat .ic svg{width:21px;height:21px}
+.stat small{display:block;color:var(--muted);font-size:12px}
+.stat b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.ok{color:var(--good)} .wn{color:var(--warn)} .bd{color:var(--bad)} .mu{color:var(--muted)}
+/* buttons */
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accentInk);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;align-items:center;gap:12px}
+.spacer{flex:1}
+/* switch */
+.sw{position:relative;width:42px;height:24px;flex:none}
+.sw input{opacity:0;width:100%;height:100%;margin:0;position:absolute;cursor:pointer;z-index:1}
+.sw span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:.15s}
+.sw span::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw input:checked+span{background:var(--accent)}
+.sw input:checked+span::after{left:21px}
+.sw input:focus-visible+span{outline:2px solid var(--accent2);outline-offset:2px}
+.big-sw{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel)}
+select,input[type=text],input[type=password]{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 10px;min-width:0}
+select:focus,input:focus,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select{cursor:pointer}
+/* pad */
+.pad{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--bg);height:300px;cursor:crosshair}
+.pad canvas{width:100%;height:100%;display:block}
+.pad .mode{position:absolute;left:14px;top:10px;font-weight:700;color:var(--muted)}
+.pad .mode.live{color:var(--accent)}
+.hintrow{color:var(--muted);font-size:12.5px;display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:2px 9px;font-size:12.5px}
+.chip b{color:var(--accent);font-weight:600}
+.cheat{display:flex;flex-direction:column;gap:9px}
+.cheat .it{display:flex;gap:12px;align-items:flex-start;padding:9px 10px;border-radius:10px;background:var(--panel2)}
+.cheat .it .k{min-width:62px;font-weight:700;color:var(--accent)}
+.welcome{display:flex;gap:16px;align-items:center;margin-bottom:16px;border-color:var(--accent);background:linear-gradient(90deg,var(--glow),var(--panel) 60%)}
+.steps{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted)}
+.steps b{color:var(--text)}
+/* controls */
+.ctl{display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media (max-width:1100px){.ctl{grid-template-columns:1fr}}
+.device svg{width:100%;height:auto}
+.hot{cursor:pointer;transition:.12s}
+.hot .shape{fill:var(--panel2);stroke:var(--line);stroke-width:2}
+.hot:hover .shape,.hot.sel .shape{stroke:var(--accent)}
+.hot.flash .shape{fill:var(--accent);stroke:var(--accent2)}
+.hot text{fill:var(--muted);font-size:11px;pointer-events:none}
+.ball{fill:url(#ballg);stroke:#3a0508;stroke-width:1.5}
+.dev .hot .shape{fill:#25282d;stroke:#3b3f46;stroke-width:1.5}
+.dev .hot .shape.wheel{fill:url(#wheelg);stroke:#5d636b}
+.dev .hot:hover .shape,.dev .hot.sel .shape{stroke:var(--accent);stroke-width:2.5}
+.dev .hot.flash .shape{fill:var(--accent);stroke:var(--accent2)}
+.dev .hot text{fill:#9aa1aa;font-size:12px;font-weight:600}
+.dev .hot.flash text{fill:#06252b}
+.dev .brand{fill:#6d737b;font-size:12px;letter-spacing:1px}
+.binds{display:flex;flex-direction:column;gap:10px}
+.bind{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:start;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--panel);transition:border-color .15s, box-shadow .2s}
+.bind.sel{border-color:var(--accent)}
+.bind.flash{box-shadow:0 0 0 3px var(--glow),0 0 22px var(--glow);border-color:var(--accent)}
+.bind .nm b{display:block}
+.bind .nm small{color:var(--muted)}
+.bind .opts{display:flex;flex-direction:column;gap:8px}
+.bind .line{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bind .line select{flex:1 1 220px;max-width:340px}
+.bind .desc{color:var(--muted);font-size:12.5px}
+.kbd{display:inline-flex;gap:4px;flex-wrap:wrap}
+.kbd i{font-style:normal;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12.5px;font-weight:600}
+.cmp{width:100%;border-collapse:collapse;font-size:14px}
+.cmp th,.cmp td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line)}
+.cmp tr:last-child th,.cmp tr:last-child td{border-bottom:0}
+.cmp thead th{font-size:13px;color:var(--muted);font-weight:600}
+.cmp thead th.us{color:var(--accent)}
+.cmp tbody th{font-weight:600;width:24%}
+.cmp td.us{background:color-mix(in srgb,var(--accent) 9%,transparent);font-weight:600}
+.cmp .yes{color:var(--good);font-weight:700;margin-right:6px}
+.cmp .no{color:var(--muted)}
+.cmp small{display:block;color:var(--muted);font-weight:400;font-size:12px;margin-top:2px}
+.cmp td.us .hl{color:var(--accent)}
+.progs{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.prog{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:11px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;color:var(--text)}
+.prog .n{font-size:11.5px;color:var(--muted);font-weight:700}
+.prog.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel2));box-shadow:0 0 0 1px var(--accent) inset}
+.prog.on .n{color:var(--accent)}
+.prog.add{border-style:dashed;color:var(--muted)}
+.gest{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.gcell{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel);display:flex;flex-direction:column;gap:6px;min-width:0}
+.gcell .h{display:flex;align-items:center;gap:6px;font-weight:600}
+.gcell .h .arr{font-size:18px;color:var(--accent);width:22px;text-align:center}
+.gcell select{width:100%}
+.gmid{display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:12px;border:1px dashed var(--line);border-radius:12px;padding:10px}
+.macros{display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start}
+.mlist{display:flex;flex-direction:column;gap:6px}
+.mitem{text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;color:var(--text)}
+.mitem.on{border-color:var(--accent)}
+.mitem small{display:block;color:var(--muted)}
+.steps{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.step{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.step .no{width:22px;color:var(--muted);font-weight:700}
+.step input[type=text]{flex:1 1 200px}
+.step input[type=number]{width:90px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:7px 10px}
+.step .sp{flex:1}
+.addsteps{display:flex;gap:6px;flex-wrap:wrap}
+.presets{display:flex;gap:8px;flex-wrap:wrap}
+.preset{flex:1;min-width:190px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}
+.preset:hover{border-color:var(--accent)}
+.preset b{display:block}
+.preset small{color:var(--muted)}
+.opt{display:flex;align-items:center;gap:14px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.opt:last-child{border-bottom:0}
+.opt .t{flex:1}
+.opt .t small{display:block;color:var(--muted)}
+/* speed */
+.slider{display:grid;grid-template-columns:90px 1fr 60px;gap:14px;align-items:center;padding:10px 0}
+input[type=range]{accent-color:var(--accent);width:100%}
+.val{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+/* apps */
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.appc{padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--panel)}
+.appc.off{opacity:.6}
+.appc .row b{flex:1}
+.appc dl{display:grid;grid-template-columns:52px 1fr;gap:3px 10px;margin:10px 0 0;font-size:12.8px}
+.appc dt{color:var(--muted)}
+.appc dd{margin:0}
+/* appearance */
+.themes{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:1000px){.themes{grid-template-columns:repeat(2,1fr)}}
+.th{border:2px solid var(--line);border-radius:14px;padding:10px;background:var(--panel);cursor:pointer;text-align:left}
+.th.on{border-color:var(--accent);box-shadow:0 0 0 4px var(--glow)}
+.th .pv{height:84px;border-radius:9px;margin-bottom:9px;display:grid;grid-template-columns:28% 1fr;overflow:hidden;border:1px solid rgba(127,127,127,.25)}
+.th .pv i{display:block}
+.th .pv .m{padding:9px;display:flex;flex-direction:column;gap:6px}
+.th .pv .m span{height:9px;border-radius:5px;display:block}
+.colors{display:flex;gap:18px;flex-wrap:wrap;margin-top:16px}
+.colors label{display:flex;align-items:center;gap:10px}
+input[type=color]{width:44px;height:30px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px;cursor:pointer}
+/* about */
+.about .ar{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.about .ar .l{width:110px;color:var(--muted)}
+.about .ar .c{flex:1;text-align:center;font-weight:600}
+.verbox{border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:6px 12px;font-weight:600}
+details{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:12px;background:var(--panel2)}
+details[open]{border-color:var(--accent)}
+summary{cursor:pointer;font-weight:600;color:var(--accent2);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▶";display:inline-block;margin-right:8px;font-size:11px;transition:.15s}
+details[open]>summary::before{transform:rotate(90deg)}
+details ul{margin:10px 0 2px;padding-left:22px}
+details li{margin:6px 0}
+details .ver{margin-top:10px;font-weight:600}
+.bar{height:8px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0;transition:width .2s}
+/* admin */
+.vt{width:100%;border-collapse:collapse}
+.vt th{text-align:left;color:var(--muted);font-weight:600;font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.vt td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.vt tr:last-child td{border-bottom:0}
+.tag{display:inline-block;border-radius:99px;padding:2px 9px;font-size:12px;font-weight:600}
+.tag.pub{background:rgba(67,209,138,.15);color:var(--good)}
+.tag.priv{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.tag.latest{background:var(--glow);color:var(--accent)}
+.note{padding:10px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:13px}
+.note.err{border-color:var(--bad);color:var(--bad)}
+.note.warn{border-color:var(--warn);color:var(--text)}
+.note.okn{border-color:var(--good);color:var(--good)}
+/* modal & toast */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px)}
+.modal.show{display:flex}
+.modal .box{width:min(520px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow)}
+.modal h3{margin:0 0 6px;font-size:18px}
+.modal .acts{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.rec{font-size:22px;text-align:center;padding:22px;border:2px dashed var(--accent);border-radius:12px;margin-top:12px;min-height:76px}
+.toast{position:fixed;right:22px;bottom:22px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 16px;box-shadow:var(--shadow);transform:translateY(20px);opacity:0;transition:.2s;z-index:60;max-width:420px}
+.toast.show{transform:none;opacity:1}
+.toast.err{border-left-color:var(--bad)}
+.actlog{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;font-size:13px}
+.actlog .l{display:flex;gap:10px;padding:7px 10px;border-radius:9px;background:var(--panel2);border-left:3px solid var(--line)}
+.actlog .l.ok{border-left-color:var(--good)} .actlog .l.warn{border-left-color:var(--bad)} .actlog .l.info{border-left-color:var(--muted)}
+.actlog .t{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.saved{color:var(--muted);font-size:12.5px;transition:opacity .4s}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><img src="{{MARK}}" alt=""><div><b>Chamfer Trackball</b><span id="sideVer">v—</span> <span id="edPill" class="pill admin" hidden>Admin</span></div></div>
+    <nav id="nav">
+      <button data-go="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Home</button>
+      <button data-go="controls"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="6"/><path d="M5 6h4M15 6h4M12 2v3"/></svg>Buttons &amp; keys</button>
+      <button data-go="macros"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h2M11 9h2M15 9h2M7 13h10M8 16h8"/></svg>Macros</button>
+      <button data-go="speed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Speed &amp; direction</button>
+      <button data-go="apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>CAD apps</button>
+      <button data-go="appearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor"/></svg>Appearance</button>
+      <button data-go="general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>General</button>
+      <button data-go="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>About &amp; updates<span class="dot" id="updDot"></span></button>
+      <button data-go="admin" id="navAdmin" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Admin</button>
+    </nav>
+    <div class="side-foot">
+      <label class="sw" title="Turn 3D controls on or off"><input type="checkbox" id="enabled"><span></span></label>
+      <div><b id="enabledTxt">3D controls on</b><br><small id="footApp">—</small></div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <!-- HOME -->
+    <section class="page" data-page="home">
+      <div class="card welcome" id="welcome" hidden>
+        <div style="flex:1">
+          <b style="font-size:16px">Welcome to Chamfer Trackball</b>
+          <div class="steps" style="margin-top:6px"><span><b>1.</b> Open your CAD app — the ball is a normal mouse</span><span><b>2.</b> Tap <b>top-right</b> = Rotate on (roll to rotate, wheel twists) · tap <b>top-left</b> = Translate on (roll to slide, wheel = in / out). Tap again or click = mouse</span><span><b>3.</b> Light <b>btn1 + btn2</b> (tap both top keys) = zoom in / out with the ball, or use the wheel. <b>Ctrl</b> and <b>Shift</b> work as usual (Ctrl+click selects more). The <b>side wheel</b> switches programs</span><span><b>4.</b> In Chamfer3D Studio it's three-axis camera rotation (ball + wheel) around the surface under your pointer</span></div>
+        </div>
+        <button class="btn primary" id="welcomeOk">Got it</button>
+      </div>
+      <h1>Hold, roll, model.</h1><p id="integrationState" class="note">Normal mouse</p>
+      <p class="sub">Your trackball works like a 3D mouse in CAD apps, and like a normal mouse everywhere else.</p>
+      <div class="grid g3" style="margin-bottom:16px">
+        <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="6"/><path d="M5 6h4M15 6h4"/></svg></div><div style="min-width:0"><small>Trackball</small><b id="stDevice">Looking…</b></div></div>
+        <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg></div><div style="min-width:0"><small>App in front</small><b id="stApp">—</b></div></div>
+        <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 4v5h-5"/></svg></div><div style="min-width:0"><small>Right now</small><b id="stMode">Idle</b><small id="stProg" style="display:block;margin-top:2px"></small></div></div>
+      </div>
+      <div class="grid g2">
+        <div class="card">
+          <div class="row" style="margin-bottom:10px"><h2 style="margin:0">Try it here</h2><span class="spacer"></span><button class="btn sm" id="padReset">Reset view</button></div>
+          <div class="pad" id="pad"><canvas id="padCanvas"></canvas><div class="mode" id="padMode">Move the pointer here, then hold a button and roll</div></div><div class="hintrow" id="padHint"></div>
+          <p class="mu" style="margin:10px 0 0;font-size:12.5px">The pad only takes over your trackball while the pointer is over it.</p>
+        </div>
+        <div class="card">
+          <div class="row" style="margin-bottom:10px"><h2 style="margin:0">Your controls</h2><span class="spacer"></span><button class="btn sm" data-go="controls">Change</button></div>
+          <div class="cheat" id="cheat"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="row" style="margin-bottom:8px"><h2 style="margin:0">What it's doing</h2><span class="spacer"></span><button class="btn sm" data-clearlog>Clear</button></div>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">Live view of every button you hold and what Chamfer Trackball does with it. If something doesn't work, this says why.</p>
+        <div class="actlog" data-actlog><div class="mu">Hold a button on your trackball…</div></div>
+      </div>
+      <div class="card" style="margin-top:16px" id="whyCard">
+        <h2>Why a trackball</h2>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">A SpaceMouse is a second device you push to make the model spin. Your trackball is one device that is both your mouse and your 3D controller.</p>
+        <table class="cmp">
+          <thead><tr><th></th><th>SpaceMouse</th><th class="us">Your trackball</th></tr></thead>
+          <tbody>
+            <tr><th>Rotation</th><td><span class="yes">✔</span></td><td class="us"><span class="yes">✔</span>Orbit<small>3D modelling: just roll the ball</small></td></tr>
+            <tr><th>Translation</th><td><span class="yes">✔</span></td><td class="us"><span class="yes">✔</span>Pan and zoom<small>Tap top-right for pan, again for zoom, then just roll</small></td></tr>
+            <tr><th>Control</th><td>Rate<small>Push harder, it spins faster and keeps going</small></td><td class="us"><span class="hl">Position</span><small>The model moves exactly as far as you roll, and stops when the ball stops</small></td></tr>
+            <tr><th>Mouse</th><td><span class="no">—</span><small>Needs a separate mouse</small></td><td class="us"><span class="yes">✔</span><span class="hl">Unified</span><small>Top-left key → Normal mouse and the same ball is your pointer</small></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <section class="page" data-page="controls">
+      <div class="row"><div><h1>Buttons &amp; keys</h1><p class="sub">Choose what each part of your trackball does. Press any button on your trackball to find it below.</p></div><span class="spacer"></span><span class="saved" id="saved1"></span></div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="row" style="margin-bottom:6px"><h2 style="margin:0">Programs</h2><span class="spacer"></span><button class="btn sm" id="progRename">Rename</button><button class="btn sm" id="progCopy">Duplicate</button><button class="btn sm danger" id="progDel">Delete</button></div>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">Each program is a full set of buttons, wheels, keys and ball gestures — like the DPI button, but for what the buttons do. Click one to use and edit it.</p>
+        <div class="progs" id="progs"></div>
+        <div class="opt" style="margin-top:12px"><div class="t">In 3D apps, rolling the ball…<small>What the ball does in this program while a 3D app is in front. Everywhere else it's a normal pointer.</small></div><select data-k="ball" id="ballSel"><option value="pointer">Moves the pointer (normal mouse)</option><option value="auto">Does it all: roll the ball; top-right taps choose orbit → pan → zoom</option><option value="orbit">Only orbits the model</option><option value="pan">Only pans the view</option><option value="zoom">Only zooms (roll up / down)</option></select></div>
+        <div class="opt"><div class="t">Switch program with a shortcut<small>Press it anywhere to go to the next program. You can also set any button to “Next program”, or use the tray icon menu.</small></div><div class="row" style="gap:8px" id="progKeyRow"></div></div>
+        <div class="opt"><div class="t">Show a message when the program changes<small>A small notification shows the program's name.</small></div><label class="sw"><input type="checkbox" data-k="programToast"><span></span></label></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>Quick setups</h2>
+        <div class="presets">
+          <button class="preset" data-preset="controller"><b>Your held-key setup</b><small>Shift + ball rotates. Ctrl+Shift + ball pans, with the wheel for simultaneous zoom. Alt + ball snaps and backtick navigates with a native integration. Release the keys for a normal mouse.</small></button><button class="preset" data-preset="ballonly"><b>Normal mouse</b><small>Original mouse clicks, pointing and scrolling. Navigation keys, custom combinations and wheel remapping are off.</small></button>
+          <button class="preset" data-preset="both"><b>Buttons + held keys</b><small>Hold Back + ball to orbit or Middle + ball to pan. Shift and Ctrl+Shift work too. Normal left and right clicks.</small></button>
+          
+          
+          
+        </div>
+      </div>
+      <div class="ctl">
+        <div class="card device">
+          <h2>Your trackball</h2>
+          <svg viewBox="0 0 300 370" id="devSvg" class="dev" role="img" aria-label="Nulea M512 trackball, seen from above">
+            <defs>
+              <radialGradient id="ballg" cx="36%" cy="30%" r="72%"><stop offset="0" stop-color="#ff8a8a"/><stop offset=".35" stop-color="#d0202a"/><stop offset="1" stop-color="#5a070c"/></radialGradient>
+              <linearGradient id="ringg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9ecef"/><stop offset=".5" stop-color="#8d939a"/><stop offset="1" stop-color="#c9ced3"/></linearGradient>
+              <linearGradient id="wheelg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aa0a6"/><stop offset=".5" stop-color="#d9dde1"/><stop offset="1" stop-color="#7d838a"/></linearGradient>
+            </defs>
+            <rect x="34" y="12" width="232" height="344" rx="26" fill="#1c1e22" stroke="#3a3e45" stroke-width="2"/>
+            <!-- side keys (mode, left/right hand, DPI): handled by the trackball itself -->
+            <g fill="#2b2e33" stroke="#4a4f57"><rect x="28" y="44" width="7" height="18" rx="2"/><rect x="28" y="68" width="7" height="18" rx="2"/><rect x="28" y="92" width="7" height="18" rx="2"/></g>
+            <g class="hot" data-b="middle"><path class="shape" d="M44 46 Q44 22 68 22 L146 22 L146 156 L44 156 Z"/><text x="62" y="46">Middle</text></g>
+            <g class="hot" data-b="back"><path class="shape" d="M154 22 L232 22 Q256 22 256 46 L256 156 L154 156 Z"/><text x="208" y="46">Back</text></g>
+            <g class="hot" data-b="left"><path class="shape" d="M44 164 L146 164 L146 346 L68 346 Q44 346 44 322 Z"/><text x="62" y="334">Left</text></g>
+            <g class="hot" data-b="right"><path class="shape" d="M154 164 L256 164 L256 322 Q256 346 232 346 L154 346 Z"/><text x="210" y="334">Right</text></g>
+            <circle cx="150" cy="160" r="76" fill="#1c1e22" pointer-events="none"/>
+            <circle cx="150" cy="160" r="70" fill="url(#ringg)" pointer-events="none"/>
+            <circle class="ball" cx="150" cy="160" r="60" pointer-events="none"/>
+            <circle id="ballRing" cx="150" cy="160" r="66" fill="none" stroke="var(--accent)" stroke-width="4" opacity="0" pointer-events="none"/>
+            <text id="ballArrow" x="150" y="160" text-anchor="middle" dominant-baseline="central" font-size="54" font-weight="700" fill="#fff" pointer-events="none" style="paint-order:stroke;stroke:rgba(0,0,0,.45);stroke-width:4px"></text>
+            <text id="ballMode" x="150" y="252" text-anchor="middle" font-size="15" font-weight="700" fill="var(--accent)" pointer-events="none"></text>
+            <ellipse id="ballShine" cx="128" cy="134" rx="18" ry="11" fill="#fff" opacity=".28" pointer-events="none"/>
+            <g class="hot" data-b="rightWheel"><rect class="shape wheel" x="24" y="250" width="16" height="50" rx="5"/><text x="4" y="318">L wheel</text></g>
+            <g class="hot" data-b="leftWheel"><rect class="shape wheel" x="260" y="250" width="16" height="50" rx="5"/><text x="248" y="318">R wheel</text></g>
+            <text x="150" y="364" text-anchor="middle" class="brand">nulea</text>
+          </svg>
+          <p class="mu" style="font-size:12.5px;margin:6px 0 0">Nulea M512 from above. Press any button on your trackball and it lights up here, so you always know which one is which. The small keys on the left side (mode, left/right hand, DPI) are handled by the trackball itself.</p>
+          <p style="margin:12px 0 0"><span class="mu">Last pressed:</span> <b id="lastPressed">—</b></p>
+          <p style="margin:4px 0 0"><span class="mu">It did:</span> <b id="lastDid">—</b></p>
+        </div>
+        <div class="binds" id="binds"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="row" style="margin-bottom:8px"><h2 style="margin:0">What it's doing</h2><span class="spacer"></span><button class="btn sm" data-clearlog>Clear</button></div>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">Live view of every button you hold and what Chamfer Trackball does with it. If something doesn't work, this says why.</p>
+        <div class="actlog" data-actlog><div class="mu">Hold a button on your trackball…</div></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Hold keys + roll (Rotatrix style)</h2>
+        <div class="binds" id="keyBinds"></div>
+      </div>
+      <div class="card" style="margin-top:16px" id="gestCard">
+        <div class="row" style="margin-bottom:8px;gap:10px"><h2 style="margin:0">Ball gestures</h2><span class="spacer"></span><span class="mu" style="font-size:13px">Gestures for</span><select id="gestScope" style="min-width:220px"></select></div>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px" id="gestHelp"></p>
+        <div class="gest" id="gest"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Extras</h2>
+        <div class="opt"><div class="t">Show the guide<small>A panel in the bottom-right of your screen that stays there: the program, the mode, what btn1–btn4 do, what you're doing (Orbit, Pan, Zoom, Twist) and the arrow you're rolling or turning. Drag it anywhere and it stays there; close it with its × and it comes back bottom-right on the next mode or program switch. It replaces the program notification.</small></div><label class="sw"><input type="checkbox" data-k="modePanel"><span></span></label></div>
+        <div class="opt"><div class="t">Show the pivot<small>While rotating, a dot marks the spot the model turns around: whatever is under your pointer when you start. In Chamfer3D Studio it's the surface you point at; other apps use their own orbit setting.</small></div><label class="sw"><input type="checkbox" data-k="showPivot"><span></span></label></div>
+        <div class="opt"><div class="t">Twist with the wheel<small>On: while Rotate is on (tap top-right), turning the wheel twists (rolls) the model in Chamfer3D Studio. Off: the wheel zooms instead. The Normal mouse program never twists.</small></div><label class="sw"><input type="checkbox" data-k="twist"><span></span></label></div>
+        <div class="opt"><div class="t">Flash a small symbol when orbit and pan swap<small>Just ↻ (orbit) or ✥ (pan) by the pointer for a moment — no words.</small></div><label class="sw"><input type="checkbox" data-k="modeIcon"><span></span></label></div>
+        <div class="opt"><div class="t">Show a label next to the pointer (off by default)<small>A small label shows Orbit, Pan or Zoom with the direction you're rolling, the gesture you're drawing and what it will run, shortcuts and macros as they fire, and program changes.</small></div><label class="sw"><input type="checkbox" data-k="showLabel"><span></span></label></div>
+        <div class="opt"><div class="t">Fine zoom while holding<small>While holding an orbit or pan button, the right wheel zooms in small steps.</small></div><label class="sw"><input type="checkbox" data-k="buttonWheelZoom"><span></span></label></div>
+        <div class="opt"><div class="t">Put the pointer back<small>After orbiting or panning, the pointer returns to where you started.</small></div><label class="sw"><input type="checkbox" data-k="returnCursor"><span></span></label></div>
+        <div class="opt"><div class="t">Wheel Reverse and Off work in every app<small>Normally a reversed or switched-off wheel only applies inside CAD apps. Shortcuts, macros and gestures always work everywhere; 3D moves always need a CAD app.</small></div><label class="sw"><input type="checkbox" data-k="shortcutsEverywhere"><span></span></label></div>
+      </div>
+      <div class="row" style="margin-top:16px"><span class="spacer"></span><button class="btn" id="resetControls">Reset buttons &amp; keys</button></div>
+    </section>
+
+    <!-- SPEED -->
+    <section class="page" data-page="macros">
+      <div class="row"><div><h1>Macros</h1><p class="sub">A macro is a list of steps — shortcuts, typed text, waits, clicks and scrolls. Make as many as you like, as long as you like, then give them to a button or a ball gesture.</p></div><span class="spacer"></span><span class="saved"></span></div>
+      <div class="macros">
+        <div class="card"><div class="mlist" id="mlist"></div><button class="btn primary" id="mNew" style="margin-top:10px;width:100%">+ New macro</button></div>
+        <div class="card" id="medit"></div>
+      </div>
+    </section>
+
+    <section class="page" data-page="speed">
+      <div class="row"><div><h1>Speed &amp; direction</h1><p class="sub">Try your changes on the Home page pad.</p></div><span class="spacer"></span><span class="saved" id="saved2"></span></div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Program</h2><span class="spacer"></span><button class="btn sm" data-go="controls">Manage programs</button></div>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">Every setting on this page belongs to the program you pick here — each program has its own pointer speed, motion feel, 3D speeds, directions, precision and click tolerance. Switching program (button, shortcut or tray) switches them too.</p>
+        <div class="progs" id="speedProgs"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="row" style="margin-bottom:6px"><h2 style="margin:0">DPI</h2><span class="spacer"></span><button class="btn sm" id="dpiDefault">Default</button></div>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">How far the pointer moves for each roll of the ball. Lower DPI = slower, more exact; higher = faster. Saved with <b id="ptrProg"></b>, so each program has its own. <b>Default</b> is your trackball's own DPI.</p>
+        <div class="slider"><b>DPI</b><input type="range" min="1" max="20" data-k="pointerSpeed"><span class="val" data-v="pointerSpeed"></span></div>
+        <div class="opt" style="margin-top:8px"><div class="t">Trackball DPI key<small>The DPI key on the side of your M512 cycles 400 → 800 → 1200 → 1600. Pick what it's on so the numbers above are right.</small></div><select data-k="trackballDpi" id="hwDpi"><option value="400">400</option><option value="800">800</option><option value="1200">1200</option><option value="1600">1600</option></select></div>
+        <p class="mu" style="margin:6px 0 0;font-size:12px">Only changes the speed while Chamfer Trackball is running — quitting it (or restarting the PC) brings back your own Windows speed.</p>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>Motion feel</h2>
+        <div class="opt"><div class="t">Smooth, like a SpaceMouse<small>The ball sets a speed and the view flies: it eases in as you roll and glides to a stop after you let go, instead of jumping exactly with the ball like a mouse. Turn off for direct, mouse-like control.</small></div><label class="sw"><input type="checkbox" data-k="smooth"><span></span></label></div>
+        <div class="slider" style="margin-top:8px"><b>Glide</b><input type="range" min="1" max="100" data-k="glide"><span class="val" data-v="glide"></span></div>
+        <p class="mu" style="margin:6px 0 0;font-size:12px">How long the view keeps moving after the ball stops. Short feels precise; long feels like flying.</p>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>3D speed</h2>
+        <div class="slider"><b>Orbit</b><input type="range" min="1" max="100" data-k="orbitSens"><span class="val" data-v="orbitSens"></span></div>
+        <div class="slider"><b>Pan</b><input type="range" min="1" max="100" data-k="panSens"><span class="val" data-v="panSens"></span></div>
+        <div class="slider"><b>Zoom</b><input type="range" min="1" max="100" data-k="zoomSens"><span class="val" data-v="zoomSens"></span></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>Precision</h2>
+        <div class="opt"><div class="t">Precise when rolling slowly<small>Slow, small rolls move the model less (down to about a third), fast rolls stay full speed — so you can line up a view exactly and still spin it quickly.</small></div><label class="sw"><input type="checkbox" data-k="preciseSlow"><span></span></label></div>
+        <div class="note warn" id="accelNote" hidden style="margin-top:10px">Windows <b>“Enhance pointer precision”</b> is on. It speeds the pointer up when you roll fast, so the same roll turns the model by different amounts. For the most exact control, turn it off. <button class="btn sm" id="openMouse" style="margin-left:6px">Open mouse settings</button></div>
+        <p class="mu" style="margin:10px 0 0;font-size:12px">Tip: a higher DPI on the trackball (its DPI key) with lower Orbit/Pan speed here gives the finest control.</p>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>Button clicks</h2>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">The M512's buttons are stiff, so pressing one can nudge the ball. This sets how much the ball may move while you press a button and it still counts as a click (or a quick tap like Fit view) instead of starting orbit, pan or a gesture.</p>
+        <div class="slider"><b>Click tolerance</b><input type="range" min="2" max="60" data-k="clickSlop"><span class="val" data-v="clickSlop"></span></div>
+        <p class="mu" style="margin:6px 0 0;font-size:12px">Clicks turning into orbit or pan by accident? Move it right. Orbit feels slow to start? Move it left.</p>
+      </div>
+      <div class="card">
+        <h2>Direction</h2>
+        <div class="opt"><div class="t">Reverse left / right orbit</div><label class="sw"><input type="checkbox" data-k="invertOrbitX"><span></span></label></div>
+        <div class="opt"><div class="t">Reverse up / down orbit</div><label class="sw"><input type="checkbox" data-k="invertOrbitY"><span></span></label></div>
+        <div class="opt"><div class="t">Reverse pan</div><label class="sw"><input type="checkbox" data-k="invertPan"><span></span></label></div>
+        <div class="opt"><div class="t">Reverse zoom</div><label class="sw"><input type="checkbox" data-k="invertZoom"><span></span></label></div>
+      </div>
+      <div class="row" style="margin-top:16px"><span class="spacer"></span><button class="btn" id="resetSpeed">Reset speed &amp; direction</button></div>
+    </section>
+
+    <!-- APPS -->
+    <section class="page" data-page="apps">
+      <div class="row"><div><h1>CAD apps</h1><p class="sub">3D controls turn on automatically when one of these apps is in front.</p></div><span class="spacer"></span><span class="saved" id="saved3"></span></div>
+      <div class="card"><h2>Native integrations</h2><p>Native integration gets the camera and the surface under your cursor. Mouse emulation provides orbit, pan and wheel zoom for other apps.</p><button class="btn" data-install-integration="blender">Install Blender integration</button> <button class="btn" data-install-integration="fusion">Install Fusion integration</button><p class="mu">The required integration is included in this executable. The button installs it into that app's normal add-on folder.</p><button class="btn" id="customCad">Add another 3D app</button></div><div class="apps" id="apps"></div>
+      <p class="mu" style="font-size:12.5px;margin-top:14px">Orbit, Pan and Zoom here are the app's own mouse controls, the ones Chamfer Trackball presses for you while you roll. If rolling moves the wrong thing in an app, match these to that app's settings.</p>
+    </section>
+
+    <!-- APPEARANCE -->
+    <section class="page" data-page="appearance">
+      <h1>Appearance</h1><p class="sub">Pick a look. Changes apply right away.</p>
+      <div class="card">
+        <h2>Theme</h2>
+        <div class="themes" id="themes">
+          <button class="th" data-mode="dark"><div class="pv" style="background:#14171b"><i style="background:#1b1f25"></i><div class="m"><span style="background:#35c6dc;width:60%"></span><span style="background:#2d343e"></span><span style="background:#2d343e;width:70%"></span></div></div><b>Dark</b><br><small class="mu">Chamfer3D charcoal &amp; cyan</small></button>
+          <button class="th" data-mode="light"><div class="pv" style="background:#eef2f5"><i style="background:#fff"></i><div class="m"><span style="background:#0e9fb5;width:60%"></span><span style="background:#d9e0e6"></span><span style="background:#d9e0e6;width:70%"></span></div></div><b>Light</b><br><small class="mu">Bright and clean</small></button>
+          <button class="th" data-mode="system"><div class="pv" style="background:linear-gradient(135deg,#14171b 50%,#eef2f5 50%)"><i style="background:transparent"></i><div class="m"><span style="background:#35c6dc;width:60%"></span></div></div><b>Match Windows</b><br><small class="mu">Follows your Windows setting</small></button>
+          <button class="th" data-mode="custom"><div class="pv" id="customPv"><i></i><div class="m"><span id="cpA" style="width:60%"></span><span style="background:rgba(127,127,127,.3)"></span></div></div><b>Custom</b><br><small class="mu">Your own colours</small></button>
+        </div>
+        <div class="colors" id="customColors" hidden>
+          <label>Accent <input type="color" id="cAccent"></label>
+          <label>Background <input type="color" id="cBg"></label>
+          <button class="btn sm" id="cReset">Use Chamfer3D colours</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- GENERAL -->
+    <section class="page" data-page="general">
+      <h1>General</h1><p class="sub">How Chamfer Trackball runs on this PC.</p>
+      <div class="card">
+        <div class="opt"><div class="t">Start with Windows<small>Starts quietly in the tray when you sign in.</small></div><label class="sw"><input type="checkbox" id="startup"><span></span></label></div>
+        <div class="opt"><div class="t">Check for updates automatically<small>Tells you when a new version is ready. Nothing installs without your click.</small></div><label class="sw"><input type="checkbox" data-k="autoUpdateCheck"><span></span></label></div>
+        <div class="opt"><div class="t">Settings file<small id="setPath">—</small></div><button class="btn sm" id="openFile">Open</button></div>
+        <div class="opt"><div class="t">Close button<small>Closing the window keeps Chamfer Trackball running in the tray.</small></div><button class="btn sm" id="hideNow">Hide to tray</button></div>
+        <div class="opt"><div class="t">Reset everything<small>Puts every program, button, wheel, combination, speed and the guide back to normal settings. Your macros and look are kept.</small></div><button class="btn sm danger" id="resetAll">Reset to normal</button></div>
+        <div class="opt"><div class="t">Quit<small>Stops 3D controls until you start the app again.</small></div><button class="btn sm danger" id="quitNow">Quit app</button></div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="page" data-page="about">
+      <h1>About &amp; updates</h1><p class="sub">Chamfer Trackball by Chamfer3D.</p>
+      <div class="card about">
+        <h2>About</h2>
+        <div class="ar"><span class="l">Version</span><span class="c"></span><span class="verbox" id="abVer">v—</span></div>
+        <div class="ar"><span class="l">Updates</span><span class="c" id="updText">—</span><button class="btn" id="updBtn">Check again</button></div>
+        <div id="updProg" hidden><div class="bar"><i id="updBar"></i></div></div>
+        <div id="updErr" class="note err" style="margin-top:10px" hidden></div>
+        <details id="newDetails" hidden><summary id="newSum"></summary><ul id="newList"></ul></details>
+        <details open id="curDetails"><summary id="curSum"></summary><ul id="curList"></ul></details>
+        <details id="oldDetails"><summary>Earlier updates</summary><div id="oldList"></div></details>
+        <p class="mu" style="font-size:12.5px;margin:14px 0 0" id="chanTxt"></p>
+      </div>
+    </section>
+
+    <!-- ADMIN (admin build only) -->
+    <section class="page" data-page="admin">
+      <h1>Admin</h1><p class="sub">Only you see this page. Your private versions go up with every update (v1.0.0 → v1.0.1 …). Users only get a version when you press <b>Release for public</b>.</p>
+      <div id="adMsg" class="note" style="margin-bottom:14px" hidden></div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>Releasing</h2>
+        <div id="adConn"></div>
+      </div>
+      <div class="card">
+        <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Versions</h2><span class="spacer"></span><button class="btn sm" id="adRefresh">Refresh</button></div>
+        <div id="adVers"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="modal"><div class="box"><h3 id="mTitle"></h3><div id="mBody" class="mu"></div><div class="acts" id="mActs"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S=null, cfg=null, page="home", saveTimer=null, lastBtnSeen=0, recording=null;
+
+const BTN={left:"btn3 · Left button",right:"btn4 · Right button",middle:"btn1 · Top-left",back:"btn2 · Top-right",forward:"Forward button",rightWheel:"Left scroll wheel",leftWheel:"Right scroll wheel"};
+const BTN_SUB={left:"Bottom-left · always a normal click",right:"Bottom-right button",middle:"Top-left button",back:"Top-right button",forward:"",rightWheel:"Wheel on the left side",leftWheel:"Wheel on the right side"};
+const ACT={normal:"Normal (no change)",lockZoom:"Zoom (tap on/off: roll up / down)",zoomIn:"Zoom in (one step)",zoomOut:"Zoom out (one step)",sendLeft:"Left click",sendRight:"Right click",sendMiddle:"Middle click",sendX1:"Mouse button 4",sendX2:"Mouse button 5",orbit:"Orbit — hold & roll",pan:"Pan — hold & roll",zoom:"Zoom — hold & roll up/down",fit:"Fit / home view",lock3d:"3D mode on/off (trackball only)",lockRotate:"Orbit (tap on / tap off)",lockTranslate:"Pan (tap on / tap off)",lockTwist:"Twist (tap on/off)",panToggle:"Orbit → pan → zoom (3D modelling)",keys:"Keyboard shortcut…",macro:"Run a macro…",gestures:"Ball gestures — hold, roll, let go",nextProgram:"Next program (cycle)",program:"Go to a program…",disabled:"Off (does nothing)"};
+const ACT_DESC={normal:"Works exactly like your mouse normally does.",lockZoom:"Tap once: roll the ball up to zoom in, down to zoom out. Tap again, or click, for the normal mouse. Only in 3D apps.",zoomIn:"Each press zooms in one step (3D apps).",zoomOut:"Each press zooms out one step (3D apps).",sendLeft:"Acts as a left click.",sendRight:"Acts as a right click.",sendMiddle:"Acts as a middle (wheel) click — many CAD apps orbit or pan with it.",sendX1:"Acts as mouse button 4 (Back).",sendX2:"Acts as mouse button 5 (Forward).",orbit:"Hold it and roll the ball to spin the model (in 3D apps).",pan:"Hold it and roll the ball to slide the view (in 3D apps).",zoom:"Hold it and roll up or down to zoom (in 3D apps).",fit:"One press fits the whole model on screen (in 3D apps).",lockRotate:"Tap once: the ball rotates the model with the ball and wheel, nothing to hold; the wheel is the twist (rolls the view in Chamfer3D Studio). Tap again, or click, for the normal mouse. Only in 3D apps.",lockTwist:"Tap once: rolling the ball left / right twists (rolls) the model around the view, like turning a 3D mouse cap; the wheel moves in / out. Tap again, or click, for the normal mouse. Twist works in Chamfer3D Studio; in other apps rolling rotates.",lockTranslate:"Tap once: the ball slides the view; the wheel moves in / out (toward you or into the screen). Tap again, or click, for the normal mouse. Only in 3D apps.",panToggle:"In 3D modelling, each tap changes what rolling the ball does: orbit → pan → zoom (roll up = zoom in, down = out) → back to orbit. Hold it for half a second to stop moving the model: the ball moves the pointer so you can click things, and the next tap brings back orbit. Outside 3D apps it does nothing.",lock3d:"Tap once and the ball becomes a 3D controller, like a SpaceMouse — nothing to hold: roll to orbit, scroll to zoom, tap your pan button to make the ball pan (tap it again to orbit). Clicking still works. Tap again for a normal pointer.",keys:"One press types the shortcut you record — in every app.",macro:"One press plays the macro — in every app. Press again to stop a long one.",gestures:"Hold it, roll the ball in a direction and let go: that direction's command runs (set them in Ball gestures below). A quick press is a normal click.",nextProgram:"Each press moves to the next program, like a DPI button.",program:"One press switches straight to the program you pick.",disabled:"Does nothing at all."};
+const MACT={normal:"Same as usual",lockZoom:"Zoom (tap on/off)",zoomIn:"Zoom in (one step)",zoomOut:"Zoom out (one step)",sendLeft:"Left click",sendRight:"Right click",sendMiddle:"Middle click",sendX1:"Mouse button 4",sendX2:"Mouse button 5",fit:"Fit / home view (Snap view)",keys:"Keyboard shortcut…",macro:"Run a macro…",nextProgram:"Next program",program:"Go to a program…",lockRotate:"Orbit (tap on / tap off)",lockTranslate:"Pan (tap on / tap off)",disabled:"Off (does nothing)"};
+const CACT={lockRotate:"Orbit (stays on while lit)",lockTranslate:"Pan (stays on while lit)",lockTwist:"Twist (stays on while lit)",lockZoom:"Zoom in / out with the ball (stays on while lit)",zoomIn:"Zoom in (one step)",zoomOut:"Zoom out (one step)",fit:"Snap view (fit / home)",keys:"Keyboard shortcut…",macro:"Run a macro…",nextProgram:"Next program",program:"Go to a program…",sendLeft:"Left click",sendRight:"Right click",sendMiddle:"Middle click",sendX1:"Mouse button 4",sendX2:"Mouse button 5",disabled:"Nothing"};
+const CMD={none:"— Nothing —",keys:"Keyboard shortcut…",macro:"Run a macro…",fit:"Fit view (3D apps)",nextProgram:"Next program",program:"Go to a program…",click:"Left click",doubleClick:"Double click",rightClick:"Right click",middleClick:"Middle click"};
+const DIRS=[["upLeft","↖","Up-left"],["up","↑","Up"],["upRight","↗","Up-right"],["left","←","Left"],[null],["right","→","Right"],["downLeft","↙","Down-left"],["down","↓","Down"],["downRight","↘","Down-right"]];
+const STEP={keys:"Shortcut",text:"Type text",wait:"Wait",click:"Click",scroll:"Scroll"};
+const TAP={fit:"Fit view",click:"Normal click",none:"Nothing"};
+const WHEEL={normal:"Normal scroll",zoom:"Smooth zoom (CAD apps)",invert:"Reverse direction",disabled:"Off (does nothing)"};
+const LWHEEL={...WHEEL,cycle:"Cycle the ball: mouse → rotate → pan → twist",program:"Next / previous program",goProgram:"Go to a program (up / down)…",keys:"Keyboard shortcut (up / down)…"};
+const LWHEEL_DESC={normal:"Zooming with the side wheel keeps your normal scrolling on the main wheel.",zoom:"Zooming with the side wheel keeps your normal scrolling on the main wheel.",invert:"Scrolls the other way.",disabled:"Does nothing.",cycle:"In 3D apps each notch changes what the ball does: Mouse → Rotate → Pan → Twist (Twist only if it's switched on in Extras). Turn the other way to go back. A click also returns to the mouse.",program:"Each notch switches to the next program (the other way: the previous one).",goProgram:"Turn it up to go to one program, down to go to another — pick them below.",keys:"Each notch up types one shortcut, each notch down another — in every app."};
+const holdLabel=k=>!k||k==="none"?"Off":k.split("+").map(x=>x.length===1?x.toUpperCase():x[0].toUpperCase()+x.slice(1)).join(" + ");
+const call=(n,...a)=>window[n]?window[n](...a):Promise.reject("not available");
+
+function toast(msg,err){const t=$("#toast");t.textContent=msg;t.className="toast show"+(err?" err":"");clearTimeout(t._t);t._t=setTimeout(()=>t.className="toast",err?5000:2200)}
+function modal(title,body,acts){$("#mTitle").textContent=title;$("#mBody").innerHTML=body;const a=$("#mActs");a.innerHTML="";
+  return new Promise(res=>{acts.forEach(([label,cls,val])=>{const b=document.createElement("button");b.className="btn "+(cls||"");b.textContent=label;b.onclick=()=>{close();res(val)};a.appendChild(b)});
+  const close=()=>$("#modal").classList.remove("show");$("#modal").classList.add("show");a.lastElementChild&&a.lastElementChild.focus();$("#modal")._close=()=>{close();res(null)}})}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#modal").classList.contains("show")&&!recording)$("#modal")._close()});
+
+/* ---------- navigation ---------- */
+function goTo(p){page=p;$$("nav button").forEach(b=>b.classList.toggle("on",b.dataset.go===p));$$(".page").forEach(s=>s.classList.toggle("on",s.dataset.page===p));
+  $("#main").scrollTop=0;if(p==="about")refreshUpd();if(p==="admin")refreshAdmin(true);setTimeout(reportPad,30)}
+window.goTo=goTo;
+document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g)goTo(g.dataset.go)});
+
+/* ---------- theme ---------- */
+function hex(c){c=c.replace("#","");return[0,2,4].map(i=>parseInt(c.substr(i,2),16))}
+function toHex(a){return"#"+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,"0")).join("")}
+function mix(a,b,t){const A=hex(a),B=hex(b);return toHex(A.map((v,i)=>v+(B[i]-v)*t))}
+function lum(c){const[r,g,b]=hex(c).map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*r+.7152*g+.0722*b}
+function applyTheme(){const t=cfg.theme,root=document.documentElement,st=root.style;
+  ["--bg","--panel","--panel2","--line","--text","--muted","--accent","--accent2","--accentInk","--glow","--grid","--cube1"].forEach(v=>st.removeProperty(v));
+  let mode=t.mode,dark=true;
+  if(mode==="system")mode=matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
+  if(mode==="custom"){const bg=t.background,ac=t.accent;dark=lum(bg)<.35;root.dataset.theme=dark?"dark":"light";
+    const to=dark?"#ffffff":"#000000";
+    st.setProperty("--bg",bg);st.setProperty("--panel",mix(bg,to,.05));st.setProperty("--panel2",mix(bg,to,.09));st.setProperty("--line",mix(bg,to,.16));
+    st.setProperty("--text",dark?"#eef2f5":"#141c24");st.setProperty("--muted",mix(dark?"#eef2f5":"#141c24",bg,.4));
+    st.setProperty("--accent",ac);st.setProperty("--accent2",mix(ac,dark?"#ffffff":"#000000",.3));st.setProperty("--accentInk",lum(ac)>.4?"#08161a":"#ffffff");
+    const [r,g,b]=hex(ac);st.setProperty("--glow",`rgba(${r},${g},${b},.18)`);st.setProperty("--grid",mix(bg,to,.1));st.setProperty("--cube1",ac);
+  }else{dark=mode!=="light";root.dataset.theme=dark?"dark":"light"}
+  call("ctTitleBar",dark).catch(()=>{});
+  $$(".th").forEach(b=>b.classList.toggle("on",b.dataset.mode===t.mode));
+  $("#customColors").hidden=t.mode!=="custom";$("#cAccent").value=t.accent;$("#cBg").value=t.background;
+  $("#customPv").style.background=t.background;$("#customPv i").style.background=mix(t.background,lum(t.background)<.35?"#ffffff":"#000000",.06);$("#cpA").style.background=t.accent;
+  padColors=null}
+matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>cfg&&cfg.theme.mode==="system"&&applyTheme());
+$("#themes").addEventListener("click",e=>{const b=e.target.closest(".th");if(!b)return;cfg.theme.mode=b.dataset.mode;applyTheme();save()});
+$("#cAccent").addEventListener("input",e=>{cfg.theme.accent=e.target.value;applyTheme();save()});
+$("#cBg").addEventListener("input",e=>{cfg.theme.background=e.target.value;applyTheme();save()});
+$("#cReset").onclick=()=>{cfg.theme.accent=S.defaults.theme.accent;cfg.theme.background=S.defaults.theme.background;applyTheme();save()};
+
+/* ---------- saving ---------- */
+function save(now){clearTimeout(saveTimer);saveTimer=setTimeout(doSave,now?0:250)}
+async function doSave(){try{const n=await call("ctSave",cfg);if(n){const theme=cfg.theme;cfg=n;cfg.theme=theme}flashSaved()}catch(err){toast(String(err.message||err),true);const st=await call("ctState");cfg=st.config;renderAll()}}
+function flashSaved(){$$(".saved").forEach(s=>{s.textContent="✓ Saved";s.style.opacity=1;clearTimeout(s._t);s._t=setTimeout(()=>s.style.opacity=0,1400)})}
+
+/* ---------- controls page ---------- */
+function opts(map,val){return Object.entries(map).map(([k,v])=>`<option value="${k}"${k===val?" selected":""}>${esc(v)}</option>`).join("")}
+function kbd(spec){if(!spec)return'<span class="mu">Not set</span>';return spec.split(",").map(c=>'<span class="kbd">'+c.split("+").map(k=>`<i>${esc(k)}</i>`).join("")+"</span>").join(" then ")}
+function renderBinds(){
+  const out=[];
+  out.push(`<div class="bind" data-row="left"><div class="nm"><b>${BTN.left}</b><small>${BTN_SUB.left}</small></div><div class="opts"><div class="desc">Kept as a normal click so you can never lock yourself out.</div></div></div>`);
+  for(const b of ["middle","back","right"]){const bd=cfg.buttons[b];
+    let extra="";
+    if(["orbit","pan","zoom"].includes(bd.action))extra=`<div class="line"><span class="mu">A quick tap does</span><select data-tap="${b}">${opts(TAP,bd.tap)}</select></div>`;
+    if(bd.action==="keys")extra=`<div class="line">${kbd(bd.keys)}<button class="btn sm" data-rec="${b}">${bd.keys?"Change":"Record"} shortcut</button></div>`;
+    if(bd.action==="macro")extra=cfg.macros.length?`<div class="line"><select data-bmacro="${b}">${macroOpts(bd.macro)}</select><button class="btn sm" data-go="macros">Edit macros</button></div>`:`<div class="line"><span class="wn">No macros yet.</span><button class="btn sm primary" data-go="macros">Make one</button></div>`;
+    if(bd.action==="program")extra=`<div class="line"><select data-bprog="${b}">${progOpts(bd.program)}</select></div>`;
+    out.push(`<div class="bind" data-row="${b}"><div class="nm"><b>${BTN[b]}</b><small>${BTN_SUB[b]}</small></div><div class="opts"><div class="line"><select data-act="${b}">${opts(ACT,bd.action)}</select><button class="btn sm" data-reset="${b}" title="Back to default">Default</button></div><div class="desc">${ACT_DESC[bd.action]}</div>${extra}</div></div>`)}
+  for(const w of ["leftWheel","rightWheel"]){const L=w==="leftWheel";
+    const pre=L?"left":"right",up=cfg[pre+"WheelUpKeys"],dn=cfg[pre+"WheelDownKeys"];
+    const wi=L?0:2;cfg.wheelPrograms=cfg.wheelPrograms||[0,1,0,1];
+    const gp=cfg[w]==="goProgram"?`<div class="line"><span class="mu">Up</span><select data-wprog="${wi}">${progOpts(cfg.wheelPrograms[wi])}</select><span class="mu">Down</span><select data-wprog="${wi+1}">${progOpts(cfg.wheelPrograms[wi+1])}</select></div>`:"";
+    const extra=gp+(cfg[w]==="keys"?`<div class="line"><span class="mu">Up</span>${kbd(up)}<button class="btn sm" data-rec="wheelUp:${pre}">${up?"Change":"Record"}</button><span class="mu">Down</span>${kbd(dn)}<button class="btn sm" data-rec="wheelDown:${pre}">${dn?"Change":"Record"}</button></div>`:"");
+    const desc=(!L&&cfg[w]==="normal")?"Most CAD apps already zoom with this wheel.":(LWHEEL_DESC[cfg[w]]||"").replace("Zooming with the side wheel keeps your normal scrolling on the main wheel.",L?"Zooming with the side wheel keeps your normal scrolling on the main wheel.":"Smooth zoom in 3D apps.");
+    out.push(`<div class="bind" data-row="${w}"><div class="nm"><b>${BTN[w]}</b><small>${BTN_SUB[w]||"Up / down scroll"}</small></div><div class="opts"><div class="line"><select data-wheel="${w}">${opts(LWHEEL,cfg[w])}</select></div><div class="desc">${desc}</div>${extra}</div></div>`)}
+  // While Rotate / Translate is on, a button can do something else.
+  cfg.modeButtons=cfg.modeButtons||{};
+  out.push(`<div class="bind" data-row="modeHead"><div class="nm"><b>While Rotate or Translate is on</b><small>Tap top-right / top-left first</small></div><div class="opts"><div class="desc">These buttons can do something else while a mode is on (like a 3D mouse). "Same as usual" keeps the choice above. A left click always goes back to the mouse.</div></div></div>`);
+  for(const b of ["right","middle","back"]){const md=cfg.modeButtons[b]||{action:"normal",tap:"click"};let extra="";
+    if(md.action==="keys")extra=`<div class="line">${kbd(md.keys)}<button class="btn sm" data-rec="mode:${b}">${md.keys?"Change":"Record"} shortcut</button></div>`;
+    if(md.action==="macro")extra=cfg.macros.length?`<div class="line"><select data-mmacro="${b}">${macroOpts(md.macro)}</select></div>`:`<div class="line"><span class="wn">No macros yet.</span><button class="btn sm primary" data-go="macros">Make one</button></div>`;
+    if(md.action==="program")extra=`<div class="line"><select data-mprog="${b}">${progOpts(md.program)}</select></div>`;
+    out.push(`<div class="bind" data-row="mode-${b}"><div class="nm"><b>${BTN[b]}</b><small>${BTN_SUB[b]} · in Rotate / Translate</small></div><div class="opts"><div class="line"><select data-mact="${b}">${opts(MACT,md.action)}</select></div>${extra}</div></div>`)}
+  // Combinations: tap buttons to light them; the lit set runs a command.
+  cfg.combos=cfg.combos||[];
+  out.push(`<div class="bind" data-row="comboHead"><div class="nm"><b>Combinations</b><small>Tap = lit, tap again = unlit</small></div><div class="opts"><div class="desc">btn1 / btn2 (top keys) light up with a tap and go off with the next tap; btn3 / btn4 (the clicks) light while held and still click. When exactly these buttons are lit, the command runs. A mode stays on while they stay lit; a shortcut or Snap view runs once.</div><div class="line"><button class="btn sm primary" data-cadd="1">Add combination</button></div></div></div>`);
+  cfg.combos.forEach((c,ci)=>{const bs=c.buttons||[],bd=c.bind||{action:"lockRotate"};let extra="";
+    if(bd.action==="keys")extra=`<div class="line">${kbd(bd.keys)}<button class="btn sm" data-rec="combo:${ci}">${bd.keys?"Change":"Record"} shortcut</button></div>`;
+    if(bd.action==="macro")extra=cfg.macros.length?`<div class="line"><select data-cmacro="${ci}">${macroOpts(bd.macro)}</select></div>`:`<div class="line"><span class="wn">No macros yet.</span></div>`;
+    if(bd.action==="program")extra=`<div class="line"><select data-cprog="${ci}">${progOpts(bd.program)}</select></div>`;
+    const boxes=[1,2,3,4].map(n=>`<label class="mu" style="margin-right:8px"><input type="checkbox" data-cbtn="${ci}:${n}" ${bs.includes(n)?"checked":""}> btn${n}</label>`).join("");
+    const warn=bs.length<2?'<div class="desc wn">Pick at least two buttons.</div>':"";
+    out.push(`<div class="bind" data-row="combo-${ci}"><div class="nm"><b>${bs.length?bs.map(n=>"btn"+n).join(" + "):"New combination"}</b><small>Combination ${ci+1}</small></div><div class="opts"><div class="line">${boxes}</div><div class="line"><select data-cact="${ci}">${opts(CACT,bd.action)}</select><button class="btn sm" data-cdel="${ci}">Remove</button></div>${warn}${extra}</div></div>`)});
+  $("#binds").innerHTML=out.join("");
+  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan; turn the wheel at the same time to move in or out."],["zoomKeys","Zoom","Optional separate hold keys: roll up/down to zoom."],["snapKeys","Snap to angle","Hold and roll to align to a face, edge or corner. Requires a native integration."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Requires a native integration."]].map(([k,n,d])=>
+    `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):'<span class="mu">Off</span>'}<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key.</div></div></div>`).join("");
+  $$("[data-k]").forEach(i=>{const k=i.dataset.k;if(i.type==="checkbox")i.checked=!!cfg[k];else i.value=cfg[k]});
+  $$("[data-v]").forEach(v=>v.textContent=valLabel(v.dataset.v,cfg[v.dataset.v]));
+}
+// Windows pointer-speed steps 1..20 as multipliers (10 = ×1).
+const WIN_MULT=[0,1/32,1/16,1/8,1/4,3/8,1/2,5/8,3/4,7/8,1,1.25,1.5,1.75,2,2.25,2.5,2.75,3,3.25,3.5];
+function dpiOf(v){return Math.round((cfg.trackballDpi||1600)*WIN_MULT[v||10]/50)*50}
+$("#dpiDefault").onclick=()=>{cfg.pointerSpeed=10;renderBinds();save(true)};
+document.addEventListener("change",e=>{if(e.target.id==="hwDpi"){cfg.trackballDpi=+e.target.value;renderBinds();save()}},true);
+function speedLabel(v){return(Math.pow(2,(v-50)/20)).toFixed(2)+"×"}
+function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" DPI"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
+document.addEventListener("change",e=>{const t=e.target;
+  if(t.dataset.act){const b=t.dataset.act,a=t.value;const cur=cfg.buttons[b];cur.action=a;
+    if(["orbit","pan","zoom"].includes(a)&&!cur.tap)cur.tap=b==="back"?"fit":"click";
+    if(a==="keys"&&!cur.keys){renderBinds();recordShortcut(b);return}
+    if(a==="macro"&&!cur.macro&&cfg.macros.length)cur.macro=cfg.macros[0].id;
+    if(a==="program")cur.program=cur.program||0;
+    if(a==="gestures")setTimeout(()=>$("#gestCard").scrollIntoView({behavior:"smooth",block:"start"}),60);
+    renderBinds();renderGestures();renderCheat();save();return}
+  if(t.dataset.mact){const b=t.dataset.mact,a=t.value;cfg.modeButtons=cfg.modeButtons||{};
+    if(a==="normal"){delete cfg.modeButtons[b];renderBinds();save();return}
+    const cur=cfg.modeButtons[b]=Object.assign(cfg.modeButtons[b]||{tap:"click"},{action:a});
+    if(a==="keys"&&!cur.keys){renderBinds();recordShortcut("mode:"+b);return}
+    if(a==="macro"&&!cur.macro&&cfg.macros.length)cur.macro=cfg.macros[0].id;
+    if(a==="program")cur.program=cur.program||0;
+    renderBinds();save();return}
+  if(t.dataset.cbtn){const [ci,n]=t.dataset.cbtn.split(":").map(Number);const c=cfg.combos[ci];c.buttons=(c.buttons||[]).filter(x=>x!==n);if(t.checked)c.buttons.push(n);c.buttons.sort();
+    const key=c.buttons.join(",");if(c.buttons.length>1&&cfg.combos.some((o,oi)=>oi!==ci&&(o.buttons||[]).join(",")===key)){toast("That combination already exists.");c.buttons=c.buttons.filter(x=>x!==n);renderBinds();return}
+    renderBinds();save(true);return}
+  if(t.dataset.cact){const c=cfg.combos[+t.dataset.cact];c.bind=Object.assign(c.bind||{tap:"click"},{action:t.value});
+    if(t.value==="keys"&&!c.bind.keys){renderBinds();recordShortcut("combo:"+t.dataset.cact);return}
+    if(t.value==="macro"&&!c.bind.macro&&cfg.macros.length)c.bind.macro=cfg.macros[0].id;
+    if(t.value==="program")c.bind.program=c.bind.program||0;
+    renderBinds();save();return}
+  if(t.dataset.cmacro){cfg.combos[+t.dataset.cmacro].bind.macro=t.value;save();return}
+  if(t.dataset.cprog){cfg.combos[+t.dataset.cprog].bind.program=+t.value;save();return}
+  if(t.dataset.mmacro){cfg.modeButtons[t.dataset.mmacro].macro=t.value;save();return}
+  if(t.dataset.mprog){cfg.modeButtons[t.dataset.mprog].program=+t.value;save();return}
+  if(t.dataset.tap){cfg.buttons[t.dataset.tap].tap=t.value;renderCheat();save();return}
+  if(t.dataset.bmacro){cfg.buttons[t.dataset.bmacro].macro=t.value;renderCheat();save();return}
+  if(t.dataset.bprog){cfg.buttons[t.dataset.bprog].program=+t.value;save();return}
+  if(t.dataset.gtype){const d=t.dataset.gtype,g=curGest();const c={type:t.value};
+    if(c.type==="macro")c.macro=(cfg.macros[0]||{}).id;if(c.type==="program")c.program=0;
+    if(c.type==="none")delete g[d];else g[d]=c;
+    if(c.type==="keys"){recordKeys("Shortcut for gesture "+d).then(k=>{if(k)g[d].keys=k;else delete g[d];renderGestures();save(true)});return}
+    renderGestures();save();return}
+  if(t.dataset.gmacro){curGest()[t.dataset.gmacro].macro=t.value;save();return}
+  if(t.dataset.gprog){curGest()[t.dataset.gprog].program=+t.value;save();return}
+  if(t.dataset.wprog){cfg.wheelPrograms=cfg.wheelPrograms||[0,1,0,1];cfg.wheelPrograms[+t.dataset.wprog]=+t.value;save();return}
+  if(t.dataset.wheel){cfg[t.dataset.wheel]=t.value;renderBinds();renderCheat();save();return}
+  if(t.dataset.keys){cfg[t.dataset.keys]=t.value;renderCheat();save();return}
+  if(t.dataset.k&&t.type==="checkbox"){cfg[t.dataset.k]=t.checked;save();return}
+});
+document.addEventListener("input",e=>{const t=e.target;if(t.dataset.k&&t.type==="range"){cfg[t.dataset.k]=+t.value;$(`[data-v="${t.dataset.k}"]`).textContent=valLabel(t.dataset.k,+t.value);save()}});
+document.addEventListener("click",e=>{const t=e.target;
+  if(t.dataset.cadd){cfg.combos=cfg.combos||[];cfg.combos.push({buttons:[],bind:{action:"lockRotate",tap:"click"}});renderBinds();save(true);return}
+  if(t.dataset.cdel){cfg.combos.splice(+t.dataset.cdel,1);renderBinds();save();return}
+  if(t.dataset.reset){cfg.buttons[t.dataset.reset]=JSON.parse(JSON.stringify(S.defaults.buttons[t.dataset.reset]));renderBinds();renderCheat();save()}
+  if(t.dataset.rec)recordShortcut(t.dataset.rec);
+  const hot=t.closest&&t.closest(".hot");if(hot)selectRow(hot.dataset.b,true);
+  const pr=t.closest&&t.closest("[data-preset]");if(pr)applyPreset(pr.dataset.preset);
+});
+function selectRow(b,scroll){$$(".bind").forEach(r=>r.classList.toggle("sel",r.dataset.row===b));$$(".hot").forEach(h=>h.classList.toggle("sel",h.dataset.b===b));
+  const r=$(`.bind[data-row="${b}"]`);if(r&&scroll)r.scrollIntoView({behavior:"smooth",block:"center"})}
+function flashRow(b){[$(`.bind[data-row="${b}"]`),$(`.hot[data-b="${b}"]`)].forEach(el=>{if(!el)return;el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");clearTimeout(el._f);el._f=setTimeout(()=>el.classList.remove("flash"),700)})}
+async function applyPreset(p){
+  if(!await modal("Apply setup?","Your button, wheel and held-key choices for this program will be replaced.",[["Cancel","",false],["Apply","primary",true]]))return;
+  const d=JSON.parse(JSON.stringify(S.defaults));
+  const buttons=Object.fromEntries(["middle","back","right","forward"].map(b=>[b,{action:"normal",tap:"click"}]));
+  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:"none",snapKeys:p==="ballonly"?"none":"alt",navigateKeys:p==="ballonly"?"none":"backtick",ball:"pointer"});
+  if(p==="both"){cfg.buttons.back={action:"orbit",tap:"click"};cfg.buttons.middle={action:"pan",tap:"click"};}
+  renderBinds();renderCheat();save(true);toast("Setup saved");
+}
+$("#resetControls").onclick=async()=>{if(await modal("Reset buttons & keys?","All buttons, wheels, keys and combinations of this program go back to how they come.",[["Cancel","",false],["Reset","primary",true]])){
+  const name=(cfg.programs[cfg.activeProgram]||{}).name;const pd=(S.programDefaults||[]).find(p=>p.name===name);const d=JSON.parse(JSON.stringify(pd||S.defaults));
+  Object.assign(cfg,{buttons:d.buttons,leftWheel:d.leftWheel,rightWheel:d.rightWheel,orbitKeys:d.orbitKeys,panKeys:d.panKeys,zoomKeys:d.zoomKeys,snapKeys:d.snapKeys||"none",navigateKeys:d.navigateKeys||"none",modeButtons:d.modeButtons||{},combos:d.combos||[],wheelPrograms:d.wheelPrograms||[0,1,0,1],leftWheelUpKeys:"",leftWheelDownKeys:"",rightWheelUpKeys:"",rightWheelDownKeys:""});
+  if(!pd)Object.assign(cfg,{buttonWheelZoom:d.buttonWheelZoom,returnCursor:d.returnCursor,shortcutsEverywhere:d.shortcutsEverywhere});renderBinds();renderCheat();save(true)}};
+$("#resetAll").onclick=async()=>{if(!await modal("Reset everything?","Every program, button, wheel, combination, speed and the guide go back to normal settings. Your macros and look are kept.",[["Cancel","",false],["Reset","primary",true]]))return;
+  try{const n=await call("ctResetAll");const theme=cfg.theme;cfg=n;cfg.theme=theme;renderAll();toast("Everything is back to normal settings")}catch(err){toast(String(err.message||err),true)}};
+$("#resetSpeed").onclick=()=>{const d=S.defaults;["orbitSens","panSens","zoomSens","invertOrbitX","invertOrbitY","invertPan","invertZoom"].forEach(k=>cfg[k]=d[k]);renderBinds();save(true);toast("Speed reset")};
+
+/* shortcut recorder */
+const CODE_NAME=c=>{if(/^Key[A-Z]$/.test(c))return c.slice(3);if(/^Digit\d$/.test(c))return c.slice(5);if(/^F\d{1,2}$/.test(c))return c;if(/^Numpad\d$/.test(c))return"Num"+c.slice(6);
+  return({ArrowLeft:"Left",ArrowRight:"Right",ArrowUp:"Up",ArrowDown:"Down",Home:"Home",End:"End",PageUp:"PageUp",PageDown:"PageDown",Insert:"Insert",Delete:"Delete",Space:"Space",Enter:"Enter",NumpadEnter:"Enter",Tab:"Tab",NumpadDecimal:"Num.",
+    Backspace:"Backspace",CapsLock:"CapsLock",PrintScreen:"PrintScreen",Pause:"Pause",ContextMenu:"Menu",MetaLeft:"Win",MetaRight:"Win",
+    Minus:"Minus",Equal:"Equals",BracketLeft:"[",BracketRight:"]",Backslash:"Backslash",Semicolon:"Semicolon",Quote:"Quote",Comma:"Comma",Period:"Period",Slash:"Slash",Backquote:"Backtick",
+    AudioVolumeUp:"VolumeUp",AudioVolumeDown:"VolumeDown",AudioVolumeMute:"Mute",MediaPlayPause:"PlayPause",MediaTrackNext:"NextTrack",MediaTrackPrevious:"PrevTrack"})[c]||null};
+function recordShortcut(target){
+  recording={target,combo:""};
+  modal("Record a shortcut",`Press the keys now, for example <b>Ctrl + Z</b>. <div class="rec" id="recBox"><span class="mu">Waiting for keys…</span></div><p style="margin:10px 0 0;font-size:12.5px">Esc cancels.</p>`,[["Cancel","",false],["Save","primary",true]]).then(ok=>{
+    const r=recording;recording=null;
+    if(r.target.startsWith("hold:")){const k=r.target.slice(5);if(ok&&r.combo){const v=r.combo.toLowerCase();if(v==="ctrl"||v==="control"){toast("Ctrl alone stays a normal keyboard key. Choose other held keys.",true);return}const clash=["orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys"].find(o=>o!==k&&cfg[o]===v);
+      if(clash){toast(holdLabel(v)+" is already used for "+clash.replace("Keys","")+". Pick other keys.");return}cfg[k]=v;renderBinds();renderCheat();save(true)}return}
+    if(r.target.startsWith("combo:")){const c=cfg.combos[+r.target.slice(6)];if(ok&&r.combo){c.bind.keys=r.combo}else if(!c.bind.keys){c.bind.action="fit"}renderBinds();save(true);return}
+    if(r.target.startsWith("mode:")){const b=r.target.slice(5);if(ok&&r.combo){cfg.modeButtons[b].keys=r.combo}else if(!cfg.modeButtons[b]?.keys){delete cfg.modeButtons[b]}renderBinds();save(true);return}
+    if(r.target.startsWith("wheelUp")||r.target.startsWith("wheelDown")){const [d,pre]=r.target.split(":");if(ok&&r.combo){cfg[(pre||"left")+(d==="wheelUp"?"WheelUpKeys":"WheelDownKeys")]=r.combo;renderBinds();renderCheat();save(true)}return}
+    if(ok&&r.combo){if(r.target.startsWith("app:")){const p=cfg.profiles.find(p=>p.id===r.target.slice(4));p.fit=r.combo;renderApps()}else{cfg.buttons[r.target].action="keys";cfg.buttons[r.target].keys=r.combo;renderBinds()}renderCheat();save(true)}
+    else if(!r.target.startsWith("app:")&&!cfg.buttons[r.target].keys){cfg.buttons[r.target].action=S.config.buttons?.[r.target]?.action==="keys"?"normal":(cfg.buttons[r.target].action==="keys"?"normal":cfg.buttons[r.target].action);renderBinds()}
+  })}
+const MOD_CODES={ControlLeft:1,ControlRight:1,ShiftLeft:1,ShiftRight:1,AltLeft:1,AltRight:1};
+const modsOf=e=>{const p=[];if(e.ctrlKey)p.push("Ctrl");if(e.shiftKey)p.push("Shift");if(e.altKey)p.push("Alt");return p};
+// A modifier pressed and let go on its own (e.g. just Shift) records that modifier.
+document.addEventListener("keyup",e=>{if(!recording||!MOD_CODES[e.code])return;e.preventDefault();
+  if(!recording.combo&&recording.mods){recording.combo=recording.mods;$("#recBox").innerHTML=kbd(recording.combo)}},true);
+document.addEventListener("keydown",e=>{if(!recording)return;e.preventDefault();e.stopPropagation();
+  if(e.code==="Escape"){$("#modal")._close();return}
+  if(MOD_CODES[e.code]){const m=modsOf(e);recording.mods=m.join("+");if(!recording.combo)$("#recBox").innerHTML=kbd(recording.mods)+' <span class="mu">+ …</span>';return}
+  const k=CODE_NAME(e.code);if(!k){$("#recBox").innerHTML='<span class="wn">That key can\'t be used in a shortcut. Try another.</span>';return}
+  const parts=[];if(e.ctrlKey)parts.push("Ctrl");if(e.shiftKey)parts.push("Shift");if(e.altKey)parts.push("Alt");parts.push(k);
+  recording.combo=parts.join("+");$("#recBox").innerHTML=kbd(recording.combo)},true);
+
+/* cheat sheet on Home */
+function renderCheat(){const items=[];const b=cfg.buttons;
+  const BALLW={auto:"orbits · tap top-right for pan, again for zoom (roll up = in), again for orbit",orbit:"orbits the model",pan:"pans the view",zoom:"zooms (roll up / down)"};
+  if(cfg.ball&&cfg.ball!=="pointer")items.push(`<div class="it"><span class="k">Ball</span><span>just roll — ${BALLW[cfg.ball]} <span class="mu">(in 3D apps)</span></span></div>`);
+  Object.keys(b).filter(k=>b[k].action==="nextProgram").forEach(k=>items.push(`<div class="it"><span class="k">${BTN[k].split(" ")[0]}</span><span>next program <span class="mu">(now: ${esc(cfg.programs[cfg.activeProgram].name)})</span></span></div>`));
+  const who=a=>Object.keys(b).filter(k=>b[k].action===a).map(k=>"hold "+BTN[k].replace(" button","").replace(" key",""));
+  const add=(k,parts)=>{if(parts.length)items.push(`<div class="it"><span class="k">${k}</span><span>${parts.join(" <span class='mu'>or</span> ")} <span class="mu">+ roll</span></span></div>`)};
+  add("Orbit",[...who("orbit"),...(cfg.orbitKeys!=="none"?["hold "+holdLabel(cfg.orbitKeys)]:[])]);
+  add("Pan + zoom",[...who("pan"),...(cfg.panKeys!=="none"?["hold "+holdLabel(cfg.panKeys)]:[])]);
+  const z=[...who("zoom"),...(cfg.zoomKeys!=="none"?["hold "+holdLabel(cfg.zoomKeys)]:[])];
+  const zw=["leftWheel","rightWheel"].filter(w=>cfg[w]==="zoom").map(w=>BTN[w].toLowerCase());
+  if(z.length||zw.length)items.push(`<div class="it"><span class="k">Zoom</span><span>${[...z.map(x=>x+' <span class="mu">+ roll</span>'),...zw].join(" <span class='mu'>or</span> ")}</span></div>`);
+  for(const [key,name] of [["snapKeys","Snap"],["navigateKeys","Navigate"]])if(cfg[key]&&cfg[key]!=="none")items.push('<div class="it"><span class="k">'+name+'</span><span>hold '+esc(holdLabel(cfg[key]))+' + ball</span></div>');
+  const fit=[...Object.keys(b).filter(k=>b[k].action==="fit").map(k=>"press "+BTN[k]),...Object.keys(b).filter(k=>["orbit","pan","zoom"].includes(b[k].action)&&b[k].tap==="fit").map(k=>"tap "+BTN[k])];
+  Object.keys(b).filter(k=>b[k].action==="lock3d").forEach(k=>items.push(`<div class="it"><span class="k">3D mode</span><span>press ${BTN[k]} <span class="mu">— then just roll to orbit</span></span></div>`));
+  if(fit.length)items.push(`<div class="it"><span class="k">Fit</span><span>${fit.join(" <span class='mu'>or</span> ")}</span></div>`);
+  Object.keys(b).filter(k=>b[k].action==="keys").forEach(k=>items.push(`<div class="it"><span class="k">${BTN[k].split(" ")[0]}</span><span>types ${kbd(b[k].keys)}</span></div>`));
+  if(!items.length)items.push('<div class="it mu">No 3D controls are set. Pick a quick setup on Buttons &amp; keys.</div>');
+  $("#cheat").innerHTML=items.join("");
+  const chips=[];const o=who("orbit")[0],p=who("pan")[0];
+  if(o)chips.push(`<span class="chip">${esc(o)} + roll = <b>orbit</b></span>`);if(p)chips.push(`<span class="chip">${esc(p)} + roll = <b>pan</b></span>`);
+  if(zw.length)chips.push(`<span class="chip">${esc(zw[0])} = <b>zoom</b></span>`);if(fit.length)chips.push(`<span class="chip">${esc(fit[0])} = <b>reset</b></span>`);
+  if(cfg.orbitKeys!=="none")chips.push(`<span class="chip">${holdLabel(cfg.orbitKeys)} + roll = <b>orbit</b></span>`);
+  $("#padHint").innerHTML=chips.join("")}
+
+/* ---------- apps ---------- */
+function gest(g){const p=[...(g.mods||[]),...(g.buttons||[])].map(x=>x[0].toUpperCase()+x.slice(1));return p.length?p.join(" + ")+" drag":"—"}
+// How each app's own orbit / pan is done (what Chamfer Trackball sends while you roll).
+const NAV_OPTS=["middle","shift+middle","ctrl+middle","alt+middle","ctrl+shift+middle","right","shift+right","ctrl+right","alt+right","left","shift+left","ctrl+left","alt+left","middle+left","middle+right","left+right"];
+const navKey=g=>[...(g.mods||[]),...(g.buttons||[])].join("+");
+const navLabel=v=>v.split("+").map(x=>x[0].toUpperCase()+x.slice(1)).join(" + ")+" drag";
+function navSel(p,kind){const cur=navKey(p[kind]||{});const opts=NAV_OPTS.includes(cur)||!cur?NAV_OPTS:[cur,...NAV_OPTS];
+  return `<select data-appnav="${esc(p.id)}" data-kind="${kind}">${opts.map(v=>`<option value="${v}"${v===cur?" selected":""}>${navLabel(v)}</option>`).join("")}</select>`}
+function renderApps(){$("#apps").innerHTML=cfg.profiles.map(p=>`<div class="appc${p.enabled?"":" off"}"><div class="row"><b>${esc(p.name)}</b><label class="sw"><input type="checkbox" data-app="${esc(p.id)}"${p.enabled?" checked":""}><span></span></label></div>
+  <dl><dt>Orbit</dt><dd>${navSel(p,"orbit")}</dd><dt>Pan</dt><dd>${navSel(p,"pan")}</dd><dt>Zoom</dt><dd>Scroll wheel <label style="margin-left:8px;font-size:12.5px"><input type="checkbox" data-appzinv="${esc(p.id)}"${p.wheelZoomInvert?" checked":""}> reversed</label></dd><dt>Fit</dt><dd>${kbd(p.fit)} <button class="btn sm" data-recapp="${esc(p.id)}" style="margin-left:6px">Change</button></dd><dt>Found by</dt><dd class="mu">${esc([...(p.exe||[]),...(p.title||[]).map(t=>"“"+t+"” in title")].join(", "))}</dd></dl>
+  <div class="mu" style="font-size:12.5px;margin-top:8px">${esc(p.note||"")}${p.custom?' <span class="ok">· changed by you</span>':""}</div></div>`).join("")}
+document.addEventListener("change",e=>{const t=e.target;
+  if(t.dataset.appnav){const p=cfg.profiles.find(p=>p.id===t.dataset.appnav);const parts=t.value.split("+");
+    p[t.dataset.kind]={buttons:parts.filter(x=>["left","right","middle"].includes(x)),mods:parts.filter(x=>["ctrl","shift","alt"].includes(x))};p.custom=true;renderApps();save(true)}
+  if(t.dataset.appzinv){const p=cfg.profiles.find(p=>p.id===t.dataset.appzinv);p.wheelZoomInvert=t.checked;p.custom=true;renderApps();save(true)}});
+document.addEventListener("change",e=>{const id=e.target.dataset.app;if(id){cfg.profiles.find(p=>p.id===id).enabled=e.target.checked;renderApps();save()}});
+document.addEventListener("click",e=>{const id=e.target.dataset.recapp;if(id)recordShortcut("app:"+id)});
+document.addEventListener("click",e=>{const t=e.target.closest("[data-hold],[data-holdoff]");if(!t)return;
+  if(t.dataset.hold)recordShortcut("hold:"+t.dataset.hold);else{cfg[t.dataset.holdoff]="none";renderBinds();renderCheat();save(true)}});
+
+/* ---------- general ---------- */
+$("#startup").addEventListener("change",async e=>{const on=await call("ctStartup",e.target.checked);e.target.checked=on;toast(on?"Starts with Windows":"Won't start with Windows")});
+$("#openFile").onclick=()=>call("ctOpenSettingsFile");
+$("#hideNow").onclick=()=>call("ctHide");
+$("#quitNow").onclick=async()=>{if(await modal("Quit Chamfer Trackball?","Your trackball goes back to a normal mouse until you start the app again.",[["Cancel","",false],["Quit","primary",true]]))call("ctQuit")};
+$("#enabled").addEventListener("change",e=>{cfg.enabled=e.target.checked;renderEnabled();save(true)});
+function renderEnabled(){$("#enabled").checked=cfg.enabled;$("#enabledTxt").textContent=cfg.enabled?"3D controls on":"3D controls off"}
+$("#welcomeOk").onclick=()=>{cfg.welcomeDone=true;$("#welcome").hidden=true;save(true)};
+
+/* ---------- about & updates ---------- */
+let updTimer=null;
+function noteList(arr){return arr.map(n=>`<li>${esc(n)}</li>`).join("")}
+function renderNotes(){const n=S.notes||[];const cur=n.find(x=>x.version===S.version)||n[0];
+  $("#abVer").textContent="v"+S.version;$("#sideVer").textContent="v"+S.version;
+  $("#curSum").textContent="What's new in v"+(cur?cur.version:S.version);$("#curList").innerHTML=cur?noteList(cur.notes):"";
+  const older=n.filter(x=>x!==cur);$("#oldDetails").hidden=!older.length;
+  $("#oldList").innerHTML=older.map(x=>`<div class="ver">v${esc(x.version)} <span class="mu" style="font-weight:400">· ${esc(x.date)}</span></div><ul>${noteList(x.notes)}</ul>`).join("")}
+async function refreshUpd(){let u;try{u=await call("ctUpdState")}catch{return}
+  const t=$("#updText"),b=$("#updBtn");$("#updErr").hidden=true;$("#updProg").hidden=true;$("#newDetails").hidden=true;b.disabled=false;b.className="btn";
+  $("#chanTxt").textContent=u.channel==="public"?"Updates come from Chamfer3D's public releases.":"Admin app: updates to your newest version (vX). Users only get versions you release for public.";
+  b.dataset.connect="";
+  switch(u.stage){
+    case"idle":t.innerHTML='<span class="mu">Not checked yet</span>';b.textContent="Check now";break;
+    case"checking":t.innerHTML='<span class="mu">Checking…</span>';b.textContent="Checking…";b.disabled=true;break;
+    case"latest":t.innerHTML='<span class="ok">Your app is on the latest update</span>';b.textContent="Check again";break;
+    case"available":t.innerHTML=`<span class="wn">v${esc(u.latest)} is ready to install</span>`;b.textContent="Update now";b.className="btn primary";
+      $("#newDetails").hidden=false;$("#newDetails").open=true;$("#newSum").textContent="What's new in v"+u.latest;$("#newList").innerHTML=noteList(u.notes||[]);break;
+    case"downloading":t.innerHTML=`<span class="mu">Downloading v${esc(u.latest)}… ${u.percent}%</span>`;b.textContent="Installing…";b.disabled=true;$("#updProg").hidden=false;$("#updBar").style.width=u.percent+"%";break;
+    case"installing":t.innerHTML='<span class="mu">Installing…</span>';b.textContent="Installing…";b.disabled=true;$("#updProg").hidden=false;$("#updBar").style.width="100%";break;
+    case"restarting":t.innerHTML='<span class="ok">Restarting on the new version…</span>';b.textContent="Restarting…";b.disabled=true;break;
+    case"error":t.innerHTML='<span class="bd">Couldn\'t finish</span>';b.textContent=u.latest&&u.latest!==S.version?"Try again":"Check again";$("#updErr").hidden=false;$("#updErr").textContent=u.error;
+      break;
+  }
+  b.dataset.stage=u.stage;b.dataset.latest=u.latest||"";
+  $("#updDot").classList.toggle("show",u.stage==="available");
+  clearTimeout(updTimer);if(["checking","downloading","installing","restarting"].includes(u.stage)||page==="about")updTimer=setTimeout(refreshUpd,u.stage==="downloading"?250:1500)}
+$("#updBtn").onclick=async()=>{if($("#updBtn").dataset.connect==="1"){goTo("admin");return}const st=$("#updBtn").dataset.stage,lt=$("#updBtn").dataset.latest;
+  if(st==="available"||(st==="error"&&lt&&lt!==S.version)){if(!await modal("Install v"+lt+"?","Chamfer Trackball will download the update, install it and restart. It takes a few seconds.",[["Not now","",false],["Update now","primary",true]]))return;call("ctUpdInstall")}
+  else call("ctUpdCheck");setTimeout(refreshUpd,120)};
+
+/* ---------- admin ---------- */
+let adTimer=null;
+async function refreshAdmin(loop){if(S.edition!=="admin")return;let a;try{a=await call("adminState")}catch{return}
+  const m=$("#adMsg");m.hidden=!(a.error||a.message);m.className="note"+(a.error?" err":" okn");m.textContent=a.error||a.message||"";
+  const busy=a.busy;
+  $("#adConn").innerHTML=a.connected?`<div class="row"><span class="ok" style="white-space:nowrap">● Ready</span><span class="mu">Releases go straight to ${esc(a.repo)} (GitHub token saved on this PC).</span><span class="spacer"></span><button class="btn sm danger" id="tokClear">Remove token</button></div>`
+    :`<div class="row"><span class="ok" style="white-space:nowrap">● Ready</span><span class="mu">Press <b>Release for public</b> on a version. No sign-in needed. It goes public within about 5–15 minutes, and this page updates by itself.</span></div>`;
+  if(a.connected)$("#tokClear").onclick=async()=>{if(await modal("Remove the saved token?","Releasing keeps working without it.",[["Cancel","",false],["Remove","primary",true]]))call("adminClearToken").then(()=>refreshAdmin())};
+  if(!a.loaded)$("#adVers").innerHTML=`<p class="mu">${busy==="loading"?"Loading versions…":"No versions loaded yet."}</p>`;
+  else if(!a.versions.length)$("#adVers").innerHTML='<p class="mu">No versions in the GitHub folder yet.</p>';
+  else $("#adVers").innerHTML=`<table class="vt"><tr><th>Version</th><th>Date</th><th>Status</th><th></th></tr>${a.versions.map(v=>{
+      const st=v.public?`<span class="tag pub">Public</span>${v.latest?' <span class="tag latest">Latest for users</span>':""}`:'<span class="tag priv">Private only</span>';
+      const me=v.thisApp?' <span class="mu" style="font-size:12px">(this app)</span>':"";
+      const pend=a.pending&&a.pending.endsWith(" "+v.version)?a.pending.split(" ")[0]:"";
+      let act="";if(busy&&busy.endsWith("v"+v.version))act=`<span class="mu">${esc(busy[0].toUpperCase()+busy.slice(1))}…</span>`;
+      else if(pend)act=`<span class="mu">${pend==="release"?"Going public…":"Withdrawing…"} (a few minutes)</span>`;
+      else if(v.public)act=`<button class="btn sm" data-wd="${esc(v.version)}"${busy?" disabled":""}>Withdraw</button>`;
+      else if(v.canShip)act=`<button class="btn sm primary" data-rel="${esc(v.version)}"${busy?" disabled":""}>Release for public</button>`;
+      else act='<span class="mu">No user app</span>';
+      return`<tr><td><b>v${esc(v.version)}</b>${me}</td><td class="mu">${esc(v.date)}</td><td>${st}</td><td style="text-align:right">${act}</td></tr>`}).join("")}</table>`;
+  $("#adRefresh").disabled=!!busy;
+  clearTimeout(adTimer);if(loop&&page==="admin")adTimer=setTimeout(()=>refreshAdmin(true),busy?700:a.pending?5000:3000)}
+$("#adRefresh").onclick=()=>{call("adminRefresh");setTimeout(()=>refreshAdmin(true),100)};
+document.addEventListener("click",async e=>{const r=e.target.dataset.rel,w=e.target.dataset.wd;
+  if(r){const a=await call("adminState"),v=a.versions.find(x=>x.version===r);
+    if(await modal("Release v"+r+" for public?",`Everyone using Chamfer Trackball will see <b>“v${esc(r)} is ready to install”</b> in Settings → About and can install it with one click. Only the app (.exe) is published.${v&&v.notes.length?`<ul style="margin:12px 0 0">${noteList(v.notes)}</ul>`:""}`,[["Cancel","",false],["Release for public","primary",true]])){call("adminRelease",r);setTimeout(()=>refreshAdmin(true),100)}}
+  if(w&&await modal("Withdraw v"+w+"?","Users won't be offered this version any more. People who already installed it keep it. It stays in your private versions.",[["Cancel","",false],["Withdraw","primary",true]])){call("adminWithdraw",w);setTimeout(()=>refreshAdmin(true),100)}});
+
+/* ---------- test pad ---------- */
+const pad={rot:[1,0,0,0,1,0,0,0,1],px:0,py:0,s:1};
+function mul(a,b){const r=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++)r[i*3+j]=a[i*3]*b[j]+a[i*3+1]*b[3+j]+a[i*3+2]*b[6+j];return r}
+function rot(yaw,pitch){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);pad.rot=mul([1,0,0,0,cp,-sp,0,sp,cp],mul([cy,0,sy,0,1,0,-sy,0,cy],pad.rot))}
+function padReset(){pad.rot=[1,0,0,0,1,0,0,0,1];rot(-.6,.45);pad.px=pad.py=0;pad.s=1}
+padReset();$("#padReset").onclick=()=>{padReset();drawPad()};
+const V=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],F=[[4,5,6,7],[1,0,3,2],[0,4,7,3],[5,1,2,6],[7,6,2,3],[0,1,5,4]];
+let padColors=null;
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function drawPad(){const c=$("#padCanvas"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;if(!r.width)return;
+  if(c.width!==Math.round(r.width*d)){c.width=Math.round(r.width*d);c.height=Math.round(r.height*d)}
+  if(!padColors)padColors={bg:cssv("--bg"),grid:cssv("--grid"),c1:cssv("--cube1"),c2:cssv("--cube2"),c3:cssv("--cube3"),line:cssv("--line")};
+  const g=c.getContext("2d"),W=c.width,H=c.height,R=pad.rot;g.fillStyle=padColors.bg;g.fillRect(0,0,W,H);
+  const xf=v=>[R[0]*v[0]+R[1]*v[1]+R[2]*v[2],R[3]*v[0]+R[4]*v[1]+R[5]*v[2],R[6]*v[0]+R[7]*v[1]+R[8]*v[2]];
+  const f=Math.min(W,H)*.78*pad.s,cx=W/2+pad.px*d,cy=H/2+pad.py*d,pr=v=>{const z=5.5-v[2];return[cx+v[0]*f/z,cy-v[1]*f/z]};
+  g.strokeStyle=padColors.grid;g.lineWidth=1*d;g.beginPath();
+  for(let i=-4;i<=4;i++){for(const[a,b]of[[[i*.5,-1,-2],[i*.5,-1,2]],[[-2,-1,i*.5],[2,-1,i*.5]]]){const p=pr(xf(a)),q=pr(xf(b));g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1])}}g.stroke();
+  const tv=V.map(xf),fs=[];
+  F.forEach((fc,i)=>{const a=tv[fc[0]],b=tv[fc[1]],cc=tv[fc[2]];const nz=(b[0]-a[0])*(cc[1]-a[1])-(b[1]-a[1])*(cc[0]-a[0]);if(nz<=0)return;fs.push({i,z:fc.reduce((s,k)=>s+tv[k][2],0),nz:nz/4})});
+  fs.sort((a,b)=>a.z-b.z);
+  for(const fc of fs){const col=fc.i===4?padColors.c1:fc.i%2?padColors.c3:padColors.c2;const L=.62+.38*Math.min(1,fc.nz);
+    g.beginPath();F[fc.i].forEach((k,j)=>{const p=pr(tv[k]);j?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])});g.closePath();
+    g.fillStyle=col;g.fill();g.fillStyle=`rgba(0,0,0,${(1-L).toFixed(3)})`;g.fill();g.strokeStyle="rgba(10,14,18,.85)";g.lineWidth=1.5*d;g.stroke()}
+  const ox=36*d,oy=H-36*d;[[[1,0,0],"#eb5050"],[[0,1,0],"#6ec86e"],[[0,0,1],"#5a96f0"]].forEach(([v,col])=>{const t=xf(v);g.strokeStyle=col;g.lineWidth=2.4*d;g.beginPath();g.moveTo(ox,oy);g.lineTo(ox+t[0]*22*d,oy-t[1]*22*d);g.stroke()})}
+function reportPad(){const p=$("#pad"),vis=page==="home"&&!document.hidden;if(!vis){call("ctPadRect",0,0,0,0,false).catch(()=>{});return}
+  const r=p.getBoundingClientRect(),d=devicePixelRatio||1;call("ctPadRect",r.left*d,r.top*d,r.width*d,r.height*d,true).catch(()=>{});drawPad()}
+addEventListener("resize",()=>{padColors=null;reportPad()});$("#main").addEventListener("scroll",()=>page==="home"&&reportPad(),{passive:true});
+document.addEventListener("visibilitychange",reportPad);
+
+/* ---------- live status ---------- */
+const MODEN={Idle:"Idle",Orbit:"Orbiting",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Rolling",Gestures:"Gesture"};
+async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
+  if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;clearTimeout(saveTimer);reloadConfig()}
+  let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}
+  if(s.zoom){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(s.zoom/700)));changed=true}if(s.fit){padReset();changed=true}
+  if(changed&&page==="home")drawPad();
+  const live=s.mode!=="Idle";$("#padMode").textContent=live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll";$("#padMode").classList.toggle("live",live);
+  const dirTxt=s.ballDir?(s.ballDir==="in"||s.ballDir==="out"?" "+s.ballDir:" "+s.ballDir):"";
+  $("#stMode").textContent=(s.lock3d?"3D mode · ":"")+(MODEN[s.mode]||s.mode)+(live?dirTxt:"");$("#stMode").className=live?"ok":"";
+  updateBall(s,live);
+  $("#stDevice").textContent=s.device||"No mouse found";$("#stDevice").className=s.device?"":"wn";
+  const appTxt=s.app?(s.appState==="cad"?s.app+" — 3D on":s.appState==="off"?s.app+" — 3D off":s.app+" — normal mouse"):"—";
+  $("#stApp").textContent=appTxt;$("#integrationState").textContent=s.integration||"Normal mouse";$("#stApp").className=s.appState==="cad"?"ok":"";$("#footApp").textContent=s.appState==="cad"?s.app:(s.enabled?"Waiting for a CAD app":"Normal mouse everywhere");
+  if(s.lastBtn&&s.lastBtnAge<1500){const key=s.lastBtn+":"+Math.round((Date.now()-s.lastBtnAge)/50);if(key!==lastBtnSeen){lastBtnSeen=key;$("#lastPressed").textContent=BTN[s.lastBtn]||s.lastBtn;
+    if(page==="controls"){flashRow(s.lastBtn);selectRow(s.lastBtn,false)}}}
+  if(s.lastAction)$("#lastDid").textContent=s.lastAction;
+  const fast=(page==="home"||page==="controls")&&!document.hidden;if(fast)requestAnimationFrame(poll);else setTimeout(poll,400)}
+
+/* ---------- live ball picture ---------- */
+// Shows every movement of the ball: an arrow for the direction, the shine rolls with it,
+// and the label says Moving, Orbiting, Panning or Zooming.
+const ballV={x:0,y:0,t:0,rx:0,ry:0};
+const ARROWS=[["→",0],["↘",45],["↓",90],["↙",135],["←",180],["↖",225],["↑",270],["↗",315]];
+function updateBall(s,live){const now=performance.now(),dt=Math.min(.2,Math.max(.001,(now-(ballV.t||now))/1000))||.016;ballV.t=now;
+  const k=Math.min(1,dt*12);ballV.x+=((s.rawX||0)/dt*.016-ballV.x)*k;ballV.y+=((s.rawY||0)/dt*.016-ballV.y)*k;
+  const sp=Math.hypot(ballV.x,ballV.y),moving=sp>.6||live;
+  ballV.rx+=ballV.x*.6;ballV.ry+=ballV.y*.6;
+  const arrow=$("#ballArrow");if(!arrow)return;
+  let txt="";if(s.sense)txt=s.sense==="cw"?"↻":"↺";else if(live&&s.ballDir)txt=s.ballDir==="in"?"+":s.ballDir==="out"?"−":s.ballDir;
+  else if(sp>.6){const a=(Math.atan2(ballV.y,ballV.x)*180/Math.PI+360)%360;txt=ARROWS[Math.round(a/45)%8][0]}
+  else if(live)txt="•";
+  arrow.textContent=txt;arrow.setAttribute("opacity",Math.min(1,.35+sp/4).toFixed(2));
+  $("#ballMode").textContent=s.sense?(s.sense==="cw"?"Circles ↻ = zoom in":"Circles ↺ = zoom out"):live?MODEN[s.mode]:(sp>.6?"Moving":"");
+  $("#ballRing").setAttribute("opacity",moving?Math.min(1,live?1:.3+sp/6).toFixed(2):0);
+  // roll the shine: offset the gradient's highlight with the movement
+  const g=$("#ballg");if(g){const ox=36+Math.max(-14,Math.min(14,-ballV.x*1.5)),oy=30+Math.max(-14,Math.min(14,-ballV.y*1.5));g.setAttribute("cx",ox+"%");g.setAttribute("cy",oy+"%")}
+  const sh=$("#ballShine");if(sh){sh.setAttribute("transform",`translate(${Math.max(-18,Math.min(18,ballV.x*2)).toFixed(1)} ${Math.max(-18,Math.min(18,ballV.y*2)).toFixed(1)})`)}}
+
+/* ---------- activity log ---------- */
+let logSeq=0,logRows=[];
+function renderLog(){const html=logRows.length?logRows.slice().reverse().map(l=>`<div class="l ${esc(l.kind)}"><span class="t">${new Date(l.time).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"})}</span><span>${esc(l.text)}</span></div>`).join(""):'<div class="mu">Hold a button on your trackball…</div>';
+  $$("[data-actlog]").forEach(el=>el.innerHTML=html)}
+async function pollLog(){try{const rows=await call("ctLog",logSeq);if(rows&&rows.length){logSeq=rows[rows.length-1].seq;logRows=logRows.concat(rows).slice(-40);renderLog()}}catch{}
+  setTimeout(pollLog,document.hidden?1000:250)}
+document.addEventListener("click",e=>{if(e.target.closest("[data-clearlog]")){logRows=[];renderLog()}});
+
+/* ---------- generic shortcut recorder ---------- */
+function recordKeys(title){recording={target:"generic",combo:""};
+  return modal(title||"Record a shortcut",`Press the keys now, for example <b>Ctrl + S</b>, a single key like <b>F5</b>, or just a modifier like <b>Shift</b>. <div class="rec" id="recBox"><span class="mu">Waiting for keys…</span></div><p style="margin:10px 0 0;font-size:12.5px">Esc cancels.</p>`,[["Cancel","",false],["Save","primary",true]])
+    .then(ok=>{const r=recording;recording=null;return ok&&r.combo?r.combo:null})}
+function askText(title,label,val){return modal(title,`<label class="mu" style="font-size:13px">${esc(label)}</label><input type="text" id="askIn" style="width:100%;margin-top:6px" maxlength="60" value="${esc(val||"")}">`,[["Cancel","",false],["OK","primary",true]])
+  .then(ok=>{const v=($("#askIn")||{}).value;return ok?(v||"").trim():null})}
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="askIn"){e.preventDefault();$("#mActs .primary").click()}});
+
+/* ---------- programs ---------- */
+let cfgRev=-1;
+function progOpts(sel){return cfg.programs.map((p,i)=>`<option value="${i}"${i===sel?" selected":""}>${i+1}. ${esc(p.name)}</option>`).join("")}
+function macroOpts(sel){return cfg.macros.map(m=>`<option value="${esc(m.id)}"${m.id===sel?" selected":""}>${esc(m.name)}</option>`).join("")}
+let gestScope="";
+function scopeProfile(){return gestScope?cfg.profiles.find(p=>p.id===gestScope):null}
+function curGest(){const ap=scopeProfile();if(ap){ap.appGestures=ap.appGestures||{};return ap.appGestures}const p=cfg.programs[cfg.activeProgram];p.gestures=p.gestures||{};return p.gestures}
+document.addEventListener("change",e=>{if(e.target.id==="gestScope"){gestScope=e.target.value;renderGestures()}});
+function renderPrograms(){$("#ptrProg").textContent=cfg.programs[cfg.activeProgram].name;
+  $("#progs").innerHTML=cfg.programs.map((p,i)=>`<button class="prog${i===cfg.activeProgram?" on":""}" data-useprog="${i}"><span class="n">${i+1}</span>${esc(p.name)}</button>`).join("")+`<button class="prog add" id="progAdd">+ Add program</button>`;
+  $("#progDel").disabled=cfg.programs.length<2;
+  $("#speedProgs").innerHTML=cfg.programs.map((p,i)=>`<button class="prog${i===cfg.activeProgram?" on":""}" data-useprog="${i}"><span class="n">${i+1}</span>${esc(p.name)}</button>`).join("");
+  $("#progKeyRow").innerHTML=`${cfg.programKeys?kbd(cfg.programKeys):'<span class="mu">Not set</span>'}<button class="btn sm" id="progKeyRec">${cfg.programKeys?"Change":"Set shortcut"}</button>${cfg.programKeys?'<button class="btn sm" id="progKeyClr">Clear</button>':""}`;
+  $("#stProg").textContent=cfg.programs.length>1?"Program "+(cfg.activeProgram+1)+": "+cfg.programs[cfg.activeProgram].name:"";
+  $$("[data-k=programToast]").forEach(i=>i.checked=!!cfg.programToast)}
+async function useProgram(i){
+  // Save edits first, then let the trackball engine switch (it keeps every program's choices).
+  clearTimeout(saveTimer);await doSave();await call("ctProgram",i);
+  setTimeout(reloadConfig,250)}
+async function reloadConfig(){const st=await call("ctState");const theme=cfg.theme;cfg=st.config;cfg.theme=theme;renderAll()}
+document.addEventListener("click",async e=>{const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.useprog!==undefined){const i=+t.dataset.useprog;if(i!==cfg.activeProgram)useProgram(i);return}
+  if(t.id==="progAdd"){const n=await askText("New program","Name (for example “Blender”, “Photo editing” or “Gaming”)","Program "+(cfg.programs.length+1));if(n===null)return;
+    const blank=JSON.parse(JSON.stringify(S.defaults));cfg.programs.push({name:n||("Program "+(cfg.programs.length+1)),buttons:blank.buttons,rightWheel:blank.rightWheel,leftWheel:blank.leftWheel,orbitKeys:blank.orbitKeys,panKeys:blank.panKeys,zoomKeys:blank.zoomKeys,gestures:{}});
+    await doSave();useProgram(cfg.programs.length-1);return}
+  if(t.id==="progRename"){const p=cfg.programs[cfg.activeProgram];const n=await askText("Rename program","Name",p.name);if(n){p.name=n;renderPrograms();save(true)}return}
+  if(t.id==="progCopy"){const p=JSON.parse(JSON.stringify(cfg.programs[cfg.activeProgram]));p.name+=" copy";Object.assign(p,{buttons:JSON.parse(JSON.stringify(cfg.buttons)),rightWheel:cfg.rightWheel,leftWheel:cfg.leftWheel,orbitKeys:cfg.orbitKeys,panKeys:cfg.panKeys,zoomKeys:cfg.zoomKeys});
+    cfg.programs.push(p);await doSave();useProgram(cfg.programs.length-1);return}
+  if(t.id==="progDel"){if(cfg.programs.length<2)return;const p=cfg.programs[cfg.activeProgram];
+    if(!await modal("Delete “"+p.name+"”?","Its buttons, keys and gestures are removed. Your other programs and your macros stay.",[["Cancel","",false],["Delete","primary",true]]))return;
+    const del=cfg.activeProgram;cfg.programs.splice(del,1);
+    const fix=x=>x>del?x-1:(x===del?0:x);
+    cfg.programs.forEach(pg=>{Object.values(pg.buttons||{}).forEach(b=>{if(b.action==="program")b.program=fix(b.program||0)});Object.values(pg.gestures||{}).forEach(c=>{if(c.type==="program")c.program=fix(c.program||0)})});
+    cfg.activeProgram=Math.min(del,cfg.programs.length-1);const np=cfg.programs[cfg.activeProgram];
+    Object.assign(cfg,{buttons:np.buttons,rightWheel:np.rightWheel,leftWheel:np.leftWheel,orbitKeys:np.orbitKeys,panKeys:np.panKeys,zoomKeys:np.zoomKeys});
+    await doSave();reloadConfig();toast("Program deleted");return}
+  if(t.id==="progKeyRec"){const k=await recordKeys("Shortcut to switch program");if(k){cfg.programKeys=k.split(",")[0];renderPrograms();save(true)}return}
+  if(t.id==="progKeyClr"){cfg.programKeys="";renderPrograms();save(true);return}
+  if(t.dataset.grec){const d=t.dataset.grec;const k=await recordKeys("Shortcut for this gesture");if(k){curGest()[d].keys=k;renderGestures();save(true)}return}
+});
+
+/* ---------- ball gestures ---------- */
+function renderGestures(){
+  if(gestScope&&!cfg.profiles.find(p=>p.id===gestScope&&p.enabled))gestScope="";
+  $("#gestScope").innerHTML=`<option value="">All apps (program “${esc(cfg.programs[cfg.activeProgram].name)}”)</option>`+cfg.profiles.filter(p=>p.enabled).map(p=>{const n=Object.keys(p.appGestures||{}).length;return`<option value="${esc(p.id)}"${p.id===gestScope?" selected":""}>${esc(p.name)}${n?" · "+n+" set":""}</option>`}).join("");
+  const ap=scopeProfile(),base=cfg.programs[cfg.activeProgram].gestures||{};
+  const g=curGest();const holders=Object.keys(cfg.buttons).filter(b=>cfg.buttons[b].action==="gestures").map(b=>BTN[b]);
+  $("#gestHelp").innerHTML=holders.length?`Hold <b>${holders.map(esc).join("</b> or <b>")}</b>, roll the ball in a direction, then let go. The pointer stays still while you do it, and a quick press is still a normal click. These gestures belong to <b>${esc(cfg.programs[cfg.activeProgram].name)}</b>.`
+    :`Set a button above to <b>Ball gestures</b>, then hold it, roll the ball in a direction and let go to run a command. Eight directions, each with its own shortcut, macro or action.`;
+  if(ap)$("#gestHelp").innerHTML+=` <br><b style="color:var(--accent)">Only while ${esc(ap.name)} is in front.</b> These win over the “All apps” gestures, so the same gesture can do a different command in each app — for example Up = <b>E</b> (Extrude) in Fusion and <b>G</b> (Grab) in Blender. Directions left on “Same as all apps” keep the program's gesture.`;
+  $("#gest").innerHTML=DIRS.map(([d,a,n])=>{if(!d)return`<div class="gmid">${ap?esc(ap.name)+"<br>":""}Hold the gesture button<br>roll · let go</div>`;const c=g[d]||{type:"none"};
+    const cmdMap=ap?Object.assign({},CMD,{none:"— Same as all apps"+(base[d]?" ("+cmdName(base[d])+")":"")+" —"}):CMD;
+    let ex="";if(c.type==="keys")ex=`<div class="row" style="gap:6px">${kbd(c.keys)}<button class="btn sm" data-grec="${d}">Change</button></div>`;
+    if(c.type==="macro")ex=cfg.macros.length?`<select data-gmacro="${d}">${macroOpts(c.macro)}</select>`:`<span class="wn" style="font-size:12px">Make a macro first</span>`;
+    if(c.type==="program")ex=`<select data-gprog="${d}">${progOpts(c.program||0)}</select>`;
+    return`<div class="gcell"><div class="h"><span class="arr">${a}</span>${n}</div><select data-gtype="${d}">${opts(cmdMap,c.type)}</select>${ex}</div>`}).join("")}
+function cmdName(c){if(c.type==="keys")return c.keys;if(c.type==="macro"){const m=cfg.macros.find(x=>x.id===c.macro);return m?m.name:"macro"}if(c.type==="program")return(cfg.programs[c.program]||{}).name||"program";return CMD[c.type]}
+
+/* ---------- macros ---------- */
+let mSel=null;
+function stepText(st){switch(st.type){case"keys":return kbd(st.value);case"text":return"“"+esc(st.value||"")+"”";case"wait":return(st.ms/1000)+" s";case"click":return st.value;case"scroll":return(st.amount>0?"up ":"down ")+Math.abs(st.amount)}return""}
+function renderMacros(){
+  if(mSel&&!cfg.macros.find(m=>m.id===mSel))mSel=null;if(!mSel&&cfg.macros.length)mSel=cfg.macros[0].id;
+  $("#mlist").innerHTML=cfg.macros.length?cfg.macros.map(m=>`<button class="mitem${m.id===mSel?" on":""}" data-msel="${esc(m.id)}"><b>${esc(m.name)}</b><small>${m.steps.length} step${m.steps.length===1?"":"s"}</small></button>`).join(""):'<p class="mu" style="margin:0">No macros yet.</p>';
+  const m=cfg.macros.find(x=>x.id===mSel);
+  if(!m){$("#medit").innerHTML=`<h2>Make your first macro</h2><p class="mu">For example: <b>Save, wait half a second, then export</b> — or type your email address with one button. Click <b>+ New macro</b>.</p>`;return}
+  const used=[];cfg.programs.forEach((p,pi)=>{Object.entries(p.buttons||{}).forEach(([b,bd])=>{if(bd.action==="macro"&&bd.macro===m.id)used.push(p.name+": "+BTN[b])});Object.entries(p.gestures||{}).forEach(([d,c])=>{if(c.type==="macro"&&c.macro===m.id)used.push(p.name+": gesture "+d)})});
+  $("#medit").innerHTML=`<div class="row" style="gap:8px"><input type="text" id="mName" value="${esc(m.name)}" maxlength="60" style="flex:1;font-weight:600;font-size:15px"><button class="btn sm" id="mTest">▶ Test</button><button class="btn sm danger" id="mDel">Delete</button></div>
+    <p class="mu" style="margin:8px 0 0;font-size:12.5px">${used.length?"Used by: "+used.map(esc).join(", "):"Not used yet — pick it for a button (Run a macro) or a ball gesture on Buttons & keys."}</p>
+    <div class="steps">${m.steps.length?m.steps.map((st,i)=>`<div class="step"><span class="no">${i+1}</span><b style="min-width:84px">${STEP[st.type]}</b>${stepEditor(st,i)}<span class="sp"></span>
+      <button class="btn sm" data-sup="${i}" title="Move up"${i?"":" disabled"}>↑</button><button class="btn sm" data-sdown="${i}" title="Move down"${i<m.steps.length-1?"":" disabled"}>↓</button><button class="btn sm danger" data-sdel="${i}" title="Remove">✕</button></div>`).join(""):'<p class="mu" style="margin:0">No steps yet. Add some below.</p>'}</div>
+    <div class="addsteps"><span class="mu" style="align-self:center;margin-right:4px">Add:</span><button class="btn sm" data-sadd="keys">+ Shortcut</button><button class="btn sm" data-sadd="text">+ Type text</button><button class="btn sm" data-sadd="wait">+ Wait</button><button class="btn sm" data-sadd="click">+ Click</button><button class="btn sm" data-sadd="scroll">+ Scroll</button></div>
+    <p class="mu" style="margin:12px 0 0;font-size:12.5px">▶ Test waits 1.5 seconds so you can click into the app you want to try it in. While a macro plays, pressing its button again stops it.</p>`}
+function stepEditor(st,i){switch(st.type){
+  case"keys":return`${kbd(st.value)}<button class="btn sm" data-srec="${i}">Change</button>`;
+  case"text":return`<input type="text" data-stext="${i}" value="${esc(st.value||"")}" placeholder="Text to type">`;
+  case"wait":return`<input type="number" data-sms="${i}" min="0.01" max="60" step="0.05" value="${(st.ms||500)/1000}"> <span class="mu">seconds</span>`;
+  case"click":return`<select data-sclick="${i}">${opts({left:"Left click",double:"Double click",right:"Right click",middle:"Middle click"},st.value||"left")}</select>`;
+  case"scroll":return`<select data-sdir="${i}">${opts({up:"Up",down:"Down"},st.amount<0?"down":"up")}</select><input type="number" data-samt="${i}" min="1" max="50" value="${Math.abs(st.amount||1)}"> <span class="mu">notches</span>`}return""}
+function curMacro(){return cfg.macros.find(x=>x.id===mSel)}
+function newMacroId(){let i=1;while(cfg.macros.find(m=>m.id==="m"+i))i++;return"m"+i}
+$("#mNew").onclick=async()=>{const n=await askText("New macro","Name (for example “Save and export”)","Macro "+(cfg.macros.length+1));if(n===null)return;
+  const m={id:newMacroId(),name:n||"Macro",steps:[]};cfg.macros.push(m);mSel=m.id;renderMacros();save(true)};
+document.addEventListener("click",async e=>{const t=e.target.closest("button");if(!t||!t.closest("[data-page=macros]"))return;const m=curMacro();
+  if(t.dataset.msel){mSel=t.dataset.msel;renderMacros();return}
+  if(!m)return;
+  if(t.id==="mDel"){if(!await modal("Delete “"+m.name+"”?","Buttons and gestures that used it go back to doing nothing special.",[["Cancel","",false],["Delete","primary",true]]))return;
+    cfg.macros=cfg.macros.filter(x=>x!==m);
+    cfg.programs.forEach(p=>{Object.values(p.buttons||{}).forEach(b=>{if(b.action==="macro"&&b.macro===m.id){b.action="normal";b.macro=""}});Object.keys(p.gestures||{}).forEach(d=>{if(p.gestures[d].type==="macro"&&p.gestures[d].macro===m.id)delete p.gestures[d]})});
+    Object.values(cfg.buttons).forEach(b=>{if(b.action==="macro"&&b.macro===m.id){b.action="normal";b.macro=""}});
+    mSel=null;renderMacros();renderBinds();renderGestures();save(true);return}
+  if(t.id==="mTest"){if(!m.steps.length)return toast("Add a step first",true);await doSave();call("ctTestMacro",m);toast("Playing in 1.5 s — click into an app");return}
+  if(t.dataset.sadd){const ty=t.dataset.sadd;let st={type:ty};
+    if(ty==="keys"){const k=await recordKeys("Shortcut for this step");if(!k)return;st.value=k}
+    if(ty==="text")st.value="";if(ty==="wait")st.ms=500;if(ty==="click")st.value="left";if(ty==="scroll")st.amount=1;
+    m.steps.push(st);renderMacros();if(ty!=="text")save(true);else setTimeout(()=>{const el=$(`[data-stext="${m.steps.length-1}"]`);el&&el.focus()},30);return}
+  if(t.dataset.srec){const i=+t.dataset.srec;const k=await recordKeys("Shortcut for step "+(i+1));if(k){m.steps[i].value=k;renderMacros();save(true)}return}
+  if(t.dataset.sdel){m.steps.splice(+t.dataset.sdel,1);renderMacros();save(true);return}
+  if(t.dataset.sup){const i=+t.dataset.sup;[m.steps[i-1],m.steps[i]]=[m.steps[i],m.steps[i-1]];renderMacros();save(true);return}
+  if(t.dataset.sdown){const i=+t.dataset.sdown;[m.steps[i+1],m.steps[i]]=[m.steps[i],m.steps[i+1]];renderMacros();save(true);return}
+});
+document.addEventListener("input",e=>{const t=e.target;if(!t.closest||!t.closest("[data-page=macros]"))return;const m=curMacro();if(!m)return;
+  if(t.id==="mName"){m.name=t.value;$$(`[data-msel="${m.id}"] b`).forEach(b=>b.textContent=t.value||"Macro");save();return}
+  if(t.dataset.stext!==undefined){const st=m.steps[+t.dataset.stext];st.value=t.value;if(t.value)save();return}
+  if(t.dataset.sms!==undefined){m.steps[+t.dataset.sms].ms=Math.round(Math.max(.01,Math.min(60,+t.value||0.5))*1000);save();return}
+  if(t.dataset.samt!==undefined){const st=m.steps[+t.dataset.samt];const n=Math.max(1,Math.min(50,+t.value||1));st.amount=st.amount<0?-n:n;save();return}});
+document.addEventListener("change",e=>{const t=e.target;if(!t.closest||!t.closest("[data-page=macros]"))return;const m=curMacro();if(!m)return;
+  if(t.dataset.sclick!==undefined){m.steps[+t.dataset.sclick].value=t.value;save();return}
+  if(t.dataset.sdir!==undefined){const st=m.steps[+t.dataset.sdir];st.amount=Math.abs(st.amount||1)*(t.value==="down"?-1:1);save();return}});
+
+/* ---------- start ---------- */
+$("#openMouse").onclick=()=>call("ctOpenMouseSettings");
+function renderAll(){$("#accelNote").hidden=!S.pointerAccel;applyTheme();renderEnabled();renderPrograms();renderBinds();renderGestures();renderMacros();renderCheat();renderApps();renderNotes();
+  $("#setPath").textContent=S.settingsPath;$("#startup").checked=S.startup;$("#welcome").hidden=!!cfg.welcomeDone}
+async function boot(){S=await call("ctState");cfg=JSON.parse(JSON.stringify(S.config));
+  if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false}
+  renderAll();goTo("home");poll();pollLog();refreshUpd();
+  if(S.justUpdated){goTo("about");toast("Updated to v"+S.version)}}
+function waitBridge(n){if(window.ctState)boot().catch(e=>toast(String(e),true));else if(n>0)setTimeout(()=>waitBridge(n-1),50);else toast("App connection failed. Restart Chamfer Trackball.",true)}
+document.addEventListener("click",async e=>{
+ const install=e.target.closest("[data-install-integration]");if(install){try{const message=await call("ctInstallIntegration",install.dataset.installIntegration);await modal("Integration",esc(message),[["OK","primary",true]]);}catch(err){toast(err.message||String(err),true)}return}
+ if(e.target.closest("#customCad")){const name=await askText("3D app","App name","");if(!name)return;const exe=await askText("3D app","Executable filename, for example ExampleCAD.exe","");if(!exe)return;try{cfg=await call("ctAddProfile",{name,exe});renderAll();toast("App added. Set its Orbit, Pan and Fit controls below.");}catch(err){toast(err.message||String(err),true)}}
+});
+waitBridge(100);
+</script>
+</body>
+</html>
