@@ -5,10 +5,14 @@ if(repo!=='chamfer3dprinting/Chamfer-Trackball'||!token)throw Error('Missing aut
 const request=JSON.parse(fs.readFileSync('.github/public-release.json','utf8'));validateRequest(request);
 const base='https://api.github.com/repos/'+repo;
 async function api(method,path,body,allowMissing=false){
- const response=await fetch(base+path,{method,headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'chamfer-public-publisher','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
- if(allowMissing&&response.status===404)return null;
- if(!response.ok)throw Error(method+' '+path+' failed: '+response.status);
- return response.status===204?null:response.json();
+ const attempts=method==='POST'?1:4;
+ for(let attempt=0;attempt<attempts;attempt++){
+  const response=await fetch(base+path,{method,headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json','User-Agent':'chamfer-public-publisher','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+  if(allowMissing&&response.status===404)return null;
+  if(response.ok)return response.status===204?null:response.json();
+  if((response.status>=500||response.status===429)&&attempt+1<attempts){await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)));continue;}
+  throw Error(method+' '+path+' failed: '+response.status);
+ }
 }
 const run=await api('GET','/actions/runs/'+request.verifiedRunId);validateRun(run,request,repo);
 const candidate=await api('GET','/releases/'+request.candidateReleaseId);validateCandidate(candidate,request);
@@ -16,7 +20,16 @@ const download=await fetch(base+'/releases/assets/'+request.assetId,{headers:{Au
 if(!download.ok)throw Error('Could not download verified candidate: '+download.status);
 const bytes=Buffer.from(await download.arrayBuffer());verifyBytes(bytes,request);
 const tag='public-v'+request.version;
-let release=await api('GET','/releases/tags/'+tag,undefined,true);
+// Draft releases may not resolve through /releases/tags before the tag exists.
+const matches=[];
+for(let page=1;page<=100;page++){
+ const batch=await api('GET','/releases?per_page=100&page='+page);
+ matches.push(...batch.filter(r=>r.tag_name===tag));
+ if(batch.length<100)break;
+ if(page===100)throw Error('Too many releases to inspect safely');
+}
+if(matches.length>1)throw Error('Multiple drafts use this public version; review before publishing');
+let release=matches[0]||null;
 if(release){
  // An existing version always owns its original bytes. Never clobber an asset.
  if(release.assets.some(a=>a.name==='ChamferTrackball.exe'))verifyPublicAsset(release,request);

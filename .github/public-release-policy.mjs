@@ -21,6 +21,7 @@ export function verifyBytes(bytes,r){
 }
 export function verifyPublicAsset(release,r){
  ensure(release.tag_name==='public-v'+r.version&&release.target_commitish===r.sourceRevision,'Public release version/source differs');
+ ensure(release.assets.length===1,'Public release must contain only its public executable');
  const asset=release.assets.find(a=>a.name==='ChamferTrackball.exe');
  ensure(asset?.digest==='sha256:'+r.sha256,'Public release executable differs');return asset;
 }

@@ -11,4 +11,5 @@ verifyBytes(bytes,r);assert.throws(()=>verifyBytes(Buffer.from('MZ-changed'),r))
 const pub={tag_name:'public-v1.0.1',target_commitish:r.sourceRevision,assets:[asset]};verifyPublicAsset(pub,r);
 assert.throws(()=>verifyPublicAsset({...pub,target_commitish:'b'.repeat(40)},r));
 assert.throws(()=>verifyPublicAsset({...pub,tag_name:'public-v1.0.2'},r));
+assert.throws(()=>verifyPublicAsset({...pub,assets:[asset,{name:'extra-file'}]},r));
 console.log('Pinned source, successful verification, candidate identity and public executable checks passed.');
