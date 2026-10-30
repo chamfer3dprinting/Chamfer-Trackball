@@ -29,7 +29,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public string DeviceStatus {get;private set;}="Identify your trackball to enable device-only controls.";
     public string LastDevice {get;private set;}="";
     public bool Ready=>connected&&!failed&&SelectedDevice().Length>0;
-    bool Routing=>(Ready&&Enabled())||mapping.HeldCount>0||consumed.Count>0;
+    bool Routing=>(Ready&&(Enabled()||SwapButtons()||SwapWheels()))||mapping.HeldCount>0||consumed.Count>0;
     public void Identify(){learning=true;learnUntil=Environment.TickCount64+15000;DeviceStatus="Roll only the trackball now…";failed=false;recoverOnInput=false;}
     public void CancelIdentify(){learning=false;DeviceStatus=Ready?"Trackball connected":"Trackball not identified";}
     void Watchdog(object? sender,EventArgs e){
@@ -93,7 +93,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(!failed&&!learning)DeviceStatus="Trackball connected";
     }
     internal void VerifyRecovery(){
-        var original=SelectedDevice;bool originalConnected=connected,originalFailed=failed,originalRecover=recoverOnInput;string originalStatus=DeviceStatus;
+        var original=SelectedDevice;var originalEnabled=Enabled;var originalButtons=SwapButtons;var originalWheels=SwapWheels;bool originalConnected=connected,originalFailed=failed,originalRecover=recoverOnInput;string originalStatus=DeviceStatus;
         try{
             SelectedDevice=()=>"saved-trackball";
             ApplyPresence(["other-mouse","SAVED-TRACKBALL"]);
@@ -102,13 +102,19 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
             if(Ready)throw new InvalidOperationException("Unrelated mouse was mistaken for the saved trackball.");
             ApplyPresence(["saved-trackball","other-mouse"]);
             if(!Ready)throw new InvalidOperationException("Reinserted trackball did not reconnect.");
+            Enabled=()=>false;SwapButtons=()=>true;SwapWheels=()=>false;
+            if(!Routing)throw new InvalidOperationException("Disabling 3D navigation lost the click correction.");
+            SwapButtons=()=>false;SwapWheels=()=>true;
+            if(!Routing)throw new InvalidOperationException("Disabling 3D navigation lost the wheel correction.");
+            SwapWheels=()=>false;
+            if(Routing)throw new InvalidOperationException("Disabled controls without corrections captured input.");
             using var replacement=new RegistrationProbe();
             if(!Win32.RegisterRawInputDevices([new Win32.RawDevice{Page=1,Usage=2,Flags=0x2100,Target=replacement.Handle}],1,(uint)Marshal.SizeOf<Win32.RawDevice>()))throw new InvalidOperationException("Cannot create registration-replacement fixture.");
             if(OwnsRegistration())throw new InvalidOperationException("Replacement registration was not detected.");
             EnsureRegistration();
             if(!OwnsRegistration())throw new InvalidOperationException("Raw Input registration was not restored.");
-        }finally{SelectedDevice=original;connected=originalConnected;failed=originalFailed;recoverOnInput=originalRecover;DeviceStatus=originalStatus;RefreshPresence();EnsureRegistration();}
-        Console.WriteLine("Input recovery verified: startup presence, exact-device identity, disconnect/reconnect and replaced Raw Input registration.");
+        }finally{SelectedDevice=original;Enabled=originalEnabled;SwapButtons=originalButtons;SwapWheels=originalWheels;connected=originalConnected;failed=originalFailed;recoverOnInput=originalRecover;DeviceStatus=originalStatus;RefreshPresence();EnsureRegistration();}
+        Console.WriteLine("Input recovery verified: startup presence, exact-device identity, disconnect/reconnect, corrections with 3D off and replaced Raw Input registration.");
     }
     sealed class RegistrationProbe:NativeWindow,IDisposable{
         public RegistrationProbe()=>CreateHandle(new CreateParams{Caption="Input recovery fixture",Parent=new nint(-3)});
@@ -123,7 +129,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         bool target=device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
         var key=(edge.Button,edge.Data);
         bool handled=false;
-        if(target)handled=MouseEvent?.Invoke(edge.Message,edge.Data)==true;
+        if(target&&Enabled())handled=MouseEvent?.Invoke(edge.Message,edge.Data)==true;
         if(edge.Down&&handled)consumed.Add(key);
         if(edge.Up&&consumed.Remove(key))handled=true;
         if(!handled)Emit(edge);
