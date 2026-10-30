@@ -1,0 +1,89 @@
+name: Build chosen public version
+on:
+  push:
+    branches: [main]
+    paths: ['.github/custom-public-request.json', '.github/workflows/custom-public.yml', '.github/custom-public.mjs', '.github/custom-public-policy.mjs', '.github/custom-public-policy.test.mjs']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: chamfer-custom-public
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read the chosen version and source
+        id: request
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $env:CUSTOM_REQUEST_FILE = Join-Path $env:RUNNER_TEMP 'custom-public-request.json'
+          "CUSTOM_REQUEST_FILE=$env:CUSTOM_REQUEST_FILE" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          node .github/custom-public.mjs prepare
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.request.outputs.source }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Check the chosen app source
+        shell: pwsh
+        run: |
+          dotnet run --project tests/Chamfer.Trackball.Tests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Core checks failed' }
+          $PSNativeCommandUseErrorActionPreference = $true
+          node tests/interface-check.cjs
+          node tests/versioning.mjs
+          node .github/custom-public-policy.test.mjs
+          node --check .github/custom-public.mjs
+          python -m py_compile integrations/blender/chamfer_trackball.py integrations/fusion/ChamferTrackball.py
+      - name: Stamp and build the exact public version
+        shell: pwsh
+        env:
+          CHOSEN_VERSION: ${{ steps.request.outputs.version }}
+          CHOSEN_SOURCE: ${{ steps.request.outputs.source }}
+        run: |
+          $customOutput = Join-Path $env:RUNNER_TEMP 'custom-public'
+          dotnet publish src/Chamfer.Trackball.App/Chamfer.Trackball.App.csproj -c Release -r win-x64 --self-contained true -p:Edition=Public -p:PublicVersion=$env:CHOSEN_VERSION -p:BuildNumber=${{ github.run_id }} -p:SourceRevision=$env:CHOSEN_SOURCE -p:EnableCompressionInSingleFile=true -o $customOutput
+          if ($LASTEXITCODE -ne 0) { throw 'Chosen public build failed' }
+          $env:CUSTOM_EXE = Join-Path $customOutput 'ChamferTrackball.exe'
+          $actualVersion = [Version]([System.Diagnostics.FileVersionInfo]::GetVersionInfo($env:CUSTOM_EXE).FileVersion)
+          if ($actualVersion.ToString(3) -ne $env:CHOSEN_VERSION) { throw 'Executable version does not match the requested version' }
+          "CUSTOM_EXE=$env:CUSTOM_EXE" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Output "Executable stamped as v$($actualVersion.ToString(3))"
+      - name: Verify the actual public app
+        shell: pwsh
+        run: |
+          Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:RUNNER_TEMP/WebView2Setup.exe"
+          Start-Process -FilePath "$env:RUNNER_TEMP/WebView2Setup.exe" -ArgumentList '/silent /install' -WindowStyle Hidden -Wait
+          $process = Start-Process -FilePath $env:CUSTOM_EXE -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden -RedirectStandardOutput "$env:RUNNER_TEMP/custom-smoke.stdout" -RedirectStandardError "$env:RUNNER_TEMP/custom-smoke.stderr"
+          if (-not $process.WaitForExit(90000)) { Stop-Process -Id $process.Id; throw 'Public app smoke test timed out' }
+          if ($process.ExitCode -ne 0 -or -not (Test-Path "$env:RUNNER_TEMP/chamfer-ui-smoke.ok")) {
+            Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.error", "$env:RUNNER_TEMP/custom-smoke.stderr" -ErrorAction SilentlyContinue
+            throw 'Public app verification failed'
+          }
+          Get-Content "$env:RUNNER_TEMP/chamfer-ui-smoke.ok"
+      - name: Release only after successful verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/custom-public.mjs publish
+      - name: Report a failed request to Admin
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_RESULT: ${{ job.status }}
+        run: node .github/custom-public.mjs finish

@@ -24,12 +24,13 @@ internal sealed class AdminService:IDisposable{
   throw new IOException("Too many releases to inspect safely.");
  }
  void RequireAdmin(){if(!BuildInfo.Admin)throw new UnauthorizedAccessException("Admin commands are unavailable in the public app.");}
- async Task<JsonNode> Api(HttpMethod method,string route,JsonObject? body=null,string? credential=null){
+ async Task<JsonNode> Api(HttpMethod method,string route,JsonObject? body=null,string? credential=null,bool allowMissing=false){
   using var request=new HttpRequestMessage(method,"https://api.github.com/repos/"+Repo+route);
   string key=credential??token;if(key.Length>0)request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",key);
   request.Headers.Accept.ParseAdd("application/vnd.github+json");request.Headers.Add("X-GitHub-Api-Version","2022-11-28");
   if(body!=null)request.Content=new StringContent(body.ToJsonString(),Encoding.UTF8,"application/json");
   using var response=await http.SendAsync(request);
+  if(allowMissing&&response.StatusCode==System.Net.HttpStatusCode.NotFound)return new JsonObject();
   if(!response.IsSuccessStatusCode)throw new InvalidOperationException("GitHub returned "+(int)response.StatusCode+". Check your repository Contents read/write permission and token expiry.");
   if(response.StatusCode==System.Net.HttpStatusCode.NoContent)return new JsonObject();
   return JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
@@ -41,12 +42,49 @@ internal sealed class AdminService:IDisposable{
   var bytes=Encoding.UTF8.GetBytes(value);try{var encrypted=ProtectedData.Protect(bytes,null,DataProtectionScope.CurrentUser);Directory.CreateDirectory(Path.GetDirectoryName(path)!);File.WriteAllBytes(path,encrypted);}finally{CryptographicOperations.ZeroMemory(bytes);}
   token=value;error="";message="GitHub connected. Public builds remain unpublished until you release them.";await Refresh();
  }
- public void Clear(){RequireAdmin();token="";if(File.Exists(path))File.Delete(path);loaded=false;releases=[];message="GitHub disconnected. Reconnect before publishing or withdrawing.";error="";}
+ public void Clear(){RequireAdmin();pending=pendingId="";token="";if(File.Exists(path))File.Delete(path);loaded=false;releases=[];message="GitHub disconnected. Reconnect before publishing or withdrawing.";error="";}
  public async Task Refresh(){
   RequireAdmin();if(busy)return;busy=true;error="";
   try{
-   releases=await ReadReleases();loaded=true;
+   releases=await ReadReleases();loaded=true;if(token.Length>0)await ReadCustomStatus();
   }catch(Exception ex){error=ex.Message;}finally{busy=false;}
+ }
+ const string CustomRequestPath="/contents/.github/custom-public-request.json",CustomStatusPath="/contents/.github/custom-public-status.json";
+ async Task<JsonObject> ReadFile(string route){
+  var file=await Api(HttpMethod.Get,route+"?ref=main",allowMissing:true);
+  if(ConfigStore.S(file,"content")=="")return new JsonObject();
+  var raw=Convert.FromBase64String(ConfigStore.S(file,"content"));if(raw.Length>65536)throw new IOException("Release status is too large.");
+  return JsonNode.Parse(raw)?.AsObject()??new JsonObject();
+ }
+ async Task ReadCustomStatus(){
+  var request=await ReadFile(CustomRequestPath);if(ConfigStore.S(request,"action")!="release")return;
+  string id=ConfigStore.S(request,"requestId"),version=ConfigStore.S(request,"version");
+  var published=releases.FirstOrDefault(r=>ConfigStore.S(r,"tag_name")=="public-v"+version&&!ConfigStore.B(r,"draft")&&!ConfigStore.B(r,"prerelease"));
+  if(published!=null){pending=pendingId="";message="Public v"+version+" is released.";return;}
+  var result=await ReadFile(CustomStatusPath);
+  if(ConfigStore.S(result,"requestId")==id&&ConfigStore.S(result,"state")=="error"){pending=pendingId="";error=ConfigStore.S(result,"message","The public build failed. Check GitHub Actions and retry.");return;}
+  pending="release "+version;pendingId=id;message=ConfigStore.S(result,"requestId")==id?ConfigStore.S(result,"message","Building and testing public v"+version+"…"):"Public v"+version+" is queued on GitHub.";
+ }
+ public async Task Poll(){
+  RequireAdmin();if(pending.Length>0&&!busy&&DateTime.UtcNow-lastPoll>TimeSpan.FromSeconds(5)){lastPoll=DateTime.UtcNow;await Refresh();}
+ }
+ public async Task RequestPublicVersion(string raw){
+  RequireAdmin();if(token.Length==0)throw new UnauthorizedAccessException("Connect GitHub in Admin before releasing a version.");
+  string version=PublicVersion.Normalize(raw);
+  if(busy||pending.Length>0)throw new InvalidOperationException("A release is already in progress.");
+  await Refresh();if(pending.Length>0)throw new InvalidOperationException("A release is already in progress.");
+  var existing=releases.FirstOrDefault(r=>ConfigStore.S(r,"tag_name")=="public-v"+version);
+  if(existing!=null){if(!ConfigStore.B(existing,"draft"))throw new InvalidOperationException("v"+version+" is already public. Choose another version.");await Release(version);return;}
+  if(!System.Text.RegularExpressions.Regex.IsMatch(BuildInfo.Source,@"^[a-f0-9]{40}$"))throw new InvalidOperationException("Update to a verified Admin version before creating a public build.");
+  busy=true;error="";
+  try{
+   var previous=await Api(HttpMethod.Get,CustomRequestPath+"?ref=main",allowMissing:true);
+   string id=Guid.NewGuid().ToString("N");
+   var request=new JsonObject{["action"]="release",["requestId"]=id,["version"]=version,["sourceRevision"]=BuildInfo.Source,["adminVersion"]=BuildInfo.Version,["requestedAt"]=DateTimeOffset.UtcNow.ToString("O")};
+   var body=new JsonObject{["message"]="Release public v"+version,["branch"]="main",["content"]=Convert.ToBase64String(Encoding.UTF8.GetBytes(request.ToJsonString()))};
+   if(ConfigStore.S(previous,"sha")!="")body["sha"]=ConfigStore.S(previous,"sha");
+   await Api(HttpMethod.Put,CustomRequestPath,body);pendingId=id;pending="release "+version;message="Public v"+version+" is queued. GitHub will build, test and publish the version you chose.";
+  }catch(Exception ex){error=ex.Message;throw;}finally{busy=false;}
  }
  public object State(){
   RequireAdmin();var publicRows=releases.Where(r=>ReleasePolicy.PublicTag(ConfigStore.S(r,"tag_name"))&&!ConfigStore.B(r,"draft")&&!ConfigStore.B(r,"prerelease")).ToArray();
@@ -59,7 +97,7 @@ internal sealed class AdminService:IDisposable{
   }
   foreach(var pub in publicRows.Where(p=>!seen.Contains(ConfigStore.S(p,"tag_name")[8..])))
    versions.Add(new{version=ConfigStore.S(pub,"tag_name")[8..],date=ConfigStore.S(pub,"created_at").Split('T')[0],@public=true,latest=ReferenceEquals(pub,latest),thisApp=false,canShip=false,notes=new[]{ConfigStore.S(pub,"body")}});
-  return new{connected=token.Length>0,repo=Repo,error,message,loaded,busy=busy?"loading":"",pending="",versions};
+  return new{connected=token.Length>0,repo=Repo,error,message,loaded,busy=busy?"loading":"",pending,versions,suggestedVersion=BuildInfo.PublicVersion};
  }
  async Task<(byte[] Bytes,string Hash)> VerifiedExecutable(JsonNode release){
   var asset=release["assets"]?.AsArray().FirstOrDefault(a=>ConfigStore.S(a,"name")=="ChamferTrackball.exe")??throw new IOException("Release has no public executable.");

@@ -6,3 +6,6 @@
 - Admin and public update channels remain separate. Public candidate v{{PUBLIC_VERSION}} stays unpublished until Release for public is chosen in Admin.
 - Physical M512 gestures and live CAD hosts still need owner testing; standard X/Y input does not measure independent ball twist.
 - Admin release controls inspect the full release history, verify the candidate and uploaded executable, and retain an existing version's original binary when re-releasing after withdrawal.
+
+- Admin now always shows Public version and Release for public at the top of its page. Enter any unused vX.Y.Z version instead of being limited to prepared candidate rows.
+- Choosing a new version queues a GitHub build of that exact executable version, runs checks and the actual interface, then publishes after verification. Admin shows queued/build/error/completion status.

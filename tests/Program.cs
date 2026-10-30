@@ -156,4 +156,10 @@ Check(!jitterExit.Active,"Slightly uneven straight rolling also leaves zoom");
 var largerDial=Trace(new CircleZoom(),a=>new(75*MathF.Cos(a),75*MathF.Sin(a)),MathF.PI*6,1500);
 Check(largerDial.Wheel>300,"Larger valid circles are not mistaken for straight movement");
 clockwise.Add(float.NaN,1,7010);Check(!clockwise.Active,"Invalid movement cannot produce a zoom");
+Check(PublicVersion.Normalize(" v3.2.1 ")=="3.2.1","Owner chooses any canonical public version");
+Check(PublicVersion.Normalize("12.34.56")=="12.34.56","Public version is not restricted to prepared candidates");
+foreach(var badVersion in new[]{"1.2","01.2.3","1.2.3-beta","1.2.65535","1.2.3.4"}){
+ bool invalidVersion=false;try{PublicVersion.Normalize(badVersion);}catch(ArgumentException){invalidVersion=true;}
+ Check(invalidVersion,"Reject invalid executable version "+badVersion);
+}
 Console.WriteLine(count+" regression checks passed.");

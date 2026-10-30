@@ -521,7 +521,11 @@ details .ver{margin-top:10px;font-weight:600}
       <h1>Admin</h1><p class="sub" id="adIntro">Each delivered update has a new version in About &amp; updates. Public candidates stay unpublished until you choose <b>Release for public</b>.</p>
       <div id="adMsg" class="note" style="margin-bottom:14px" hidden></div>
       <div class="card" style="margin-bottom:16px">
-        <h2>Releasing</h2>
+        <h2>Release for public</h2>
+        <p class="mu">Choose the public version you want. GitHub builds and tests that version before making the Windows app available to users.</p>
+        <div class="row" style="margin:12px 0"><label for="publicVersion">Public version</label><input id="publicVersion" type="text" placeholder="1.2.3" maxlength="24" inputmode="decimal" style="width:160px"><button class="btn primary" id="releasePublic">Release for public</button></div>
+        <div id="publicReleaseProgress" class="note" hidden></div>
+        <p class="mu" id="releaseConnectionHint"></p>
         <div id="adConn"></div>
       </div>
       <div class="card">
@@ -869,6 +873,10 @@ let adTimer=null;
 async function refreshAdmin(loop){if(S.edition!=="admin")return;let a;try{a=await call("adminState")}catch{return}
   const m=$("#adMsg");m.hidden=!(a.error||a.message);m.className="note"+(a.error?" err":" okn");m.textContent=a.error||a.message||"";
   const busy=a.busy;
+  if(!$("#publicVersion").value)$("#publicVersion").value=a.suggestedVersion||S.publicVersion||"";
+  $("#releasePublic").disabled=!!busy||!!a.pending;
+  $("#publicReleaseProgress").hidden=!a.pending;$("#publicReleaseProgress").textContent=a.message||"Building and testing your public version…";
+  $("#releaseConnectionHint").textContent=a.connected?"GitHub connected. Choose any unused version above.":"Connect GitHub below to enable publishing. Your version choice stays here.";
   $("#adConn").innerHTML=a.connected?`<div class="row"><span class="ok">● GitHub connected</span><span class="mu">${esc(a.repo)} · credentials encrypted for your Windows account</span><span class="spacer"></span><button class="btn sm danger" id="tokClear">Disconnect</button></div>`:
     `<p class="mu">Connect your GitHub account to publish or withdraw versions. Create a fine-grained token for <b>Chamfer-Trackball</b> with <b>Contents: read and write</b>.</p><div class="row" style="margin-top:10px"><button class="btn" id="tokOpen">Open GitHub</button><input id="tokValue" type="password" autocomplete="off" placeholder="Paste GitHub access token" style="flex:1;min-width:180px"><button class="btn primary" id="tokConnect">Connect</button></div>`;
   if(a.connected)$("#tokClear").onclick=async()=>{if(await modal("Disconnect GitHub?","You will need to reconnect before publishing or withdrawing a version.",[["Cancel","",false],["Disconnect","primary",true]])){await call("adminClearToken");refreshAdmin()}};
@@ -877,7 +885,7 @@ async function refreshAdmin(loop){if(S.edition!=="admin")return;let a;try{a=awai
     $("#tokConnect").onclick=async()=>{const input=$("#tokValue"),token=input.value;input.value="";try{await call("adminConnect",token);toast("GitHub connected");refreshAdmin()}catch(e){toast(String(e.message||e),true)}};
   }
   if(!a.loaded)$("#adVers").innerHTML=`<p class="mu">${busy==="loading"?"Loading versions…":"No versions loaded yet."}</p>`;
-  else if(!a.versions.length)$("#adVers").innerHTML='<p class="mu">No versions in the GitHub folder yet.</p>';
+  else if(!a.versions.length)$("#adVers").innerHTML='<p class="mu">No prepared versions loaded. Use the version field above to create a public release.</p>';
   else $("#adVers").innerHTML=`<table class="vt"><tr><th>Version</th><th>Date</th><th>Status</th><th></th></tr>${a.versions.map(v=>{
       const st=v.public?`<span class="tag pub">Public</span>${v.latest?' <span class="tag latest">Latest for users</span>':""}`:'<span class="tag priv">Unpublished</span>';
       const me=v.thisApp?' <span class="mu" style="font-size:12px">(this app)</span>':"";
@@ -890,6 +898,13 @@ async function refreshAdmin(loop){if(S.edition!=="admin")return;let a;try{a=awai
       return`<tr><td><b>v${esc(v.version)}</b>${me}</td><td class="mu">${esc(v.date)}</td><td>${st}</td><td style="text-align:right">${act}</td></tr>`}).join("")}</table>`;
   $("#adRefresh").disabled=!!busy;
   clearTimeout(adTimer);if(loop&&page==="admin")adTimer=setTimeout(()=>refreshAdmin(true),busy?700:a.pending?5000:3000)}
+$("#releasePublic").onclick=async()=>{
+ const raw=$("#publicVersion").value.trim().replace(/^v/i,"");
+ if(!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(raw)||raw.split(".").some(n=>Number(n)>65534)){toast("Enter a version like 1.2.3.",true);return}
+ const state=await call("adminState");if(!state.connected){toast("Connect GitHub in Admin, then click Release for public.",true);return}
+ if(!await modal("Release v"+raw+" for public?","GitHub will build and test this version of the app, then publish it for users. This can take a few minutes.",[["Cancel","",false],["Release for public","primary",true]]))return;
+ try{$("#releasePublic").disabled=true;await call("adminRequestVersion",raw);toast("Public v"+raw+" queued");await refreshAdmin(true)}catch(err){toast(String(err.message||err),true);refreshAdmin(true)}
+};
 $("#adRefresh").onclick=()=>{call("adminRefresh");setTimeout(()=>refreshAdmin(true),100)};
 document.addEventListener("click",async e=>{const r=e.target.dataset.rel,w=e.target.dataset.wd;
   if(r){const a=await call("adminState"),v=a.versions.find(x=>x.version===r);
@@ -1095,7 +1110,7 @@ $("#openMouse").onclick=()=>call("ctOpenMouseSettings");
 function renderAll(){$("#accelNote").hidden=!S.pointerAccel;applyTheme();renderEnabled();renderPrograms();renderBinds();renderGestures();renderMacros();renderCheat();renderApps();renderNotes();
   $("#setPath").textContent=S.settingsPath;$("#startup").checked=S.startup;$("#welcome").hidden=!!cfg.welcomeDone}
 async function boot(){S=await call("ctState");cfg=JSON.parse(JSON.stringify(S.config));
-  if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false;$("#adIntro").textContent="Admin v"+S.version+". Public candidate v"+S.publicVersion+" stays unpublished until you choose Release for public. Click Update in About & updates to install a newer Admin version."}
+  if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false;$("#adIntro").textContent="Admin v"+S.version+". Choose any unused public version below and click Release for public. Click Update in About & updates for newer Admin versions."}
   renderAll();goTo("home");poll();pollLog();refreshUpd();
   if(S.justUpdated){goTo("about");toast("Updated to v"+S.version)}}
 function waitBridge(n){if(window.ctState)boot().catch(e=>toast(String(e),true));else if(n>0)setTimeout(()=>waitBridge(n-1),50);else toast("App connection failed. Restart Chamfer Trackball.",true)}

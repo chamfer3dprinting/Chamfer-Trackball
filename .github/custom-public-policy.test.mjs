@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {normalizeVersion,validateCustomRequest,executableHash,validatePublicRelease} from './custom-public-policy.mjs';
+assert.equal(normalizeVersion(' v3.2.1 '),'3.2.1');assert.equal(normalizeVersion('12.34.56'),'12.34.56');
+for(const bad of ['1.2','1.2.3-beta','01.2.3','-1.2.3','1.2.65535','1.2.3.4','1.2.3\ninjection'])assert.throws(()=>normalizeVersion(bad));
+const request={action:'release',requestId:'a'.repeat(32),version:'9.8.7',sourceRevision:'b'.repeat(40)};
+assert.equal(validateCustomRequest(request,'c'.repeat(40)).version,'9.8.7');
+assert.equal(validateCustomRequest({...request,action:'verify',sourceRevision:'current'},'c'.repeat(40)).sourceRevision,'c'.repeat(40));
+assert.throws(()=>validateCustomRequest({...request,sourceRevision:'current'},'c'.repeat(40)));
+assert.throws(()=>validateCustomRequest({...request,action:'automatic'},'c'.repeat(40)));
+const hash=executableHash(Buffer.from('MZ-test'));assert.throws(()=>executableHash(Buffer.from('not an app')));
+const release={tag_name:'public-v9.8.7',target_commitish:request.sourceRevision,assets:[{name:'ChamferTrackball.exe',digest:hash}]};
+validatePublicRelease(release,request,hash);assert.throws(()=>validatePublicRelease({...release,tag_name:'public-v9.8.8'},request,hash));assert.throws(()=>validatePublicRelease(release,request,'sha256:'+'0'.repeat(64)));
+console.log('Arbitrary public versions, pinned source and immutable release checks passed.');

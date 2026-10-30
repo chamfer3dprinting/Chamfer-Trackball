@@ -1,0 +1,6 @@
+- Normal mouse pointing, clicks and scrolling remain the default.
+- Optional ball navigation includes orbit/pan switching and clockwise/anticlockwise circle zoom.
+- Customize and save held keys, button combinations, wheel actions and program settings.
+- Native Blender/Fusion adapters and editable mouse-emulation profiles are included.
+- About & updates installs newer published public versions after checksum verification.
+- Standard M512 reports supply X/Y and wheels, not independent physical ball twist. Physical gestures and live CAD hosts need owner testing.

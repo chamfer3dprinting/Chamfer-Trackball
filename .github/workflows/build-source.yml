@@ -31,8 +31,11 @@ jobs:
       - name: Interface syntax and integration syntax
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           node tests/interface-check.cjs
           node tests/versioning.mjs
+          node .github/custom-public-policy.test.mjs
+          node --check .github/custom-public.mjs
           node --check .github/store-build.mjs
           node --check .github/choose-versions.mjs
           python -m py_compile integrations/blender/chamfer_trackball.py integrations/fusion/ChamferTrackball.py

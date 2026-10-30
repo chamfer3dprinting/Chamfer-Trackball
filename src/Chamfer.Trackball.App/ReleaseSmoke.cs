@@ -13,10 +13,10 @@ internal static class ReleaseSmoke{
  static AdminService Service(MemoryGitHub api,string credential="smoke-test-credential")=>new(new HttpClient(api){Timeout=TimeSpan.FromSeconds(10)},credential);
  public static async Task Run(){
   using(var api=new MemoryGitHub())using(var service=Service(api)){
-   if(!BuildInfo.Admin){await Denied(()=>service.Release("1.0.1"));Check(api.Requests==0,"public app contacted release API");Console.WriteLine("Public app rejects release operations.");return;}
+   if(!BuildInfo.Admin){await Denied(()=>service.Release("1.0.1"));await Denied(()=>service.RequestPublicVersion("9.8.7"));Check(api.Requests==0,"public app contacted release API");Console.WriteLine("Public app rejects release operations.");return;}
   }
   using(var api=new MemoryGitHub())using(var service=Service(api,"")){
-   await Denied(()=>service.Release("1.0.1"));Check(api.Requests==0,"missing credential contacted release API");
+   await Denied(()=>service.Release("1.0.1"));await Denied(()=>service.RequestPublicVersion("9.8.7"));Check(api.Requests==0,"missing credential contacted release API");
   }
   using(var api=new MemoryGitHub())using(var service=Service(api)){
    await service.Refresh();
@@ -42,11 +42,27 @@ internal static class ReleaseSmoke{
   using(var api=new MemoryGitHub{Forbidden=true})using(var service=Service(api)){
    await Denied(()=>service.Release("1.0.1"));Check(api.Drafts==0&&!api.Published,"permission failure created a release");
   }
+  using(var api=new MemoryGitHub())using(var service=Service(api)){
+   await service.RequestPublicVersion(" v9.8.7 ");
+   Check(ConfigStore.S(api.CustomRequest,"version")=="9.8.7"&&ConfigStore.S(api.CustomRequest,"sourceRevision")==BuildInfo.Source&&api.RequestWrites==1,"custom version request was not pinned and queued");
+   var queued=JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(service.State()))!;
+   Check(ConfigStore.S(queued,"pending")=="release 9.8.7","queued version is not shown in Admin");
+   await Denied(()=>service.RequestPublicVersion("8.7.6"));Check(api.RequestWrites==1,"a pending release was replaced");
+   api.CustomStatus=new(){["requestId"]=ConfigStore.S(api.CustomRequest,"requestId"),["state"]="error",["message"]="Test build failed"};
+   await service.Refresh();var failed=JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(service.State()))!;
+   Check(ConfigStore.S(failed,"pending")==""&&ConfigStore.S(failed,"error")=="Test build failed","build failure is not shown in Admin");
+   await service.RequestPublicVersion("8.7.6");Check(api.RequestWrites==2,"failed release cannot be retried with another chosen version");
+   api.Releases.Add(new JsonObject{["tag_name"]="public-v8.7.6",["draft"]=false,["prerelease"]=false,["assets"]=new JsonArray()});
+   await service.Refresh();var completed=JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(service.State()))!;
+   Check(ConfigStore.S(completed,"pending")==""&&ConfigStore.S(completed,"message").Contains("released"),"published custom version does not clear progress");
+  }
+  Console.WriteLine("Custom public version queue, pinned source, pending state, errors and completion passed.");
   Console.WriteLine("Admin release smoke passed: authenticated publish, pagination, verified upload, public update discovery, duplicate prevention, withdrawal/re-release and failure handling.");
  }
  sealed class MemoryGitHub:HttpMessageHandler{
   public readonly byte[] Exe=Encoding.ASCII.GetBytes("MZ-verified-public-candidate");
   public readonly JsonArray Releases=[];
+  public JsonObject? CustomRequest,CustomStatus;public int RequestWrites;
   public int Requests,Uploads,Drafts,Downloads;public bool CorruptDownload,CorruptUpload,Forbidden;
   string Digest=>"sha256:"+Convert.ToHexString(SHA256.HashData(Exe)).ToLowerInvariant();
   JsonObject? Public=>Releases.OfType<JsonObject>().FirstOrDefault(r=>ConfigStore.S(r,"tag_name")=="public-v1.0.1");
@@ -60,6 +76,17 @@ internal static class ReleaseSmoke{
    Requests++;Check(request.Headers.Authorization?.Parameter=="smoke-test-credential","missing authenticated request");
    var uri=request.RequestUri!;string path=uri.AbsolutePath;string method=request.Method.Method;
    if(Forbidden)return new(HttpStatusCode.Forbidden){Content=new StringContent("permission denied")};
+   if(method=="GET"&&path.Contains("/contents/.github/custom-public-")){
+    var value=path.EndsWith("custom-public-request.json")?CustomRequest:CustomStatus;
+    return value==null?new HttpResponseMessage(HttpStatusCode.NotFound){Content=new StringContent("{}")}:Json(new JsonObject{["sha"]="file-sha",["content"]=Convert.ToBase64String(Encoding.UTF8.GetBytes(value.ToJsonString()))});
+   }
+   if(method=="PUT"&&path.EndsWith("/contents/.github/custom-public-request.json")){
+    var body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!;
+    CustomRequest=JsonNode.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(ConfigStore.S(body,"content"))))!.AsObject();
+    Check(ConfigStore.S(CustomRequest,"action")=="release"&&ConfigStore.S(CustomRequest,"sourceRevision")==BuildInfo.Source,"custom request has wrong action/source");
+    Check(!CustomRequest.ToJsonString().Contains("credential"),"credential was copied into repository request");
+    RequestWrites++;return Json(new JsonObject{["content"]=new JsonObject{["sha"]="saved-sha"}});
+   }
    if(method=="GET"&&path.EndsWith("/releases")){
     int page=uri.Query.Contains("page=2")?2:1;
     return Json(new JsonArray(Releases.Skip((page-1)*100).Take(100).Select(r=>r!.DeepClone()).ToArray()));

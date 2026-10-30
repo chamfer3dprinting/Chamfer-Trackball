@@ -46,3 +46,17 @@ assert.ok(updateStart>0&&updateEnd>updateStart);
  calls.length=0;button.dataset.stage='latest';await button.onclick();assert.deepEqual(calls,['ctUpdCheck']);
  console.log('One Update click saves settings and invokes installation; Check again only checks.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+assert.ok(html.includes('id="publicVersion"'));assert.ok(html.includes('id="releasePublic"'));
+assert.ok(html.includes('adminRequestVersion'));
+console.log('Admin has a persistent custom version field and Release for public control.');
+
+const customStart=html.indexOf('$("#releasePublic").onclick='),customEnd=html.indexOf('$("#adRefresh").onclick=',customStart);
+(async()=>{
+ const field={value:'v9.8.7'},button={},calls=[];
+ const context={$:s=>s==='#publicVersion'?field:button,call:async(n,v)=>{calls.push([n,v]);return {connected:true}},modal:async()=>true,toast:()=>{},refreshAdmin:async()=>{}};
+ vm.runInNewContext(html.slice(customStart,customEnd),context);await button.onclick();
+ assert.ok(calls.some(([n,v])=>n==='adminRequestVersion'&&v==='9.8.7'));
+ field.value='1.2';calls.length=0;await button.onclick();assert.equal(calls.length,0);
+ console.log('Chosen release version reaches the Admin bridge and invalid versions are rejected.');
+})().catch(e=>{console.error(e);process.exitCode=1;});
