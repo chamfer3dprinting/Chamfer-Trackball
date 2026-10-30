@@ -33,6 +33,7 @@ public sealed class CircleZoom {
                 // A sharp kink, reversal or sustained straight roll returns control
                 // immediately; no queued orbit motion is replayed after zoom.
                 if(MathF.Abs(turn)>1.05f){Reset();return (false,0);}
+                if(HasStraightTail(Math.Max(30,maxDiameter*.3f))){Reset();return (false,0);}
                 wheel+=turn*(480/(2*MathF.PI));consumed=true;
             }else if(IsCircle(Math.Clamp(maxDiameter,60,400))){
                 Active=true;straightTravel=0;consumed=true;
@@ -40,6 +41,14 @@ public sealed class CircleZoom {
             }
         }
         return (consumed,wheel);
+    }
+    bool HasStraightTail(float minimumLength){
+        int end=points.Count-1,start=end;float length=0;
+        while(start>0&&length<minimumLength){length+=Vector2.Distance(points[start],points[start-1]);start--;}
+        if(length<minimumLength)return false;
+        var axis=points[end]-points[start];float distance=axis.Length();if(distance/length<.985f)return false;
+        for(int i=start+1;i<end;i++){var v=points[i]-points[start];if(MathF.Abs(axis.X*v.Y-axis.Y*v.X)/distance>2)return false;}
+        return true;
     }
     bool IsCircle(float maxDiameter){
         // Inspect recent suffixes so a straight approach to a circle cannot prevent
