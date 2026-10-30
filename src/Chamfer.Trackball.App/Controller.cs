@@ -30,6 +30,7 @@ public string AppName{get;private set;}="";
         input.SwapButtons=()=>ConfigStore.B(cfg,"trackballSwapButtons");input.SwapWheels=()=>ConfigStore.B(cfg,"trackballSwapWheels");input.Enabled=()=>ConfigStore.B(cfg,"enabled");
         input.Identified+=device=>{var n=store.Snapshot();n["selectedDevice"]=device;store.Save(n);cfg=store.Snapshot();Log("Trackball identified; original clicks and wheel axes are preserved unless you enable a correction.");};
         input.IsNavigationChord=keys=>ModeResolver.Resolve(cfg,keys)!=NavMode.Idle;
+        input.RoutingReset+=()=>{End();latched=NavMode.Idle;pressed.Clear();intercepted.Clear();comboUsed.Clear();combos.Clear();stoppedByClick=false;};
         input.KeysChanged+=KeysChanged;input.Motion+=Motion;input.MouseEvent+=MouseEvent;
         timer.Tick+=Tick;timer.Start();Tick(null,EventArgs.Empty);
     }

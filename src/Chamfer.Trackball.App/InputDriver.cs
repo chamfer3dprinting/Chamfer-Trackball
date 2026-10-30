@@ -12,6 +12,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public event Action<int,int,string>? Motion;
     public event Func<int,int,bool>? MouseEvent;
     public event Action? KeysChanged;
+    public event Action? RoutingReset;
     public Func<bool> IsCapture=()=>false;
     public Func<bool> IsCad=()=>false;
     public Func<IReadOnlySet<int>,bool> IsNavigationChord=_=>false;
@@ -21,29 +22,97 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     const int DispatchEdges=0x8001;
     readonly System.Windows.Forms.Timer watchdog=new(){Interval=30};
     readonly HashSet<(int,int)> consumed=[];
-    bool failed,learning,connected,motionBlocked;
-    long learnUntil;
+    bool failed,learning,connected,motionBlocked,recoverOnInput;
+    long learnUntil,nextRegistrationCheck,nextPresenceCheck;
     public Func<bool> SwapButtons=()=>false,SwapWheels=()=>false,Enabled=()=>true;
     public event Action<string>? Identified;
     public string DeviceStatus {get;private set;}="Identify your trackball to enable device-only controls.";
     public string LastDevice {get;private set;}="";
     public bool Ready=>connected&&!failed&&SelectedDevice().Length>0;
     bool Routing=>(Ready&&Enabled())||mapping.HeldCount>0||consumed.Count>0;
-    public void Identify(){learning=true;learnUntil=Environment.TickCount64+15000;DeviceStatus="Roll only the trackball now…";failed=false;}
+    public void Identify(){learning=true;learnUntil=Environment.TickCount64+15000;DeviceStatus="Roll only the trackball now…";failed=false;recoverOnInput=false;}
     public void CancelIdentify(){learning=false;DeviceStatus=Ready?"Trackball connected":"Trackball not identified";}
     void Watchdog(object? sender,EventArgs e){
         var now=Environment.TickCount64;
+        if(now>=nextRegistrationCheck){EnsureRegistration();nextRegistrationCheck=now+250;}
+        if(now>=nextPresenceCheck){RefreshPresence();nextPresenceCheck=now+1000;}
         if(learning&&now>learnUntil)CancelIdentify();
         if(!IsCapture()){motionHealth.Reset();motionBlocked=false;}
-        if(gate.Expired(now)||motionHealth.Expired(now))FailOpen("Device input timed out. Normal mouse restored; identify the trackball again.");
+        if(gate.Expired(now)||motionHealth.Expired(now))FailOpen("Input interrupted. Normal mouse restored; reconnecting automatically.",true);
     }
-    void FailOpen(string message){
-        failed=true;motionBlocked=false;motionHealth.Reset();DeviceStatus=message;
+    void FailOpen(string message,bool reconnect=false){
+        failed=true;recoverOnInput=reconnect;motionBlocked=false;motionHealth.Reset();DeviceStatus=message;
+        RoutingReset?.Invoke();
         // Finish matched physical edges before releasing the mapped state.
         while(matched.TryDequeue(out var match))try{Edge(match.Device,match.Edge);}catch(InvalidOperationException){}
         foreach(var edge in mapping.ReleaseAll())try{Emit(edge);}catch(InvalidOperationException){}
         consumed.Clear();
         foreach(var edge in gate.Drain())try{Emit(edge);}catch(InvalidOperationException){}
+    }
+    bool OwnsRegistration(){
+        uint count=0,size=(uint)Marshal.SizeOf<Win32.RawDevice>();
+        var query=Win32.GetRegisteredRawInputDevices(null,ref count,size);
+        if(count>256||(query==uint.MaxValue&&Marshal.GetLastWin32Error()!=122))return false;
+        var list=new Win32.RawDevice[count];
+        if(Win32.GetRegisteredRawInputDevices(list,ref count,size)==uint.MaxValue)return false;
+        return list.Any(d=>d.Page==1&&d.Usage==2&&d.Target==Handle&&(d.Flags&0x2100)==0x2100);
+    }
+    void EnsureRegistration(){
+        if(OwnsRegistration())return;
+        if(!Win32.RegisterRawInputDevices([new Win32.RawDevice{Page=1,Usage=2,Flags=0x2100,Target=Handle}],1,(uint)Marshal.SizeOf<Win32.RawDevice>())){
+            FailOpen("Trackball input unavailable. Normal mouse restored.",true);return;
+        }
+        // WebView2 or another host component can replace a process's sole mouse
+        // registration. Restore our dedicated input window before routing again.
+        if(recoverOnInput){failed=false;recoverOnInput=false;motionHealth.Reset();}
+        nextPresenceCheck=0;
+    }
+    static string DeviceName(nint handle){
+        uint length=0;Win32.GetRawInputDeviceInfo(handle,0x20000007,null,ref length);
+        if(length==0||length>4095)return "";
+        var name=new StringBuilder((int)length+1);
+        return Win32.GetRawInputDeviceInfo(handle,0x20000007,name,ref length)==uint.MaxValue?"":name.ToString();
+    }
+    static string[] PresentMice(){
+        uint count=0,size=(uint)Marshal.SizeOf<Win32.RawList>();
+        if(Win32.GetRawInputDeviceList(null,ref count,size)==uint.MaxValue||count>1024)return [];
+        var list=new Win32.RawList[count];
+        if(Win32.GetRawInputDeviceList(list,ref count,size)==uint.MaxValue)return [];
+        return list.Where(d=>d.Type==0).Select(d=>DeviceName(d.Handle)).Where(n=>n.Length>0).ToArray();
+    }
+    void RefreshPresence()=>ApplyPresence(PresentMice());
+    void ApplyPresence(IEnumerable<string> names){
+        string selected=SelectedDevice();
+        bool present=selected.Length>0&&names.Any(n=>n.Equals(selected,StringComparison.OrdinalIgnoreCase));
+        if(!present){
+            if(connected)FailOpen("Trackball disconnected. Normal mouse remains available.",true);
+            connected=false;return;
+        }
+        if(!connected&&recoverOnInput){failed=false;recoverOnInput=false;}
+        connected=true;
+        if(!failed&&!learning)DeviceStatus="Trackball connected";
+    }
+    internal void VerifyRecovery(){
+        var original=SelectedDevice;bool originalConnected=connected,originalFailed=failed,originalRecover=recoverOnInput;string originalStatus=DeviceStatus;
+        try{
+            SelectedDevice=()=>"saved-trackball";
+            ApplyPresence(["other-mouse","SAVED-TRACKBALL"]);
+            if(!Ready)throw new InvalidOperationException("Saved trackball did not reconnect before motion.");
+            ApplyPresence(["other-mouse"]);
+            if(Ready)throw new InvalidOperationException("Unrelated mouse was mistaken for the saved trackball.");
+            ApplyPresence(["saved-trackball","other-mouse"]);
+            if(!Ready)throw new InvalidOperationException("Reinserted trackball did not reconnect.");
+            using var replacement=new RegistrationProbe();
+            if(!Win32.RegisterRawInputDevices([new Win32.RawDevice{Page=1,Usage=2,Flags=0x2100,Target=replacement.Handle}],1,(uint)Marshal.SizeOf<Win32.RawDevice>()))throw new InvalidOperationException("Cannot create registration-replacement fixture.");
+            if(OwnsRegistration())throw new InvalidOperationException("Replacement registration was not detected.");
+            EnsureRegistration();
+            if(!OwnsRegistration())throw new InvalidOperationException("Raw Input registration was not restored.");
+        }finally{SelectedDevice=original;connected=originalConnected;failed=originalFailed;recoverOnInput=originalRecover;DeviceStatus=originalStatus;RefreshPresence();EnsureRegistration();}
+        Console.WriteLine("Input recovery verified: startup presence, exact-device identity, disconnect/reconnect and replaced Raw Input registration.");
+    }
+    sealed class RegistrationProbe:NativeWindow,IDisposable{
+        public RegistrationProbe()=>CreateHandle(new CreateParams{Caption="Input recovery fixture",Parent=new nint(-3)});
+        public void Dispose()=>DestroyHandle();
     }
     static void Emit(MouseEdge edge){
         var flags=edge.Message switch{0x201=>2u,0x202=>4u,0x204=>8u,0x205=>16u,0x207=>32u,0x208=>64u,0x20b=>128u,0x20c=>256u,0x20a=>0x800u,0x20e=>0x1000u,_=>0u};
@@ -134,7 +203,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         }
         if(m.Msg==0xfe){
             if(m.WParam==2&&deviceNames.TryGetValue(m.LParam,out var removed)&&removed.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase)){
-                connected=false;FailOpen("Trackball disconnected. Normal mouse remains available.");
+                connected=false;FailOpen("Trackball disconnected. Normal mouse remains available.",true);
             }
             deviceNames.Clear();
         }
@@ -148,10 +217,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                         var h=Marshal.PtrToStructure<Win32.RawHeader>(p);int offset=(int)header;
                         if(h.Type==0&&h.Device!=0&&unchecked((uint)Marshal.ReadInt32(p,offset+20))!=(uint)Win32.Marker){
                             if(!deviceNames.TryGetValue(h.Device,out var device)){
-                                uint len=0;Win32.GetRawInputDeviceInfo(h.Device,0x20000007,null,ref len);
-                                var name=new StringBuilder((int)Math.Min(len+1,4096));
-                                Win32.GetRawInputDeviceInfo(h.Device,0x20000007,name,ref len);
-                                device=name.ToString();deviceNames[h.Device]=device;
+                                device=DeviceName(h.Device);deviceNames[h.Device]=device;
                             }
                             var flags=(ushort)Marshal.ReadInt16(p,offset);
                             var buttons=(ushort)Marshal.ReadInt16(p,offset+4);
@@ -161,7 +227,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                                 learning=false;Identified?.Invoke(device);connected=true;failed=false;DeviceStatus="Trackball identified. Original inputs are preserved; corrections are optional.";
                             }
                             bool target=device.Length>0&&device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
-                            if(target){LastDevice=device;connected=true;if(!failed&&!learning)DeviceStatus="Trackball connected";}
+                            if(target){LastDevice=device;connected=true;if(recoverOnInput){failed=false;recoverOnInput=false;}if(!failed&&!learning)DeviceStatus="Trackball connected";}
                             if(dx!=0||dy!=0)motionHealth.Raw();
                             bool capture=Ready&&Enabled()&&IsCapture();
                             if((flags&1)==0&&(dx!=0||dy!=0)){

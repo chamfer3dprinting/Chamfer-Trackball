@@ -164,6 +164,7 @@ internal sealed class MainForm:Form{
     async Task SmokeTest(){
         try{
             if(!System.Text.RegularExpressions.Regex.IsMatch(BuildInfo.Version,@"^\d+\.\d+\.\d+$")||(!BuildInfo.Admin&&BuildInfo.Version!=BuildInfo.PublicVersion))throw new Exception("Edition version metadata mismatch.");
+            input.VerifyRecovery();
             await NativeSmokeTest();
             await ReleaseSmoke.Run();
             if(BuildInfo.Admin){var state=admin.State();if(state==null)throw new Exception("Admin state unavailable.");}
@@ -182,7 +183,7 @@ internal sealed class MainForm:Form{
             if(passed!="true"||ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, floating guide, held controls, integration installer and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, floating guide, held controls, input reconnect/registration recovery, integration installer and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }

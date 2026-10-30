@@ -16,12 +16,15 @@ internal static class Win32 {
     [DllImport("user32.dll")]internal static extern bool GetCursorPos(out Point p);
     [DllImport("user32.dll",SetLastError=true)]internal static extern uint SendInput(uint n,Input[] inputs,int size);
     [DllImport("user32.dll",SetLastError=true)]internal static extern bool RegisterRawInputDevices(RawDevice[] devices,uint n,uint size);
+    [DllImport("user32.dll",SetLastError=true)]internal static extern uint GetRegisteredRawInputDevices([Out] RawDevice[]? devices,ref uint count,uint size);
+    [DllImport("user32.dll",SetLastError=true)]internal static extern uint GetRawInputDeviceList([Out] RawList[]? devices,ref uint count,uint size);
     [DllImport("user32.dll")]internal static extern uint GetRawInputData(nint input,uint command,nint data,ref uint size,uint headerSize);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)]internal static extern uint GetRawInputDeviceInfo(nint device,uint command,StringBuilder? text,ref uint size);
     [StructLayout(LayoutKind.Sequential)]internal struct Point{public int X,Y;}
     [StructLayout(LayoutKind.Sequential)]internal struct MouseHook{public Point Point;public uint Data,Flags,Time;public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)]internal struct KeyHook{public uint Key,Scan,Flags,Time;public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)]internal struct RawDevice{public ushort Page,Usage;public uint Flags;public nint Target;}
+    [StructLayout(LayoutKind.Sequential)]internal struct RawList{public nint Handle;public uint Type;}
     [StructLayout(LayoutKind.Sequential)]internal struct RawHeader{public uint Type,Size;public nint Device,W;}
     [StructLayout(LayoutKind.Sequential)]internal struct Input{public uint Type;public Union Data;}
     [StructLayout(LayoutKind.Explicit)]internal struct Union{[FieldOffset(0)]public MouseInput Mouse;[FieldOffset(0)]public KeyInput Key;}

@@ -1,7 +1,7 @@
-- Fixed a false input timeout after stopping the ball. Idle time no longer disables orbit, pan and zoom.
-- Device-specific click and wheel routing now matches Raw Input and low-level hooks in either arrival order, with exactly-once replay. Normal pass-through input cannot become a duplicate click.
-- Other mice and absolute pointing devices retain motion while trackball navigation captures the ball.
-- Added regressions for raw-first/hook-first input, unchanged clicks and wheels, idle after motion, and genuine missing-input fail-open.
-- Customizable navigation keys, saved combinations, normal-mouse defaults and the Admin public-release controls remain included.
-- Admin v{{ADMIN_VERSION}} is a new application version; public candidate v{{PUBLIC_VERSION}} stays unpublished until released in Admin.
-- Physical M512 operation in the owner's live Chamfer Studio session still needs confirmation. Standard X/Y input does not measure independent ball twist.
+- Reconnect the saved trackball automatically when the app starts. Existing button and wheel corrections apply without re-identifying or waiting for ball movement.
+- Keep the device's Raw Input connection attached when an embedded component replaces the process registration.
+- Recover from a transient input interruption when the trackball reconnects; release held navigation actions cleanly.
+- Device selection remains exact: other mice keep normal clicks, wheels and pointing.
+- Added actual Windows recovery checks to both Admin and public executable tests, including startup presence, unrelated devices, reconnect and replaced input registration.
+- Admin v{{ADMIN_VERSION}} retains saved keys, programs, combinations and corrections. Public candidate v{{PUBLIC_VERSION}} uses the same control code and remains unpublished.
+- Physical M512 button, wheel and navigation testing remains required; ordinary X/Y reports do not measure independent three-axis ball twist.
