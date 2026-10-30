@@ -9,6 +9,7 @@ internal static class Win32 {
     [DllImport("user32.dll")]internal static extern nint CallNextHookEx(nint hook,int code,nint w,nint l);
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode)]internal static extern nint GetModuleHandle(string? name);
     [DllImport("user32.dll")]internal static extern nint GetForegroundWindow();
+    [DllImport("user32.dll",SetLastError=true)]internal static extern bool PostMessage(nint window,int message,nint w,nint l);
     [DllImport("user32.dll")]internal static extern uint GetWindowThreadProcessId(nint window,out uint pid);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)]internal static extern int GetWindowText(nint w,StringBuilder text,int n);
     [DllImport("user32.dll")]internal static extern short GetAsyncKeyState(int key);

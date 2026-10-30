@@ -17,10 +17,12 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public Func<IReadOnlySet<int>,bool> IsNavigationChord=_=>false;
     public Func<string> SelectedDevice=()=>"";
     readonly DeviceMapping mapping=new();readonly MouseGate gate=new();
+    readonly MotionHealth motionHealth=new();readonly Queue<MouseMatch> matched=[];
+    const int DispatchEdges=0x8001;
     readonly System.Windows.Forms.Timer watchdog=new(){Interval=30};
     readonly HashSet<(int,int)> consumed=[];
     bool failed,learning,connected,motionBlocked;
-    long learnUntil,lastBlockedMotion,lastRaw;
+    long learnUntil;
     public Func<bool> SwapButtons=()=>false,SwapWheels=()=>false,Enabled=()=>true;
     public event Action<string>? Identified;
     public string DeviceStatus {get;private set;}="Identify your trackball to enable device-only controls.";
@@ -32,10 +34,13 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     void Watchdog(object? sender,EventArgs e){
         var now=Environment.TickCount64;
         if(learning&&now>learnUntil)CancelIdentify();
-        if(gate.Expired(now)||(motionBlocked&&now-lastBlockedMotion>150&&now-lastRaw>150))FailOpen("Device input timed out. Normal mouse restored; identify the trackball again.");
+        if(!IsCapture()){motionHealth.Reset();motionBlocked=false;}
+        if(gate.Expired(now)||motionHealth.Expired(now))FailOpen("Device input timed out. Normal mouse restored; identify the trackball again.");
     }
     void FailOpen(string message){
-        failed=true;motionBlocked=false;DeviceStatus=message;
+        failed=true;motionBlocked=false;motionHealth.Reset();DeviceStatus=message;
+        // Finish matched physical edges before releasing the mapped state.
+        while(matched.TryDequeue(out var match))try{Edge(match.Device,match.Edge);}catch(InvalidOperationException){}
         foreach(var edge in mapping.ReleaseAll())try{Emit(edge);}catch(InvalidOperationException){}
         consumed.Clear();
         foreach(var edge in gate.Drain())try{Emit(edge);}catch(InvalidOperationException){}
@@ -45,9 +50,6 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(flags!=0)Win32.Mouse(flags,0,0,edge.Data);
     }
     void Edge(string device,MouseEdge raw){
-        // Only replay events that the hook actually withheld. Raw Input is also
-        // delivered when the hook passes an event, so unconditional replay doubles clicks.
-        if(!gate.Take(raw))return;
         var edge=mapping.Map(device,SelectedDevice(),raw,SwapButtons(),SwapWheels());
         bool target=device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
         var key=(edge.Button,edge.Data);
@@ -57,6 +59,12 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(edge.Up&&consumed.Remove(key))handled=true;
         if(!handled)Emit(edge);
         else foreach(var k in deferred)usedDeferred.Add(k);
+    }
+    void Match(MouseMatch? match){
+        if(match is not MouseMatch item||!item.Blocked)return;
+        matched.Enqueue(item);
+        // Never inject or call controller actions from inside the low-level hook.
+        Win32.PostMessage(Handle,DispatchEdges,0,0);
     }
     public IReadOnlySet<int> Keys {
         get{
@@ -107,19 +115,23 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         try{
             int msg=(int)w;
             if(msg==0x200&&Ready&&Enabled()&&IsCapture()){
-                motionBlocked=true;lastBlockedMotion=Environment.TickCount64;
+                motionBlocked=true;motionHealth.Block(Environment.TickCount64);
                 foreach(var key in deferred)usedDeferred.Add(key);
                 return 1;
             }
-            if(Routing&&msg is 0x201 or 0x202 or 0x204 or 0x205 or 0x207 or 0x208 or 0x20b or 0x20c or 0x20a or 0x20e){
+            if(msg is 0x201 or 0x202 or 0x204 or 0x205 or 0x207 or 0x208 or 0x20b or 0x20c or 0x20a or 0x20e){
                 var data=msg is 0x20a or 0x20e or 0x20b or 0x20c?unchecked((short)(e.Data>>16)):0;
-                gate.Block(new(msg,data),Environment.TickCount64);
-                return 1;
+                bool blocked=Routing;
+                Match(gate.Hook(new(msg,data),Environment.TickCount64,blocked));
+                if(blocked)return 1;
             }
         }catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}
         return Win32.CallNextHookEx(mouseHook,code,w,l);
     }
     protected override void WndProc(ref Message m){
+        if(m.Msg==DispatchEdges){
+            while(matched.TryDequeue(out var match))try{Edge(match.Device,match.Edge);}catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}
+        }
         if(m.Msg==0xfe){
             if(m.WParam==2&&deviceNames.TryGetValue(m.LParam,out var removed)&&removed.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase)){
                 connected=false;FailOpen("Trackball disconnected. Normal mouse remains available.");
@@ -135,7 +147,6 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                     if(Win32.GetRawInputData(m.LParam,0x10000003,p,ref size,header)==size){
                         var h=Marshal.PtrToStructure<Win32.RawHeader>(p);int offset=(int)header;
                         if(h.Type==0&&h.Device!=0&&unchecked((uint)Marshal.ReadInt32(p,offset+20))!=(uint)Win32.Marker){
-                            lastRaw=Environment.TickCount64;
                             if(!deviceNames.TryGetValue(h.Device,out var device)){
                                 uint len=0;Win32.GetRawInputDeviceInfo(h.Device,0x20000007,null,ref len);
                                 var name=new StringBuilder((int)Math.Min(len+1,4096));
@@ -151,19 +162,21 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                             }
                             bool target=device.Length>0&&device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
                             if(target){LastDevice=device;connected=true;if(!failed&&!learning)DeviceStatus="Trackball connected";}
+                            if(dx!=0||dy!=0)motionHealth.Raw();
+                            bool capture=Ready&&Enabled()&&IsCapture();
                             if((flags&1)==0&&(dx!=0||dy!=0)){
                                 if(target&&Enabled()&&!failed){
                                     if(IsCad())foreach(var k in deferred)usedDeferred.Add(k);
                                     Motion?.Invoke(dx,dy,device);
-                                }else if(motionBlocked)Win32.Mouse(1,dx,dy);
+                                }else if(motionBlocked||capture)Win32.Mouse(1,dx,dy);
                                 motionBlocked=false;
-                            }else if((flags&1)!=0&&motionBlocked){
+                            }else if((flags&1)!=0&&(motionBlocked||capture)){
                                 // Absolute mice/tablets must also keep pointing during
                                 // trackball navigation. Preserve the reported coordinate space.
                                 Win32.Mouse(0x8001u|((flags&2)!=0?0x4000u:0u),dx,dy);motionBlocked=false;
                             }
                             foreach(var (flag,msg,value) in new (int,int,int)[]{(1,0x201,0),(2,0x202,0),(4,0x204,0),(8,0x205,0),(16,0x207,0),(32,0x208,0),(64,0x20b,1),(128,0x20c,1),(256,0x20b,2),(512,0x20c,2),(1024,0x20a,data),(2048,0x20e,data)})
-                                if((buttons&flag)!=0)Edge(device,new(msg,value));
+                                if((buttons&flag)!=0)Match(gate.Raw(device,new(msg,value),Environment.TickCount64));
                         }
                     }
                 }catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}

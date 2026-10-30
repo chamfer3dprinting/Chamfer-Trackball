@@ -101,11 +101,36 @@ foreach(var delta in new[]{-240,-120,60,120,240}){
 Check(dm.Map("ball","",leftDown,true,true)==leftDown,"Unidentified devices are never guessed");
 dm.ReleaseAll();
 dm.Map("ball","ball",rightDown,true,false);Check(dm.ReleaseAll().Single()==new MouseEdge(0x202)&&dm.HeldCount==0,"Disconnect clears held mapped buttons");
-var gate=new MouseGate();gate.Block(leftDown,10);gate.Block(new(0x20a,-120),11);
-Check(!gate.Take(new(0x20e,-120))&&gate.Count==2,"Different wheel axis cannot consume a physical-event ticket");
-Check(gate.Take(leftDown)&&!gate.Take(leftDown),"A raw event can replay only once");
-Check(!gate.Expired(160)&&gate.Expired(162),"Unmatched physical input times out");
-Check(gate.Drain().Single()==new MouseEdge(0x20a,-120)&&gate.Count==0,"Fail-open replays the original physical input unchanged");
+var gate=new MouseGate();
+Check(gate.Hook(leftDown,10,true)==null&&gate.Count==1,"A withheld hook waits for device identity");
+Check(gate.Raw("ball",new(0x20e,-120),11)==null&&gate.Count==1,"A different wheel axis cannot consume a physical event");
+var hookFirst=gate.Raw("ball",leftDown,12);
+Check(hookFirst==new MouseMatch("ball",leftDown,true)&&gate.Count==0,"Hook-first input routes exactly once");
+Check(gate.Raw("ball",leftDown,13)==null,"A duplicate raw observation cannot replay a click");
+Check(!gate.Expired(200)&&gate.Hook(leftDown,201,false)==null,"Stale raw input cannot match a later hook");
+gate.Drain();
+Check(gate.Raw("ball",rightDown,300)==null,"Raw-first input waits for its hook");
+Check(gate.Hook(rightDown,301,true)==new MouseMatch("ball",rightDown,true),"Raw-first input retains its device and is replayed once");
+Check(gate.Raw("mouse",leftDown,302)==null&&gate.Hook(leftDown,303,false)==new MouseMatch("mouse",leftDown,false),"Raw-first pass-through input is never duplicated");
+Check(gate.Hook(new(0x202),304,false)==null&&gate.Raw("mouse",new(0x202),305)==new MouseMatch("mouse",new(0x202),false),"Hook-first pass-through release is never duplicated");
+foreach(var edge in new[]{leftDown,new MouseEdge(0x202),rightDown,new MouseEdge(0x205),new MouseEdge(0x20b,1),new MouseEdge(0x20c,1),new MouseEdge(0x20a,120),new MouseEdge(0x20e,-120)}){
+ var paired=new MouseGate();paired.Raw("ball",edge,500);
+ Check(paired.Hook(edge,501,true)==new MouseMatch("ball",edge,true),"Raw-first button/wheel preserves message and data "+edge.Message);
+}
+gate.Hook(new(0x20a,-120),600,true);
+Check(!gate.Expired(750)&&gate.Expired(752),"Truly unmatched blocked input still fails open");
+Check(gate.Drain().Single()==new MouseEdge(0x20a,-120)&&gate.Count==0,"Fail-open replays only withheld physical input unchanged");
+var health=new MotionHealth();
+health.Raw();health.Block(1000);
+Check(!health.Expired(2000),"Stopping after a raw-first movement is healthy");
+health.Reset();health.Block(2000);health.Raw();
+Check(!health.Expired(3000),"Stopping after a hook-first movement is healthy");
+for(int i=0;i<200;i++){health.Raw();health.Block(3000+i*8);}
+Check(!health.Expired(6000),"Repeated raw-first motion followed by idle cannot disable navigation");
+health.Reset();health.Block(7000);health.Block(7510);
+Check(health.Expired(7520),"Sustained blocked movement without Raw Input fails open");
+health.Raw();Check(!health.Expired(7530),"A fresh raw movement clears the missing-input interval");
+health.Block(8000);health.Reset();Check(!health.Expired(9000),"Leaving capture clears the motion watchdog");
 JsonObject Rel(string tag,bool draft=false,bool preview=false)=>new(){["tag_name"]=tag,["draft"]=draft,["prerelease"]=preview};
 var releases=new JsonArray(Rel("v99.0.0"),Rel("admin-v1.5.5-build.2",preview:true),Rel("admin-v1.5.5-build.3",preview:true),Rel("public-v1.0.0"),Rel("public-v1.0.1",draft:true),Rel("candidate-v1.0.1-build.3",draft:true));
 Check(ReleasePolicy.Latest(releases,false,0,"1.0.0")==null,"Public updater ignores admin previews, candidates and drafts");

@@ -1,11 +1,7 @@
-- Admin v{{ADMIN_VERSION}} uses a real increasing application version. About, the sidebar and update notifications display vX.X.X.
-- Click Update to download the verified executable, replace the installed app and restart on the new version. Current programs, combinations and bindings are retained.
-- Update selection compares version numbers: it never offers the current version or a downgrade. Internal build/source metadata remains available for diagnostics only.
-- Existing build-number Admin apps receive a compatible update entry carrying the same v{{ADMIN_VERSION}} executable.
-- Ball navigation, orbit/pan switching, circle zoom, customizable held keys, normal mouse defaults and reliable saving remain included.
-- Admin and public update channels remain separate. Public candidate v{{PUBLIC_VERSION}} stays unpublished until Release for public is chosen in Admin.
-- Physical M512 gestures and live CAD hosts still need owner testing; standard X/Y input does not measure independent ball twist.
-- Admin release controls inspect the full release history, verify the candidate and uploaded executable, and retain an existing version's original binary when re-releasing after withdrawal.
-
-- Admin now always shows Public version and Release for public at the top of its page. Enter any unused vX.Y.Z version instead of being limited to prepared candidate rows.
-- Choosing a new version queues a GitHub build of that exact executable version, runs checks and the actual interface, then publishes after verification. Admin shows queued/build/error/completion status.
+- Fixed a false input timeout after stopping the ball. Idle time no longer disables orbit, pan and zoom.
+- Device-specific click and wheel routing now matches Raw Input and low-level hooks in either arrival order, with exactly-once replay. Normal pass-through input cannot become a duplicate click.
+- Other mice and absolute pointing devices retain motion while trackball navigation captures the ball.
+- Added regressions for raw-first/hook-first input, unchanged clicks and wheels, idle after motion, and genuine missing-input fail-open.
+- Customizable navigation keys, saved combinations, normal-mouse defaults and the Admin public-release controls remain included.
+- Admin v{{ADMIN_VERSION}} is a new application version; public candidate v{{PUBLIC_VERSION}} stays unpublished until released in Admin.
+- Physical M512 operation in the owner's live Chamfer Studio session still needs confirmation. Standard X/Y input does not measure independent ball twist.

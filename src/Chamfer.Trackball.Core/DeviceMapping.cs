@@ -24,13 +24,39 @@ public sealed class DeviceMapping{
  }
  public MouseEdge[] ReleaseAll(){var r=held.Values.Select(x=>x.Release()).Distinct().ToArray();held.Clear();return r;}
 }
+// Raw Input and low-level hooks may reach the UI thread in either order.
+// Keep both observations, including hooks that passed through, so a stale raw
+// event can never become a duplicate click when routing is enabled later.
+public readonly record struct MouseMatch(string Device,MouseEdge Edge,bool Blocked);
 public sealed class MouseGate{
- readonly List<(MouseEdge Edge,long Time)> pending=[];
- public int Count=>pending.Count;
- public void Block(MouseEdge edge,long now)=>pending.Add((edge,now));
- public bool Take(MouseEdge raw){
-  var i=pending.FindIndex(p=>p.Edge==raw);if(i<0)return false;pending.RemoveAt(i);return true;
+ readonly List<(MouseEdge Edge,long Time,bool Blocked)> hooks=[];
+ readonly List<(string Device,MouseEdge Edge,long Time)> raw=[];
+ public int Count=>hooks.Count(p=>p.Blocked);
+ public MouseMatch? Hook(MouseEdge edge,long now,bool blocked){
+  Prune(now);
+  var i=raw.FindIndex(p=>p.Edge==edge);
+  if(i>=0){var item=raw[i];raw.RemoveAt(i);return new(item.Device,edge,blocked);}
+  hooks.Add((edge,now,blocked));return null;
  }
- public bool Expired(long now)=>pending.Any(p=>now-p.Time>150);
- public MouseEdge[] Drain(){var r=pending.Select(p=>p.Edge).ToArray();pending.Clear();return r;}
+ public MouseMatch? Raw(string device,MouseEdge edge,long now){
+  Prune(now);
+  var i=hooks.FindIndex(p=>p.Edge==edge);
+  if(i>=0){var item=hooks[i];hooks.RemoveAt(i);return new(device,edge,item.Blocked);}
+  raw.Add((device,edge,now));return null;
+ }
+ void Prune(long now){
+  raw.RemoveAll(p=>now-p.Time>150);
+  hooks.RemoveAll(p=>!p.Blocked&&now-p.Time>150);
+ }
+ public bool Expired(long now){Prune(now);return hooks.Any(p=>p.Blocked&&now-p.Time>150);}
+ public MouseEdge[] Drain(){var r=hooks.Where(p=>p.Blocked).Select(p=>p.Edge).ToArray();hooks.Clear();raw.Clear();return r;}
+}
+// An idle ball is healthy. Fail open only when legacy movement continues for
+// half a second without any corresponding Raw Input movement.
+public sealed class MotionHealth{
+ long? waitingSince;long lastBlocked;
+ public void Block(long now){waitingSince??=now;lastBlocked=now;}
+ public void Raw()=>waitingSince=null;
+ public bool Expired(long now)=>waitingSince is long since&&lastBlocked-since>500&&now-lastBlocked<150;
+ public void Reset(){waitingSince=null;lastBlocked=0;}
 }
