@@ -40,7 +40,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         foreach(var edge in gate.Drain())try{Emit(edge);}catch(InvalidOperationException){}
     }
     static void Emit(MouseEdge edge){
-        var flags=edge.Message switch{0x201=>2u,0x202=>4u,0x204=>8u,0x205=>16u,0x207=>32u,0x208=>64u,0x20b=>128u,0x20c=>256u,0x20a=>0x800u,0x20e=>0x1000u,_=>0};
+        var flags=edge.Message switch{0x201=>2u,0x202=>4u,0x204=>8u,0x205=>16u,0x207=>32u,0x208=>64u,0x20b=>128u,0x20c=>256u,0x20a=>0x800u,0x20e=>0x1000u,_=>0u};
         if(flags!=0)Win32.Mouse(flags,0,0,edge.Data);
     }
     void Edge(string device,MouseEdge raw){

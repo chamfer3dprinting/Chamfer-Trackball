@@ -92,7 +92,7 @@ internal sealed class NativeServer:IDisposable {
                 if(!clients.TryGetValue(ConfigStore.S(obj,"id"),out var c)){await Reply(stream,404,new{error="Unknown connection"},stop.Token);return;}
                 Receive(c,obj);await Reply(stream,200,new{ok=true},stop.Token);return;
             }
-            await Reply(stream,200,new{app="Chamfer Trackball",version=ConfigStore.Version},stop.Token);
+            await Reply(stream,200,new{app="Chamfer Trackball",version=BuildInfo.Version},stop.Token);
         }catch(Exception ex)when(ex is IOException or OperationCanceledException or SocketException or JsonException or ArgumentException or InvalidOperationException){ }
     }
     static async Task Reply(NetworkStream stream,int status,object obj,CancellationToken ct){

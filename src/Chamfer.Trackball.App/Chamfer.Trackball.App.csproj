@@ -26,7 +26,6 @@
     <EmbeddedResource Include="logo.ico"/>
     <AssemblyMetadata Include="BuildNumber" Value="$(BuildNumber)"/>
     <AssemblyMetadata Include="SourceRevision" Value="$(SourceRevision)"/>
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0"/>
     <EmbeddedResource Include="../../integrations/**/*" Link="integrations/%(RecursiveDir)%(Filename)%(Extension)"/>
   </ItemGroup>
 </Project>
