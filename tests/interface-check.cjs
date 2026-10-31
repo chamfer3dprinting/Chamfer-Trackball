@@ -121,7 +121,7 @@ programConfig.pointerSpeed=2;programConfig.glide=1;programConfig.navigateKeys='n
 assert.equal(programConfig.pointerSpeed,17);assert.equal(programConfig.glide,77);assert.equal(programConfig.navigateKeys,'win');
 const coreStore=fs.readFileSync('src/Chamfer.Trackball.Core/ConfigStore.cs','utf8');
 for(const field of helpers.fields)assert.ok(coreStore.includes('"'+field+'"'));
-assert.ok(html.includes('const p=snapshotProgram();')&&html.includes('loadProgramFields(np);'));
+assert.ok(html.includes('const p=snapshotProgram();'));
 assert.ok(html.includes('choice==="current"?snapshotProgram()'));
 console.log('Added, duplicated and remaining programs carry full speed, glide, gestures, combinations and held controls without aliasing.');
 
@@ -138,3 +138,29 @@ assert.ok(controller.includes('["keys"]=KeysState()')&&controller.includes('Poin
 assert.ok(controller.includes('pointer.Move(x,y,PointerGain)')&&controller.includes('pointer.Tick('));
 assert.ok(inputDriver.includes('if(k is 91 or 92||Keys.Contains(91))usedDeferred.Add(k)'));
 console.log('Physical keyboard display lights held Windows/Alt and clears on release; speed reaches real pointer delivery.');
+
+const inputConstructor=inputDriver.slice(inputDriver.indexOf('    public InputDriver(){'),inputDriver.indexOf('    bool RouteKey('));
+assert.ok(!inputConstructor.includes('Win32.GetAsyncKeyState('),'startup must not treat aggregate/injected OS state as physical keyboard holds');
+console.log('Keyboard starts with observed physical edges, so an inherited Backtick cannot block every held control.');
+
+assert.ok(html.includes('.slider:has(input[data-k="pointerSpeed"]){grid-template-columns:90px 1fr 165px}'),'effective DPI value needs readable space at the normal app width');
+
+
+assert.ok(html.includes('call("ctProgramDelete",cfg.activeProgram)'),'program deletion must update stored programs and preset references together');
+assert.ok(html.includes('p.defaultKind=p.defaultKind||p.name;p.name=n'));
+for(const id of ['savedPresetsCard','presetSelect','presetApply','presetRename','presetDelete'])assert.ok(html.includes('id="'+id+'"'));
+const presetStart=html.indexOf('async function handlePreset('),presetEnd=html.indexOf('function progOpts(',presetStart);
+assert.ok(presetStart>0&&presetEnd>presetStart);
+(async()=>{
+ const calls=[];let ask='Fine CAD';const cfg={activeProgram:0,programs:[{name:'3D modelling'}],presets:[]};
+ const context={cfg,$:()=>({value:'0'}),askText:async()=>ask,modal:async()=>true,doSave:async()=>calls.push(['save']),call:async(name,...args)=>{calls.push([name,...args]);return context.cfg},renderAll:()=>{},toast:()=>{}};
+ vm.runInNewContext(html.slice(presetStart,presetEnd),context);
+ const button=id=>({id,hasAttribute:name=>name==='data-savepreset'&&id==='save'});
+ await context.handlePreset(button('save'));assert.deepEqual(calls,[['save'],['ctPresetSave','Fine CAD',false]]);
+ context.cfg.presets=[{name:'Fine CAD'}];calls.length=0;await context.handlePreset(button('save'));assert.deepEqual(calls,[['save'],['ctPresetSave','Fine CAD',true]]);
+ ask='Detail view';calls.length=0;await context.handlePreset(button('presetRename'));assert.deepEqual(calls,[['save'],['ctPresetRename',0,'Detail view']]);
+ calls.length=0;await context.handlePreset(button('presetApply'));assert.deepEqual(calls,[['save'],['ctPresetApply',0]]);
+ calls.length=0;await context.handlePreset(button('presetDelete'));assert.deepEqual(calls,[['save'],['ctPresetDelete',0]]);
+ ask=null;calls.length=0;await context.handlePreset(button('save'));assert.equal(calls.length,0);
+ console.log('Save, explicit overwrite, apply, rename and delete use the preset bridge after saving current program edits; cancellation changes nothing.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

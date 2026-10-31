@@ -172,6 +172,7 @@ select{cursor:pointer}
 /* speed */
 .slider{display:grid;grid-template-columns:90px 1fr 60px;gap:14px;align-items:center;padding:10px 0}
 input[type=range]{accent-color:var(--accent);width:100%}
+.slider:has(input[data-k="pointerSpeed"]){grid-template-columns:90px 1fr 165px}
 .val{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
 /* apps */
 .apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
@@ -339,6 +340,12 @@ details .ver{margin-top:10px;font-weight:600}
         <div class="opt"><div class="t">Switch program with a shortcut<small>Press it anywhere to go to the next program. You can also set any button to “Next program”, or use the tray icon menu.</small></div><div class="row" style="gap:8px" id="progKeyRow"></div></div>
         <div class="opt"><div class="t">Show a message when the program changes<small>A small notification shows the program's name.</small></div><label class="sw"><input type="checkbox" data-k="programToast"><span></span></label></div>
       </div>
+      <div class="card" style="margin-bottom:16px" id="savedPresetsCard">
+        <div class="row"><h2 style="margin:0">Saved presets</h2><span class="spacer"></span><button class="btn sm primary" data-savepreset>Save current as preset</button></div>
+        <p class="mu">Save this program’s buttons, keys, wheels, ball controls, pointer speed, 3D speeds and glide under a name. Apply a saved preset to any program.</p>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><select id="presetSelect" aria-label="Saved preset" style="min-width:220px;flex:1"></select><button class="btn sm" id="presetApply">Apply</button><button class="btn sm" id="presetRename">Rename</button><button class="btn sm danger" id="presetDelete">Delete</button></div>
+        <p class="mu" id="presetSummary" style="margin:8px 0 0;font-size:12px"></p>
+      </div>
       <div class="card" style="margin-bottom:16px">
         <h2>Quick setups</h2>
         <div class="presets">
@@ -428,7 +435,7 @@ details .ver{margin-top:10px;font-weight:600}
     <section class="page" data-page="speed">
       <div class="row"><div><h1>Speed &amp; direction</h1><p class="sub">Try your changes on the Home page pad.</p></div><span class="spacer"></span><span class="saved" id="saved2"></span></div>
       <div class="card" style="margin-bottom:16px">
-        <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Program</h2><span class="spacer"></span><button class="btn sm" data-go="controls">Manage programs</button></div>
+        <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Program</h2><span class="spacer"></span><button class="btn sm" data-savepreset>Save current as preset</button><button class="btn sm" data-go="controls">Manage programs</button></div>
         <p class="mu" style="margin:0 0 10px;font-size:12.5px">Every setting on this page belongs to the program you pick here — each program has its own pointer speed, motion feel, 3D speeds, directions, precision and click tolerance. Switching program (button, shortcut or tray) switches them too.</p>
         <div class="progs" id="speedProgs"></div>
       </div>
@@ -689,7 +696,7 @@ function dpiOf(v){return Math.max(1,Math.round((cfg.trackballDpi||1600)*WIN_MULT
 $("#dpiDefault").onclick=()=>{cfg.pointerSpeed=10;renderBinds();save(true)};
 document.addEventListener("change",e=>{if(e.target.id==="hwDpi"){cfg.trackballDpi=+e.target.value;renderBinds();save()}},true);
 function speedLabel(v){return(Math.pow(2,(v-50)/20)).toFixed(2)+"×"}
-function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" effective DPI · "+WIN_MULT[v||10].toFixed(2)+"×"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
+function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" DPI · "+WIN_MULT[v||10].toFixed(2)+"×"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
 document.addEventListener("change",e=>{const t=e.target;
   if(t.dataset.act){const b=t.dataset.act,a=t.value;const cur=cfg.buttons[b];cur.action=a;
     if(["orbit","pan","zoom"].includes(a)&&!cur.tap)cur.tap=b==="back"?"fit":"click";
@@ -1059,13 +1066,45 @@ function programDefault(){
  const p=cfg.programs[cfg.activeProgram];
  return (S.programDefaults||[]).find(d=>d.name===(p.defaultKind||p.name))||S.programDefaults?.[0]||S.defaults;
 }
+
+function renderPresets(){
+ const select=$("#presetSelect");if(!select)return;const previous=select.value;
+ const presets=cfg.presets||[];select.innerHTML=presets.length?presets.map((p,i)=>'<option value="'+i+'">'+esc(p.name)+'</option>').join(""):'<option value="">No saved presets yet</option>';
+ if(presets[+previous]&&previous!=="")select.value=previous;
+ for(const id of ["presetApply","presetRename","presetDelete"])$("#"+id).disabled=!presets.length;
+ $("#presetSummary").textContent=presets.length?presets.length+" saved · retained after restarting and resetting controls":"Choose your settings, then save your first preset. The built-in quick setups below stay available.";
+}
+async function handlePreset(t){
+ const saveCurrent=t.hasAttribute("data-savepreset");
+ if(!saveCurrent&&!["presetApply","presetRename","presetDelete"].includes(t.id))return false;
+ try{
+  if(saveCurrent){
+   const name=await askText("Save current settings as preset","Preset name",cfg.programs[cfg.activeProgram].name+" setup");if(!name)return true;
+   const exists=(cfg.presets||[]).some(p=>p.name.toLowerCase()===name.toLowerCase());let replace=false;
+   if(exists){replace=await modal("Replace “"+name+"”?","The saved preset will use this program’s current settings.",[["Cancel","",false],["Replace","primary",true]]);if(!replace)return true;}
+   await doSave();cfg=await call("ctPresetSave",name,replace);renderAll();toast("Preset saved");return true;
+  }
+  const index=+$("#presetSelect").value,preset=cfg.presets?.[index];if(!preset)return true;
+  if(t.id==="presetApply"){
+   if(!await modal("Apply “"+preset.name+"”?","This replaces the active program’s controls, speeds and glide. Its name and your other programs stay the same.",[["Cancel","",false],["Apply","primary",true]]))return true;
+   await doSave();cfg=await call("ctPresetApply",index);renderAll();toast("Preset applied");
+  }else if(t.id==="presetRename"){
+   const name=await askText("Rename preset","Preset name",preset.name);if(!name)return true;
+   await doSave();cfg=await call("ctPresetRename",index,name);renderAll();toast("Preset renamed");
+  }else{
+   if(!await modal("Delete “"+preset.name+"”?","The saved preset is removed. Applied program settings stay as they are.",[["Cancel","",false],["Delete","primary",true]]))return true;
+   await doSave();cfg=await call("ctPresetDelete",index);renderAll();toast("Preset deleted");
+  }
+ }catch(error){toast(String(error.message||error),true);}
+ return true;
+}
 function progOpts(sel){return cfg.programs.map((p,i)=>`<option value="${i}"${i===sel?" selected":""}>${i+1}. ${esc(p.name)}</option>`).join("")}
 function macroOpts(sel){return cfg.macros.map(m=>`<option value="${esc(m.id)}"${m.id===sel?" selected":""}>${esc(m.name)}</option>`).join("")}
 let gestScope="";
 function scopeProfile(){return gestScope?cfg.profiles.find(p=>p.id===gestScope):null}
 function curGest(){const ap=scopeProfile();if(ap){ap.appGestures=ap.appGestures||{};return ap.appGestures}const p=cfg.programs[cfg.activeProgram];p.gestures=p.gestures||{};return p.gestures}
 document.addEventListener("change",e=>{if(e.target.id==="gestScope"){gestScope=e.target.value;renderGestures()}});
-function renderPrograms(){$("#ptrProg").textContent=cfg.programs[cfg.activeProgram].name;
+function renderPrograms(){renderPresets();$("#ptrProg").textContent=cfg.programs[cfg.activeProgram].name;
   $("#progs").innerHTML=cfg.programs.map((p,i)=>`<button class="prog${i===cfg.activeProgram?" on":""}" data-useprog="${i}"><span class="n">${i+1}</span>${esc(p.name)}</button>`).join("")+`<button class="prog add" id="progAdd">+ Add program</button>`;
   $("#progDel").disabled=cfg.programs.length<2;
   $("#speedProgs").innerHTML=cfg.programs.map((p,i)=>`<button class="prog${i===cfg.activeProgram?" on":""}" data-useprog="${i}"><span class="n">${i+1}</span>${esc(p.name)}</button>`).join("");
@@ -1078,22 +1117,18 @@ async function useProgram(i){
   setTimeout(reloadConfig,250)}
 async function reloadConfig(){const st=await call("ctState");const theme=cfg.theme;cfg=st.config;cfg.theme=theme;renderAll()}
 document.addEventListener("click",async e=>{const t=e.target.closest("button");if(!t)return;
+  if(await handlePreset(t))return;
   if(t.dataset.useprog!==undefined){const i=+t.dataset.useprog;if(i!==cfg.activeProgram)useProgram(i);return}
   if(t.id==="progAdd"){const n=await askText("New program","Name (for example “Blender”, “Photo editing” or “Gaming”)","Program "+(cfg.programs.length+1));if(n===null)return;
     const choice=await modal("Start with which controls?","Choose a complete setup, including pointer speed, motion feel and 3D keys.",[["Cancel","",false],["Normal mouse","","normal"],["3D modelling","","3d"],["Current program","primary","current"]]);if(!choice)return;
     const blank=choice==="current"?snapshotProgram():clone(S.programDefaults[choice==="3d"?1:0]);blank.defaultKind=blank.defaultKind||blank.name;blank.name=n||("Program "+(cfg.programs.length+1));cfg.programs.push(blank);
     await doSave();useProgram(cfg.programs.length-1);return}
-  if(t.id==="progRename"){const p=cfg.programs[cfg.activeProgram];const n=await askText("Rename program","Name",p.name);if(n){p.name=n;renderPrograms();save(true)}return}
+  if(t.id==="progRename"){const p=cfg.programs[cfg.activeProgram];const n=await askText("Rename program","Name",p.name);if(n){p.defaultKind=p.defaultKind||p.name;p.name=n;renderPrograms();save(true)}return}
   if(t.id==="progCopy"){const p=snapshotProgram();p.defaultKind=p.defaultKind||p.name;p.name+=" copy";
     cfg.programs.push(p);await doSave();useProgram(cfg.programs.length-1);return}
   if(t.id==="progDel"){if(cfg.programs.length<2)return;const p=cfg.programs[cfg.activeProgram];
     if(!await modal("Delete “"+p.name+"”?","Its buttons, keys and gestures are removed. Your other programs and your macros stay.",[["Cancel","",false],["Delete","primary",true]]))return;
-    const del=cfg.activeProgram;cfg.programs.splice(del,1);
-    const fix=x=>x>del?x-1:(x===del?0:x);
-    cfg.programs.forEach(pg=>{Object.values(pg.buttons||{}).forEach(b=>{if(b.action==="program")b.program=fix(b.program||0)});Object.values(pg.gestures||{}).forEach(c=>{if(c.type==="program")c.program=fix(c.program||0)})});
-    cfg.activeProgram=Math.min(del,cfg.programs.length-1);const np=cfg.programs[cfg.activeProgram];
-    loadProgramFields(np);
-    await doSave();reloadConfig();toast("Program deleted");return}
+    await doSave();cfg=await call("ctProgramDelete",cfg.activeProgram);renderAll();toast("Program deleted");return}
   if(t.id==="progKeyRec"){const k=await recordKeys("Shortcut to switch program");if(k){cfg.programKeys=k.split(",")[0];renderPrograms();save(true)}return}
   if(t.id==="progKeyClr"){cfg.programKeys="";renderPrograms();save(true);return}
   if(t.dataset.grec){const d=t.dataset.grec;const k=await recordKeys("Shortcut for this gesture");if(k){curGest()[d].keys=k;renderGestures();save(true)}return}

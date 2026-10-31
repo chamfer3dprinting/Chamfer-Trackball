@@ -778,5 +778,6 @@
   "trackballSwapButtons": false,
   "trackballSwapWheels": false,
   "circleZoom": false,
-  "circleSize": 160
+  "circleSize": 160,
+  "presets": []
 }

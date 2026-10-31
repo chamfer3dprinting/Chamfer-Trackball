@@ -61,6 +61,8 @@ public sealed class ConfigStore {
             var next=(JsonObject)incoming.DeepClone();Normalize(next);
             // Device identity comes from Raw Input, not a possibly stale settings page.
             next["selectedDevice"]=config["selectedDevice"]?.DeepClone()??JsonValue.Create("");
+            // The named library has dedicated mutations; an older page cannot erase it.
+            next["presets"]=config["presets"]!.DeepClone();
             var i=Math.Clamp(I(next,"activeProgram",0),0,next["programs"]!.AsArray().Count-1);
             next["activeProgram"]=i;
             var p=next["programs"]![i]!.AsObject();
@@ -79,7 +81,64 @@ public sealed class ConfigStore {
         }
     }
     public void Select(int index){lock(gate){var n=(JsonObject)config.DeepClone();LoadProgram(n,index);Write(n);config=n;Revision++;}}
-    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown","selectedDevice"})if(config[k]!=null)n[k]=config[k]!.DeepClone();Write(n);config=n;Revision++;return Snapshot();}}
+    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown","selectedDevice","presets"})if(config[k]!=null)n[k]=config[k]!.DeepClone();Write(n);config=n;Revision++;return Snapshot();}}
+
+
+    static void ReindexProgramReferences(JsonObject settings,int removed){
+        int Fix(int value)=>value>removed?value-1:value==removed?0:value;
+        var bindings=(settings["buttons"] as JsonObject??new()).Select(p=>p.Value)
+            .Concat((settings["modeButtons"] as JsonObject??new()).Select(p=>p.Value))
+            .Concat((settings["combos"] as JsonArray??new()).Select(p=>p?["bind"]));
+        foreach(var binding in bindings)if(binding is JsonObject b&&S(b,"action")=="program")b["program"]=Fix(I(b,"program"));
+        foreach(var entry in settings["gestures"] as JsonObject??new())if(entry.Value is JsonObject g&&S(g,"type")=="program")g["program"]=Fix(I(g,"program"));
+        if(settings["wheelPrograms"] is JsonArray wheels)for(int i=0;i<wheels.Count;i++)wheels[i]=Fix(wheels[i]?.GetValue<int>()??0);
+    }
+    public JsonObject DeleteProgram(int index){lock(gate){
+        var n=(JsonObject)config.DeepClone();var list=n["programs"]!.AsArray();
+        if(list.Count<2||index<0||index>=list.Count)throw new InvalidDataException("Keep at least one valid program.");
+        int active=I(n,"activeProgram");list.RemoveAt(index);
+        foreach(var item in list)ReindexProgramReferences(item!.AsObject(),index);
+        foreach(var preset in n["presets"]!.AsArray())ReindexProgramReferences(preset!["settings"]!.AsObject(),index);
+        active=active>index?active-1:active==index?Math.Min(index,list.Count-1):active;
+        LoadProgram(n,active);return PersistPresetChange(n);
+    }}
+    static string PresetName(string name){
+        name=name.Trim();if(name.Length is <1 or >60||name.Any(char.IsControl))throw new InvalidDataException("Use a preset name with 1–60 characters.");
+        return name;
+    }
+    static JsonObject PresetAt(JsonObject n,int index){
+        var list=n["presets"]!.AsArray();if(index<0||index>=list.Count)throw new InvalidDataException("That preset no longer exists.");
+        return list[index]!.AsObject();
+    }
+    JsonObject PersistPresetChange(JsonObject next){Validate(next);Write(next);config=next;Revision++;return Snapshot();}
+    public JsonObject SavePreset(string name,bool replace=false){lock(gate){
+        name=PresetName(name);var n=(JsonObject)config.DeepClone();var list=n["presets"]!.AsArray();
+        var existing=list.Select((p,i)=>(p,i)).FirstOrDefault(item=>string.Equals(S(item.p,"name"),name,StringComparison.OrdinalIgnoreCase));
+        bool found=existing.p!=null;
+        if(found&&!replace)throw new InvalidDataException("A preset with that name already exists.");
+        if(!found&&list.Count>=64)throw new InvalidDataException("You can save up to 64 presets.");
+        var current=n["programs"]![I(n,"activeProgram")]!.AsObject();var settings=new JsonObject();
+        foreach(var field in ProgramFields)settings[field]=current[field]?.DeepClone();
+        settings["defaultKind"]=JsonValue.Create(S(current,"defaultKind",S(current,"name")));
+        var preset=new JsonObject{["name"]=name,["settings"]=settings};
+        if(found)list[existing.i]=preset;else list.Add(preset);
+        return PersistPresetChange(n);
+    }}
+    public JsonObject ApplyPreset(int index){lock(gate){
+        var n=(JsonObject)config.DeepClone();var settings=PresetAt(n,index)["settings"]!.AsObject();
+        int active=I(n,"activeProgram");var current=n["programs"]![active]!.AsObject();
+        foreach(var field in ProgramFields)if(settings.ContainsKey(field))current[field]=settings[field]?.DeepClone();
+        if(settings["defaultKind"]!=null)current["defaultKind"]=settings["defaultKind"]!.DeepClone();
+        LoadProgram(n,active);return PersistPresetChange(n);
+    }}
+    public JsonObject RenamePreset(int index,string name){lock(gate){
+        name=PresetName(name);var n=(JsonObject)config.DeepClone();var item=PresetAt(n,index);
+        if(n["presets"]!.AsArray().Where((_,i)=>i!=index).Any(p=>string.Equals(S(p,"name"),name,StringComparison.OrdinalIgnoreCase)))throw new InvalidDataException("A preset with that name already exists.");
+        item["name"]=name;return PersistPresetChange(n);
+    }}
+    public JsonObject DeletePreset(int index){lock(gate){
+        var n=(JsonObject)config.DeepClone();PresetAt(n,index);n["presets"]!.AsArray().RemoveAt(index);return PersistPresetChange(n);
+    }}
     private void Write(JsonObject n){
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var text=n.ToJsonString(new JsonSerializerOptions{WriteIndented=true});
@@ -106,8 +165,16 @@ public sealed class ConfigStore {
         c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=25;
     }
     public static void Validate(JsonObject c){
-        foreach(var node in c["programs"]!.AsArray()){
-            var p=node!.AsObject();var used=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var programs=c["programs"]!.AsArray().Select(n=>n!.AsObject()).ToList();
+        if(c["presets"] is not JsonArray presets||presets.Count>64)throw new InvalidDataException("Use a valid library of up to 64 presets.");
+        var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(var preset in presets){
+            var name=PresetName(S(preset,"name"));if(!names.Add(name))throw new InvalidDataException("Preset names must be unique.");
+            if(preset?["settings"] is not JsonObject settings)throw new InvalidDataException("A preset must contain program settings.");
+            programs.Add(settings);
+        }
+        foreach(var p in programs){
+            var used=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach(var key in new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys"}){
                 var chord=S(p,key,"none");if(chord=="none"||chord=="")continue;
                 var binding=KeyChord.Parse(chord);
