@@ -1060,6 +1060,11 @@ function programDefault(){
  const p=cfg.programs[cfg.activeProgram];
  return (S.programDefaults||[]).find(d=>d.name===(p.defaultKind||p.name))||S.programDefaults?.[0]||S.defaults;
 }
+function reindexProgram(p,fix){
+ for(const b of [...Object.values(p.buttons||{}),...Object.values(p.modeButtons||{}),...(p.combos||[]).map(c=>c.bind||{})])if(b.action==="program")b.program=fix(b.program||0);
+ for(const g of Object.values(p.gestures||{}))if(g.type==="program")g.program=fix(g.program||0);
+ if(p.wheelPrograms)p.wheelPrograms=p.wheelPrograms.map(fix);
+}
 function progOpts(sel){return cfg.programs.map((p,i)=>`<option value="${i}"${i===sel?" selected":""}>${i+1}. ${esc(p.name)}</option>`).join("")}
 function macroOpts(sel){return cfg.macros.map(m=>`<option value="${esc(m.id)}"${m.id===sel?" selected":""}>${esc(m.name)}</option>`).join("")}
 let gestScope="";
@@ -1084,14 +1089,14 @@ document.addEventListener("click",async e=>{const t=e.target.closest("button");i
     const choice=await modal("Start with which controls?","Choose a complete setup, including pointer speed, motion feel and 3D keys.",[["Cancel","",false],["Normal mouse","","normal"],["3D modelling","","3d"],["Current program","primary","current"]]);if(!choice)return;
     const blank=choice==="current"?snapshotProgram():clone(S.programDefaults[choice==="3d"?1:0]);blank.defaultKind=blank.defaultKind||blank.name;blank.name=n||("Program "+(cfg.programs.length+1));cfg.programs.push(blank);
     await doSave();useProgram(cfg.programs.length-1);return}
-  if(t.id==="progRename"){const p=cfg.programs[cfg.activeProgram];const n=await askText("Rename program","Name",p.name);if(n){p.name=n;renderPrograms();save(true)}return}
+  if(t.id==="progRename"){const p=cfg.programs[cfg.activeProgram];const n=await askText("Rename program","Name",p.name);if(n){p.defaultKind=p.defaultKind||p.name;p.name=n;renderPrograms();save(true)}return}
   if(t.id==="progCopy"){const p=snapshotProgram();p.defaultKind=p.defaultKind||p.name;p.name+=" copy";
     cfg.programs.push(p);await doSave();useProgram(cfg.programs.length-1);return}
   if(t.id==="progDel"){if(cfg.programs.length<2)return;const p=cfg.programs[cfg.activeProgram];
     if(!await modal("Delete “"+p.name+"”?","Its buttons, keys and gestures are removed. Your other programs and your macros stay.",[["Cancel","",false],["Delete","primary",true]]))return;
     const del=cfg.activeProgram;cfg.programs.splice(del,1);
     const fix=x=>x>del?x-1:(x===del?0:x);
-    cfg.programs.forEach(pg=>{Object.values(pg.buttons||{}).forEach(b=>{if(b.action==="program")b.program=fix(b.program||0)});Object.values(pg.gestures||{}).forEach(c=>{if(c.type==="program")c.program=fix(c.program||0)})});
+    cfg.programs.forEach(pg=>reindexProgram(pg,fix));
     cfg.activeProgram=Math.min(del,cfg.programs.length-1);const np=cfg.programs[cfg.activeProgram];
     loadProgramFields(np);
     await doSave();reloadConfig();toast("Program deleted");return}

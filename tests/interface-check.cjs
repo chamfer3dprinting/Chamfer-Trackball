@@ -144,3 +144,11 @@ assert.ok(!inputConstructor.includes('Win32.GetAsyncKeyState('),'startup must no
 console.log('Keyboard starts with observed physical edges, so an inherited Backtick cannot block every held control.');
 
 assert.ok(html.includes('.slider:has(input[data-k="pointerSpeed"]){grid-template-columns:90px 1fr 165px}'),'effective DPI value needs readable space at the normal app width');
+
+const programReindex=new Function(html.slice(html.indexOf('function reindexProgram('),html.indexOf('function progOpts('))+';return reindexProgram;')();
+const referenced={buttons:{back:{action:'program',program:2}},modeButtons:{middle:{action:'program',program:1}},combos:[{bind:{action:'program',program:2}}],gestures:{up:{type:'program',program:1}},wheelPrograms:[0,1,2,2]};
+programReindex(referenced,x=>x>1?x-1:x===1?0:x);
+assert.equal(referenced.buttons.back.program,1);assert.equal(referenced.modeButtons.middle.program,0);
+assert.equal(referenced.combos[0].bind.program,1);assert.equal(referenced.gestures.up.program,0);assert.deepEqual(referenced.wheelPrograms,[0,0,1,1]);
+assert.ok(html.includes('p.defaultKind=p.defaultKind||p.name;p.name=n'));
+console.log('Renaming retains the program default; deleting reindexes button, mode, combination, gesture and wheel targets together.');
