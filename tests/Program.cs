@@ -207,6 +207,8 @@ Check(MotionPolicy.Circle(NavMode.PanZoom,true,true),"Ctrl+Shift or a held pan b
 Check(!MotionPolicy.Circle(NavMode.Orbit,true,true),"Held orbit circles remain deliberate rotation");
 Check(MotionPolicy.Circle(NavMode.Orbit,true,false)&&!MotionPolicy.Circle(NavMode.PanZoom,false,true),"Free-ball circle zoom respects its saved enable switch");
 Check(MotionPolicy.WhilePaused(NavMode.Orbit,true,false)==NavMode.Idle,"A click can still restore normal pointing");
+Check(MotionPolicy.ResumeAfterClick(true,NavMode.Orbit,false,true),"Ball-only orbit resumes on the next trackball movement after a click");
+Check(!MotionPolicy.ResumeAfterClick(true,NavMode.Orbit,false,false)&&!MotionPolicy.ResumeAfterClick(true,NavMode.Idle,false,true)&&!MotionPolicy.ResumeAfterClick(true,NavMode.Orbit,true,true),"Click pause resumes only on 3D ball movement without a held mode");
 Check(MotionPolicy.WhilePaused(NavMode.Orbit,true,true)==NavMode.Orbit&&MotionPolicy.WhilePaused(NavMode.Snap,true,true)==NavMode.Snap,"Held commands work after returning to the pointer");
 
 
