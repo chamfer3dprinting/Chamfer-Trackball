@@ -221,10 +221,10 @@ internal sealed class MainForm:Form{
             using(var screenshot=File.Create(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png")))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,screenshot);
             var ready=await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-hold=snapKeys]')!==null&&document.querySelector('[data-hold=navigateKeys]')!==null&&document.querySelector('[data-install-integration=blender]')!==null");
             var passed=await web.CoreWebView2.ExecuteScriptAsync("window.__smokeResult?.ok===true");
-            if(passed!="true"||ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
+            if(passed!="true"||ready!="true"||store.Snapshot()["programs"]?[0]?["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration recovery, Studio snap/navigation negotiation, quiet idle status, integration installer and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D gains across program switches and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }
