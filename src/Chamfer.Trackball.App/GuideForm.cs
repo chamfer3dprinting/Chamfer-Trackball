@@ -7,7 +7,7 @@ internal sealed class GuideForm:Form{
  readonly Image logo=Brand.Image();bool compact,dragging;Point drag;string last="";long guideConfigRevision=-1;bool showGuide=true;
  public GuideForm(Controller controller,ConfigStore store){
   this.controller=controller;this.store=store;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;
-  DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,300);BackColor=Color.FromArgb(39,43,46);ForeColor=Color.FromArgb(220,225,230);
+  DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,410);BackColor=Color.FromArgb(39,43,46);ForeColor=Color.FromArgb(220,225,230);
   Icon=Brand.Icon;Text="Chamfer Trackball guide";StartPosition=FormStartPosition.Manual;
   var area=Screen.PrimaryScreen!.WorkingArea;Location=new(area.Right-Width-18,area.Bottom-Height-18);
   var c=store.Snapshot();int x=ConfigStore.I(c,"guideX",Location.X),y=ConfigStore.I(c,"guideY",Location.Y);
@@ -15,7 +15,7 @@ internal sealed class GuideForm:Form{
   timer.Tick+=(_,_)=>{var revision=store.Revision;if(revision!=guideConfigRevision){showGuide=ConfigStore.B(store.Snapshot(),"modePanel",true);guideConfigRevision=revision;}if(showGuide){if(!Visible)Show();var now=controller.GuideState().ToJsonString();if(now!=last){last=now;Invalidate();}}else if(Visible)Hide();};
   timer.Start();
  }
- protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ClientSize=new((int)(330*DeviceDpi/96f),(int)((compact?70:300)*DeviceDpi/96f));var a=Screen.FromPoint(Location).WorkingArea;Location=new(Math.Clamp(Left,a.Left,Math.Max(a.Left,a.Right-Width)),Math.Clamp(Top,a.Top,Math.Max(a.Top,a.Bottom-Height)));}
+ protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ClientSize=new((int)(330*DeviceDpi/96f),(int)((compact?70:410)*DeviceDpi/96f));var a=Screen.FromPoint(Location).WorkingArea;Location=new(Math.Clamp(Left,a.Left,Math.Max(a.Left,a.Right-Width)),Math.Clamp(Top,a.Top,Math.Max(a.Top,a.Bottom-Height)));}
  protected override bool ShowWithoutActivation=>true;
  protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x08000000|0x80;return p;}}
  protected override void OnPaint(PaintEventArgs e){
@@ -46,14 +46,26 @@ internal sealed class GuideForm:Form{
   g.DrawLine(arrow,41,188,122,188);g.DrawLine(arrow,81,151,81,225);g.DrawLine(arrow,135,151,135,225);g.DrawLine(arrow,200,213,281,213);
   foreach(int yy in new[]{218,227,236}){g.DrawLine(line,37-(yy-218)/2,yy,128+(yy-218)/2,yy);g.DrawLine(line,194-(yy-218)/2,yy,287+(yy-218)/2,yy);}
   string roll=mode switch{"Idle"=>"Pointer","Orbit"=>"Orbit","PanZoom"=>"Pan","Zoom"=>"Zoom","Snap"=>"Snap","Navigate"=>"Move",_=>mode};
-  string wheel=mode=="Orbit"?"Roll":mode=="Idle"?"Scroll":"Zoom";
+  string wheel=mode=="Orbit"?"Roll":mode=="Idle"?"Scroll":mode=="Snap"?"Turn face":mode=="Navigate"?"Turn":"Zoom";
   g.DrawString("Roll: "+roll+"   ·   Wheel: "+wheel,font,text,53,249);
   g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);
+  g.DrawLine(line,12,301,318,301);
+  var keys=new HashSet<int>(s["keys"]!.AsArray().Select(key=>key!.GetValue<int>()));
+  int shortcutRow=0;
+  foreach(var item in s["shortcuts"]!.AsArray()){
+   string chord=ConfigStore.S(item,"chord","none");if(chord is "" or "none")continue;
+   bool held=false;try{held=KeyChord.Parse(chord).Matches(keys);}catch(FormatException){}
+   float y=307+shortcutRow++*18;string label=chord.Replace("win","Windows",StringComparison.OrdinalIgnoreCase).Replace("+"," + ");
+   g.DrawString(label,tiny,held?accent:muted,new RectangleF(13,y,156,18));
+   g.DrawString(ConfigStore.S(item,"label"),tiny,held?accent:text,180,y);
+  }
+  g.DrawString("Physical keyboard · held keys light up",tiny,muted,13,392);
+
  }
  protected override void OnMouseDown(MouseEventArgs e){
   base.OnMouseDown(e);float scale=DeviceDpi/96f;float x=e.X/scale,y=e.Y/scale;
   if(y<34&&x>302){var c=store.Snapshot();c["modePanel"]=false;store.Save(c);Hide();return;}
-  if(y<34&&x>275){compact=!compact;ClientSize=new((int)(330*scale),(int)((compact?70:282)*scale));Invalidate();return;}
+  if(y<34&&x>275){compact=!compact;ClientSize=new((int)(330*scale),(int)((compact?70:410)*scale));Invalidate();return;}
   if(y<34){dragging=true;drag=e.Location;Capture=true;}
  }
  protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(dragging)Location=new(Left+e.X-drag.X,Top+e.Y-drag.Y);}

@@ -31,7 +31,7 @@ internal static class Win32 {
     [StructLayout(LayoutKind.Sequential)]internal struct MouseInput{public int X,Y;public uint Data,Flags,Time;public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)]internal struct KeyInput{public ushort Key,Scan;public uint Flags,Time;public nuint Extra;}
     internal static void Mouse(uint flags,int x=0,int y=0,int data=0)=>Send([new Input{Type=0,Data=new Union{Mouse=new MouseInput{X=x,Y=y,Data=unchecked((uint)data),Flags=flags,Extra=(nuint)Marker}}}]);
-    internal static void Key(int key,bool down)=>Send([new Input{Type=1,Data=new Union{Key=new KeyInput{Key=(ushort)key,Flags=down?0u:2u,Extra=(nuint)Marker}}}]);
+    internal static void Key(int key,bool down)=>Send([new Input{Type=1,Data=new Union{Key=new KeyInput{Key=(ushort)key,Flags=(down?0u:2u)|(key is 91 or 92?1u:0u),Extra=(nuint)Marker}}}]);
     internal static void Text(string text){foreach(var c in text)Send([new Input{Type=1,Data=new Union{Key=new KeyInput{Scan=c,Flags=4,Extra=(nuint)Marker}}},new Input{Type=1,Data=new Union{Key=new KeyInput{Scan=c,Flags=6,Extra=(nuint)Marker}}}]);}
     static void Send(Input[] input){if(SendInput((uint)input.Length,input,Marshal.SizeOf<Input>())!=input.Length)throw new InvalidOperationException("Windows refused input. Run the CAD app and Trackball at the same permission level.");}
 }

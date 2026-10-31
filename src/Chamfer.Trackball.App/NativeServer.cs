@@ -13,7 +13,7 @@ internal sealed class NativeServer:IDisposable {
     internal sealed class Client {
         public string Id=Guid.NewGuid().ToString("N"),App="",Session="";
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
-        public bool Focus=true;public DateTime Began;public CameraPose? Pose,BasePose;public float SnapX,SnapY;
+        public bool Focus=true;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
         public readonly SemaphoreSlim OutSignal=new(0,1);
         public object Gate=new();
@@ -28,7 +28,7 @@ internal sealed class NativeServer:IDisposable {
     public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
     public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
-    public void Begin(Client c,NavMode mode,int x,int y){lock(c.Gate){c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.SnapX=c.SnapY=0;Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
+    public void Begin(Client c,NavMode mode,int x,int y){lock(c.Gate){c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.Snap.Reset();Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
     public bool Move(Client c,NavMode mode,float dx,float dy,float wheel,bool vertical,float gain){
         lock(c.Gate){
             if(c.Version==1){
@@ -36,7 +36,7 @@ internal sealed class NativeServer:IDisposable {
                 return true;
             }
             if(c.Pose==null)return false;
-            if(mode==NavMode.Snap){c.SnapX+=dx;c.SnapY+=dy;c.Pose=CameraMath.Move(c.BasePose!,mode,c.SnapX,c.SnapY,0,false,gain);}
+            if(mode==NavMode.Snap)c.Pose=c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
             else c.Pose=CameraMath.Move(c.Pose,mode,dx,dy,wheel,vertical,gain);
             Queue(c,PoseMessage(c));return true;
         }
@@ -63,7 +63,8 @@ internal sealed class NativeServer:IDisposable {
         try{
             Vector3 vec(string key){var a=m[key]!.AsArray();if(a.Count!=3)throw new FormatException();return new(a[0]!.GetValue<float>(),a[1]!.GetValue<float>(),a[2]!.GetValue<float>());}
             var p=new CameraPose(vec("eye"),vec("target"),vec("up"),vec("pivot"),(float)ConfigStore.D(m,"verticalFov",.785398),(float)ConfigStore.D(m,"orthoHeight",10),ConfigStore.I(m,"width",800),ConfigStore.I(m,"height",600),ConfigStore.B(m,"orthographic"));
-            if(p.Valid)lock(c.Gate){c.Pose=c.BasePose=p;}
+            p=p with{WorldUp=m["worldUp"] is JsonArray?vec("worldUp"):c.App=="chamfer3d"?Vector3.UnitY:Vector3.UnitZ};
+            if(p.Valid&&CameraPose.Finite(p.WorldUp)&&p.WorldUp.LengthSquared()>1e-12f)lock(c.Gate){c.Pose=c.BasePose=p;c.Snap.Reset(p);}
         }catch(Exception ex)when(ex is FormatException or InvalidOperationException or ArgumentException or NullReferenceException){ }
     }
     async Task Accept(){

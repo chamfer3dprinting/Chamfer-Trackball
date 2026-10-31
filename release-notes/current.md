@@ -1,22 +1,13 @@
-- Default 3D modelling to ordinary pointer movement. Hold Shift for Orbit, Ctrl+Shift for Pan and Ctrl for Zoom; release the navigation keys to point normally.
-- Restrict Alt + ball snapping to Top, Bottom, Left, Right, Front and Back. Exclude diagonal edge and corner views while preserving the cursor pivot.
-- Allow Ctrl as the Zoom hold key in both saved settings and the key recorder. Ctrl+C, Ctrl+V and other ordinary shortcuts remain normal; existing custom bindings are preserved during migration.
-- Keep the identified trackball when an older settings page saves controls or combinations. Device selection now has its own persisted write and survives program changes, reset and restart.
-- Add Identify trackball and Cancel directly to Home, show when a 3D app still needs device setup, and allow 60 seconds to roll the ball during identification.
-- Keep Windows mouse and keyboard hooks on their own message thread, queue keyboard/controller work outside hook callbacks, and restore normal input when the settings window is busy.
-- Reduce lag during ball-only zoom classification by evaluating the circle gesture once per existing 16 ms camera frame instead of once per raw sensor packet.
-- Recognize smaller, imperfect circle paths with brief pauses; apply the accumulated turn when the first loop is recognized so a single circle creates visible zoom. Straight rolls, half-turn curves and circles beyond the configured size remain orbit or pan.
-- Reduce circle-zoom gesture detection from repeated quadratic turn-angle scans to one linear pass using precomputed turns, lowering CPU work while rolling in 3D navigation. Gesture thresholds and behavior remain unchanged.
-- Replace per-8ms polling in the native WebSocket sender with event-driven delivery and a one-second idle heartbeat. Check the foreground app at 20 Hz while idle, retain 16 ms updates during navigation, and only reload guide settings when configuration changes.
-- Make ball-only orbit, Back-button orbit/pan switching and circle zoom ready by default in the 3D modelling program. Migrate existing settings once while preserving the separate Normal mouse program and custom controls.
-- Implement the existing soft-stop setting for 3D motion and discard stale camera poses when a native client falls behind, keeping the newest view responsive.
-- Clarify that circle zoom starts with an almost-full circle over the 3D viewport: clockwise zooms in, anticlockwise zooms out; straight rolling resumes orbit or pan.
-- Cap active settings UI polling at 20 Hz instead of sending status requests every display frame; preserve the independent 16 ms trackball input loop.
-- Batch sensor movement into display-rate camera updates instead of sending one camera message for every input packet. Preserve fine movement and wheel zoom at low sensitivity.
-- Ctrl+Shift Pan + zoom now allows enabled ball-circle zoom while held. Shift orbit continues to rotate; the separate Zoom key remains optional and customizable.
-- Apply zoom sensitivity consistently to ball and wheel zoom, including simultaneous pan/zoom. Sensitivity now matches the speed displayed in the interface.
-- Held commands work after a click returns to normal pointing. Background settings stop rebuilding unchanged labels and no longer run the CAD view's animation loop.
-- Add Studio protocol-2 negotiation for native Alt + ball aligned snapping and backtick navigation/Alt height. Older Studio links retain their orbit/pan/zoom connection.
-- Keep mouse and wheel defaults, custom keys and saved combinations unchanged. Public candidate v{{PUBLIC_VERSION}} remains unpublished; Admin v{{ADMIN_VERSION}} is a new version.
-- Physical responsiveness and held commands require owner testing with the updated Studio camera link. Standard M512 X/Y input does not measure independent ball twist.
-- Resume ball-only Orbit, Pan and circle zoom on the next trackball movement after a normal click briefly restores pointer input.
+# Chamfer Trackball Admin update
+
+- Make the saved pointer speed / effective DPI slider affect actual selected-trackball movement, with immediate delivery and preserved fractional counts.
+- Apply program glide to pointing and 3D navigation. Stop tails on clicks, focus/configuration changes and held-mode release. Neutral speed with soft stop off uses native pointing.
+- Preserve complete speed, feel, combinations, gestures and held-key choices in new, duplicate, deleted and switched programs. Keep the confirmed native buttons and wheel axes as defaults.
+- Use Windows + ball for scene navigation and Windows + Alt for height in the 3D modelling program. Releasing Windows does not open Start there, even without ball movement. Other system shortcuts and normal Windows behavior outside 3D views remain available.
+- Add a live physical-keyboard display and held-key highlights in the floating guide.
+- Correct Studio snapping to its Y-up cube convention, allow continued rolling from Top to Bottom, and prevent face-boundary flicker. Alt + wheel makes quarter turns without leaving the selected face.
+- Keep Shift orbit, Ctrl+Shift pan, Ctrl zoom, Alt snap and ordinary pointing without a held command. Preserve device identification, custom controls and existing programs.
+
+The software DPI value is an estimate based on the hardware DPI selected in settings. The M512's standard X/Y sensor does not independently report physical twist. Native Snap and Navigate need a compatible host integration. Admin prereleases and unpublished public candidates remain separate; this update does not publish a public stable release.
+
+Automated checks cover count scaling, pointer glide, program persistence/copying, keyboard routing, camera face transitions, cursor pivots, and actual WebView controls. Physical device feel still requires owner testing.

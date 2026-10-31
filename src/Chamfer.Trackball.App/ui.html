@@ -237,6 +237,7 @@ details .ver{margin-top:10px;font-weight:600}
 .actlog .l.ok{border-left-color:var(--good)} .actlog .l.warn{border-left-color:var(--bad)} .actlog .l.info{border-left-color:var(--muted)}
 .actlog .t{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .saved{color:var(--muted);font-size:12.5px;transition:opacity .4s}
+.key-row{display:flex;gap:5px;margin:5px 0}.key-cap{flex:1;min-width:0;text-align:center;padding:7px 3px;border:1px solid var(--border,#384149);border-radius:5px;color:var(--muted,#99aab8);font-size:11px}.key-cap.bound{border-color:var(--accent,#35c6dc)}.key-cap.down{background:var(--accent,#35c6dc);color:#081015}.key-cap.wide{flex:1.8}.live-keyboard{max-width:760px}
 </style>
 </head>
 <body>
@@ -266,7 +267,7 @@ details .ver{margin-top:10px;font-weight:600}
       <div class="card welcome" id="welcome" hidden>
         <div style="flex:1">
           <b style="font-size:16px">Welcome to Chamfer Trackball</b>
-          <div class="steps" style="margin-top:6px"><span><b>1.</b> In Buttons &amp; keys, choose <b>Identify trackball</b>, then roll only its ball.</span><span><b>2.</b> btn1 = Middle (top-left), btn2 = Back (top-right), btn3 = Left click (bottom-left), btn4 = Right click (bottom-right). Left wheel = up / down; right wheel = horizontal.</span><span><b>3.</b> Hold <b>Shift</b> to orbit, <b>Ctrl + Shift</b> to pan, <b>Ctrl</b> to zoom, <b>Alt</b> to snap to a cube face, or <b>backtick</b> to navigate. Edit these held keys in Buttons &amp; keys.</span><span><b>4.</b> Install the Blender or Fusion integration from CAD apps for cursor pivot, aligned snapping and navigation. Other apps use their own editable mouse profiles.</span></div>
+          <div class="steps" style="margin-top:6px"><span><b>1.</b> In Buttons &amp; keys, choose <b>Identify trackball</b>, then roll only its ball.</span><span><b>2.</b> btn1 = Middle (top-left), btn2 = Back (top-right), btn3 = Left click (bottom-left), btn4 = Right click (bottom-right). Left wheel = up / down; right wheel = horizontal.</span><span><b>3.</b> Hold <b>Shift</b> to orbit, <b>Ctrl + Shift</b> to pan, <b>Ctrl</b> to zoom, <b>Alt</b> to snap to a cube face, or <b>Windows</b> to navigate. Edit these held keys in Buttons &amp; keys.</span><span><b>4.</b> Install the Blender or Fusion integration from CAD apps for cursor pivot, aligned snapping and navigation. Other apps use their own editable mouse profiles.</span></div>
         </div>
         <button class="btn primary" id="welcomeOk">Got it</button>
       </div>
@@ -292,6 +293,12 @@ details .ver{margin-top:10px;font-weight:600}
           <div class="row" style="margin-bottom:10px"><h2 style="margin:0">Your controls</h2><span class="spacer"></span><button class="btn sm" data-go="controls">Change</button></div>
           <div class="cheat" id="cheat"></div>
         </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Keyboard shortcuts</h2>
+        <p class="mu">Press your physical keyboard to see the held keys light up. Outlined keys belong to this program’s shortcuts. Change them in Buttons &amp; keys.</p>
+        <div id="liveKeyboard" class="live-keyboard" aria-label="Live keyboard shortcuts"></div>
+        <div id="keyboardMode" class="mu" style="margin-top:8px"></div>
       </div>
       <div class="card" style="margin-top:16px">
         <div class="row" style="margin-bottom:8px"><h2 style="margin:0">What it's doing</h2><span class="spacer"></span><button class="btn sm" data-clearlog>Clear</button></div>
@@ -335,7 +342,7 @@ details .ver{margin-top:10px;font-weight:600}
       <div class="card" style="margin-bottom:16px">
         <h2>Quick setups</h2>
         <div class="presets">
-          <button class="preset" data-preset="controller"><b>Your held-key setup</b><small>Shift + ball rotates. Ctrl+Shift + ball pans. Ctrl + ball up/down zooms. Alt + ball snaps to a cube face and backtick navigates with a native integration. Release the keys for a normal pointer.</small></button><button class="preset" data-preset="ballonly"><b>Normal mouse</b><small>Original mouse clicks, pointing and scrolling. Navigation keys, custom combinations and wheel remapping are off.</small></button>
+          <button class="preset" data-preset="controller"><b>Your held-key setup</b><small>Shift + ball rotates. Ctrl+Shift + ball pans. Ctrl + ball up/down zooms. Alt + ball snaps to a cube face and Windows navigates with a native integration. Release the keys for a normal pointer.</small></button><button class="preset" data-preset="ballonly"><b>Normal mouse</b><small>Original mouse clicks, pointing and scrolling. Navigation keys, custom combinations and wheel remapping are off.</small></button>
           <button class="preset" data-preset="ballnav"><b>Ball navigation</b><small>Select this for 3D apps: roll straight to orbit, tap the M512 Back button to switch to pan, then tap again for orbit. Draw an almost-full small circle over the 3D view to zoom: clockwise in, anticlockwise out. Keep circling to continue zooming.</small></button><button class="preset" data-preset="both"><b>Buttons + held keys</b><small>Hold Back + ball to orbit or Middle + ball to pan. Shift and Ctrl+Shift work too. Normal left and right clicks.</small></button>
           
           
@@ -426,17 +433,17 @@ details .ver{margin-top:10px;font-weight:600}
         <div class="progs" id="speedProgs"></div>
       </div>
       <div class="card" style="margin-bottom:16px">
-        <div class="row" style="margin-bottom:6px"><h2 style="margin:0">DPI</h2><span class="spacer"></span><button class="btn sm" id="dpiDefault">Default</button></div>
-        <p class="mu" style="margin:0 0 10px;font-size:12.5px">How far the pointer moves for each roll of the ball. Lower DPI = slower, more exact; higher = faster. Saved with <b id="ptrProg"></b>, so each program has its own. <b>Default</b> is your trackball's own DPI.</p>
+        <div class="row" style="margin-bottom:6px"><h2 style="margin:0">Pointer speed / effective DPI</h2><span class="spacer"></span><button class="btn sm" id="dpiDefault">Default</button></div>
+        <p class="mu" style="margin:0 0 10px;font-size:12.5px">Software speed for the identified trackball. Lower is slower and more exact; higher travels farther. Saved with <b id="ptrProg"></b>, so each program has its own. <b>Default</b> is your trackball's own DPI.</p>
         <div class="slider"><b>DPI</b><input type="range" min="1" max="20" data-k="pointerSpeed"><span class="val" data-v="pointerSpeed"></span></div>
-        <div class="opt" style="margin-top:8px"><div class="t">Trackball DPI key<small>The DPI key on the side of your M512 cycles 400 → 800 → 1200 → 1600. Pick what it's on so the numbers above are right.</small></div><select data-k="trackballDpi" id="hwDpi"><option value="400">400</option><option value="800">800</option><option value="1200">1200</option><option value="1600">1600</option></select></div>
-        <p class="mu" style="margin:6px 0 0;font-size:12px">Only changes the speed while Chamfer Trackball is running — quitting it (or restarting the PC) brings back your own Windows speed.</p>
+        <div class="opt" style="margin-top:8px"><div class="t">Trackball DPI key<small>Select the DPI set by the trackball’s physical DPI key. This calibrates the effective DPI estimate; software cannot change the sensor’s hardware DPI.</small></div><select data-k="trackballDpi" id="hwDpi"><option value="400">400</option><option value="800">800</option><option value="1200">1200</option><option value="1600">1600</option></select></div>
+        <p class="mu" style="margin:6px 0 0;font-size:12px">Applies to this trackball in Normal mouse, 3D modelling and added programs. Uses your Windows speed as the baseline; quitting restores native pointing. 3D movement uses the separate Orbit, Pan and Zoom speeds below.</p>
       </div>
       <div class="card" style="margin-bottom:16px">
         <h2>Motion feel</h2>
-        <div class="opt"><div class="t">Soft stop after release<small>The view follows the ball directly while you roll, then eases to a stop after you let go. Glide sets how long it continues. Turn this off to stop immediately. This setting only affects 3D navigation.</small></div><label class="sw"><input type="checkbox" data-k="smooth"><span></span></label></div>
+        <div class="opt"><div class="t">Soft stop after release<small>The pointer and 3D view follow the ball directly, then ease to a stop after the ball stops. Glide sets the decay time. Turn this off to stop immediately. Clicking or releasing a navigation key stops glide.</small></div><label class="sw"><input type="checkbox" data-k="smooth"><span></span></label></div>
         <div class="slider" style="margin-top:8px"><b>Glide</b><input type="range" min="1" max="100" data-k="glide"><span class="val" data-v="glide"></span></div>
-        <p class="mu" style="margin:6px 0 0;font-size:12px">How long the view keeps moving after the ball stops. Short feels precise; long feels like flying.</p>
+        <p class="mu" style="margin:6px 0 0;font-size:12px">The decay time for pointer movement and 3D navigation in this program. Short feels precise; long coasts farther.</p>
       </div>
       <div class="card" style="margin-bottom:16px">
         <h2>3D speed</h2>
@@ -564,7 +571,7 @@ const TAP={fit:"Fit view",click:"Normal click",none:"Nothing"};
 const WHEEL={normal:"Normal scroll",zoom:"Smooth zoom (CAD apps)",invert:"Reverse direction",disabled:"Off (does nothing)"};
 const LWHEEL={...WHEEL,cycle:"Cycle the ball: mouse → rotate → pan → twist",program:"Next / previous program",goProgram:"Go to a program (up / down)…",keys:"Keyboard shortcut (up / down)…"};
 const LWHEEL_DESC={normal:"Zooming with the side wheel keeps your normal scrolling on the main wheel.",zoom:"Zooming with the side wheel keeps your normal scrolling on the main wheel.",invert:"Scrolls the other way.",disabled:"Does nothing.",cycle:"In 3D apps each notch changes what the ball does: Mouse → Rotate → Pan → Twist (Twist only if it's switched on in Extras). Turn the other way to go back. A click also returns to the mouse.",program:"Each notch switches to the next program (the other way: the previous one).",goProgram:"Turn it up to go to one program, down to go to another — pick them below.",keys:"Each notch up types one shortcut, each notch down another — in every app."};
-const holdLabel=k=>!k||k==="none"?"Off":k.split("+").map(x=>x.length===1?x.toUpperCase():x[0].toUpperCase()+x.slice(1)).join(" + ");
+const holdLabel=k=>!k||k==="none"?"Off":k.split("+").map(x=>x.toLowerCase()==="win"?"Windows":x.length===1?x.toUpperCase():x[0].toUpperCase()+x.slice(1)).join(" + ");
 const call=(n,...a)=>window[n]?window[n](...a):Promise.reject("not available");
 
 function toast(msg,err){const t=$("#toast");t.textContent=msg;t.className="toast show"+(err?" err":"");clearTimeout(t._t);t._t=setTimeout(()=>t.className="toast",err?5000:2200)}
@@ -671,18 +678,18 @@ function renderBinds(){
     const warn=bs.length<2?'<div class="desc wn">Pick at least two buttons.</div>':"";
     out.push(`<div class="bind" data-row="combo-${ci}"><div class="nm"><b>${bs.length?bs.map(n=>"btn"+n).join(" + "):"New combination"}</b><small>Combination ${ci+1}</small></div><div class="opts"><div class="line">${boxes}</div><div class="line"><select data-cact="${ci}">${opts(CACT,bd.action)}</select><button class="btn sm" data-cdel="${ci}">Remove</button></div>${warn}${extra}</div></div>`)});
   $("#binds").innerHTML=out.join("");
-  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll to snap to Top, Bottom, Left, Right, Front or Back. Requires a native integration."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Requires a native integration."]].map(([k,n,d])=>
-    `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):`<span class="mu">${k==="zoomKeys"&&cfg.panKeys&&cfg.panKeys!=="none"?"Included in Pan + zoom":"Off"}</span>` }<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key.</div></div></div>`).join("");
+  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll to snap to Top, Bottom, Left, Right, Front or Back. Keep rolling to reach the opposite face. The wheel turns the face in 90° steps. Requires a native integration."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Windows release will not open Start in this program’s 3D view. Requires a native integration."]].map(([k,n,d])=>
+    `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):`<span class="mu">${k==="zoomKeys"&&cfg.panKeys&&cfg.panKeys!=="none"?"Included in Pan + zoom":"Off"}</span>` }<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key, except Windows, which stays reserved for navigation.</div></div></div>`).join("");
   $$("[data-k]").forEach(i=>{const k=i.dataset.k;if(i.type==="checkbox")i.checked=!!cfg[k];else i.value=cfg[k]});
   $$("[data-v]").forEach(v=>v.textContent=valLabel(v.dataset.v,cfg[v.dataset.v]));
 }
 // Windows pointer-speed steps 1..20 as multipliers (10 = ×1).
 const WIN_MULT=[0,1/32,1/16,1/8,1/4,3/8,1/2,5/8,3/4,7/8,1,1.25,1.5,1.75,2,2.25,2.5,2.75,3,3.25,3.5];
-function dpiOf(v){return Math.round((cfg.trackballDpi||1600)*WIN_MULT[v||10]/50)*50}
+function dpiOf(v){return Math.max(1,Math.round((cfg.trackballDpi||1600)*WIN_MULT[v||10]))}
 $("#dpiDefault").onclick=()=>{cfg.pointerSpeed=10;renderBinds();save(true)};
 document.addEventListener("change",e=>{if(e.target.id==="hwDpi"){cfg.trackballDpi=+e.target.value;renderBinds();save()}},true);
 function speedLabel(v){return(Math.pow(2,(v-50)/20)).toFixed(2)+"×"}
-function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" DPI"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
+function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" effective DPI · "+WIN_MULT[v||10].toFixed(2)+"×"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
 document.addEventListener("change",e=>{const t=e.target;
   if(t.dataset.act){const b=t.dataset.act,a=t.value;const cur=cfg.buttons[b];cur.action=a;
     if(["orbit","pan","zoom"].includes(a)&&!cur.tap)cur.tap=b==="back"?"fit":"click";
@@ -741,18 +748,18 @@ async function applyPreset(p){
   if(!await modal("Apply setup?","Your button, wheel and held-key choices for this program will be replaced.",[["Cancel","",false],["Apply","primary",true]]))return;
   const d=JSON.parse(JSON.stringify(S.defaults));
   const buttons=Object.fromEntries(["middle","back","right","forward"].map(b=>[b,{action:"normal",tap:"click"}]));
-  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:p==="ballonly"?"none":"ctrl",snapKeys:p==="ballonly"?"none":"alt",navigateKeys:p==="ballonly"?"none":"backtick",ball:"pointer",circleZoom:false,circleSize:160});
+  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:p==="ballonly"?"none":"ctrl",snapKeys:p==="ballonly"?"none":"alt",navigateKeys:p==="ballonly"?"none":"win",ball:"pointer",circleZoom:false,circleSize:160});
   if(p==="ballnav"){cfg.ball="orbit";cfg.circleZoom=true;cfg.buttons.back={action:"panToggle",tap:"click"};}
   if(p==="both"){cfg.buttons.back={action:"orbit",tap:"click"};cfg.buttons.middle={action:"pan",tap:"click"};}
   renderBinds();renderCheat();await doSave();toast("Setup saved");
 }
 $("#resetControls").onclick=async()=>{if(await modal("Reset buttons & keys?","All buttons, wheels, keys and combinations of this program go back to how they come.",[["Cancel","",false],["Reset","primary",true]])){
-  const name=(cfg.programs[cfg.activeProgram]||{}).name;const pd=(S.programDefaults||[]).find(p=>p.name===name);const d=JSON.parse(JSON.stringify(pd||S.defaults));
+  const pd=programDefault();const d=clone(pd);
   Object.assign(cfg,{ball:d.ball||"pointer",circleZoom:!!d.circleZoom,circleSize:d.circleSize||160,buttons:d.buttons,leftWheel:d.leftWheel,rightWheel:d.rightWheel,orbitKeys:d.orbitKeys,panKeys:d.panKeys,zoomKeys:d.zoomKeys,snapKeys:d.snapKeys||"none",navigateKeys:d.navigateKeys||"none",modeButtons:d.modeButtons||{},combos:d.combos||[],wheelPrograms:d.wheelPrograms||[0,1,0,1],leftWheelUpKeys:"",leftWheelDownKeys:"",rightWheelUpKeys:"",rightWheelDownKeys:""});
   if(!pd)Object.assign(cfg,{buttonWheelZoom:d.buttonWheelZoom,returnCursor:d.returnCursor,shortcutsEverywhere:d.shortcutsEverywhere});renderBinds();renderCheat();save(true)}};
 $("#resetAll").onclick=async()=>{if(!await modal("Reset everything?","Every program, button, wheel, combination, speed and the guide go back to normal settings. Your macros and look are kept.",[["Cancel","",false],["Reset","primary",true]]))return;
   try{const n=await call("ctResetAll");const theme=cfg.theme;cfg=n;cfg.theme=theme;renderAll();toast("Everything is back to normal settings")}catch(err){toast(String(err.message||err),true)}};
-$("#resetSpeed").onclick=()=>{const d=S.defaults;["orbitSens","panSens","zoomSens","invertOrbitX","invertOrbitY","invertPan","invertZoom"].forEach(k=>cfg[k]=d[k]);renderBinds();save(true);toast("Speed reset")};
+$("#resetSpeed").onclick=()=>{const d=programDefault();cfg.pointerSpeed=d.pointerSpeed||10;FEEL_FIELDS.forEach(k=>cfg[k]=d.feel?.[k]??S.defaults[k]);renderBinds();save(true);toast("Speed and motion feel reset for this program")};
 
 /* shortcut recorder */
 const CODE_NAME=c=>{if(/^Key[A-Z]$/.test(c))return c.slice(3);if(/^Digit\d$/.test(c))return c.slice(5);if(/^F\d{1,2}$/.test(c))return c;if(/^Numpad\d$/.test(c))return"Num"+c.slice(6);
@@ -781,11 +788,35 @@ document.addEventListener("keydown",e=>{if(!recording)return;e.preventDefault();
   if(e.code==="Escape"){$("#modal")._close();return}
   if(MOD_CODES[e.code]){const m=modsOf(e);recording.mods=m.join("+");if(!recording.combo)$("#recBox").innerHTML=kbd(recording.mods)+' <span class="mu">+ …</span>';return}
   const k=CODE_NAME(e.code);if(!k){$("#recBox").innerHTML='<span class="wn">That key can\'t be used in a shortcut. Try another.</span>';return}
-  const parts=[];if(e.ctrlKey)parts.push("Ctrl");if(e.shiftKey)parts.push("Shift");if(e.altKey)parts.push("Alt");parts.push(k);
+  const parts=[];if(e.ctrlKey)parts.push("Ctrl");if(e.shiftKey)parts.push("Shift");if(e.altKey)parts.push("Alt");if(e.metaKey&&k!=="Win")parts.push("Win");parts.push(k);
   recording.combo=parts.join("+");$("#recBox").innerHTML=kbd(recording.combo)},true);
 
+
+/* live keyboard: current key states only, never recorded text */
+const KEY_ROWS=[
+ [["Esc",27],...Array.from({length:12},(_,i)=>["F"+(i+1),112+i])],
+ [["Backtick",192],...Array.from({length:10},(_,i)=>[String((i+1)%10),48+(i+1)%10]),["−",189],["=",187],["Backspace",8]],
+ [["Tab",9],...Array.from("QWERTYUIOP",s=>[s,s.charCodeAt(0)]),["[",219],["]",221],["Backslash",220]],
+ [["Caps",20],...Array.from("ASDFGHJKL",s=>[s,s.charCodeAt(0)]),[";",186],["Quote",222],["Enter",13]],
+ [["Shift",16],...Array.from("ZXCVBNM",s=>[s,s.charCodeAt(0)]),[",",188],[".",190],["/",191],["Shift",16]],
+ [["Ctrl",17],["Windows",91],["Alt",18],["Space",32],["Alt",18],["Ctrl",17],["←",37],["↑",38],["↓",40],["→",39]]
+];
+function chordVks(chord){
+ return String(chord||"").toLowerCase().split("+").map(k=>({ctrl:17,control:17,shift:16,alt:18,win:91,windows:91,backtick:192,space:32,tab:9,enter:13}[k]||(/^f\d+$/.test(k)?111+Number(k.slice(1)):k.length===1?k.toUpperCase().charCodeAt(0):0))).filter(Boolean);
+}
+function renderKeyboard(){
+ const el=$("#liveKeyboard");if(!el)return;
+ const bound=new Set(["orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys"].flatMap(k=>chordVks(cfg[k])));
+ el.innerHTML=KEY_ROWS.map(row=>'<div class="key-row">'+row.map(([name,key])=>'<span class="key-cap'+(name.length>1?' wide':'')+(bound.has(key)?' bound':'')+'" data-vk="'+key+'">'+esc(name)+'</span>').join("")+'</div>').join("");
+}
+function updateKeyboard(s){
+ const keys=new Set(s.keys||[]);
+ $$("#liveKeyboard [data-vk]").forEach(el=>{const down=keys.has(+el.dataset.vk);if(el.classList.contains("down")!==down)el.classList.toggle("down",down)});
+ liveText("#keyboardMode",s.appState==="cad"?"3D controls: "+(MODEN[s.mode]||s.mode):"Normal keyboard — 3D shortcuts activate in a supported 3D view.");
+}
+
 /* cheat sheet on Home */
-function renderCheat(){const items=[];const b=cfg.buttons;
+function renderCheat(){renderKeyboard();const items=[];const b=cfg.buttons;
   const BALLW={auto:"orbits · tap top-right for pan, again for zoom (roll up = in), again for orbit",orbit:"orbits the model",pan:"pans the view",zoom:"zooms (roll up / down)"};
   if(cfg.ball&&cfg.ball!=="pointer")items.push(`<div class="it"><span class="k">Ball</span><span>just roll — ${BALLW[cfg.ball]} <span class="mu">(in 3D apps)</span></span></div>`);
   Object.keys(b).filter(k=>b[k].action==="nextProgram").forEach(k=>items.push(`<div class="it"><span class="k">${BTN[k].split(" ")[0]}</span><span>next program <span class="mu">(now: ${esc(cfg.programs[cfg.activeProgram].name)})</span></span></div>`));
@@ -957,6 +988,7 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   const amount=s.zoomLog===undefined?(s.zoom||0)/700:s.zoomLog;
   if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
   const focused=!document.hidden&&document.hasFocus();
+  if(page==="home"&&!document.hidden)updateKeyboard(s);
   if(changed&&page==="home"&&focused)drawPad();
   const live=s.mode!=="Idle";liveText("#padMode",live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
   const dirTxt=s.ballDir?" "+s.ballDir:"";
@@ -1011,6 +1043,22 @@ document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="askIn
 
 /* ---------- programs ---------- */
 let cfgRev=-1;
+const PROGRAM_FIELDS=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+const FEEL_FIELDS=["orbitSens","panSens","zoomSens","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"];
+const clone=v=>v===undefined?null:JSON.parse(JSON.stringify(v));
+function snapshotProgram(name){
+ const p=clone(cfg.programs[cfg.activeProgram]);p.name=name||p.name;
+ for(const k of PROGRAM_FIELDS)if(k!=="gestures"&&k!=="feel")p[k]=clone(cfg[k]);
+ p.feel=Object.fromEntries(FEEL_FIELDS.map(k=>[k,clone(cfg[k])]));return p;
+}
+function loadProgramFields(p){
+ for(const k of PROGRAM_FIELDS)cfg[k]=clone(p[k]);
+ for(const k of FEEL_FIELDS)cfg[k]=clone(p.feel?.[k]??S.defaults[k]);
+}
+function programDefault(){
+ const p=cfg.programs[cfg.activeProgram];
+ return (S.programDefaults||[]).find(d=>d.name===(p.defaultKind||p.name))||S.programDefaults?.[0]||S.defaults;
+}
 function progOpts(sel){return cfg.programs.map((p,i)=>`<option value="${i}"${i===sel?" selected":""}>${i+1}. ${esc(p.name)}</option>`).join("")}
 function macroOpts(sel){return cfg.macros.map(m=>`<option value="${esc(m.id)}"${m.id===sel?" selected":""}>${esc(m.name)}</option>`).join("")}
 let gestScope="";
@@ -1032,10 +1080,11 @@ async function reloadConfig(){const st=await call("ctState");const theme=cfg.the
 document.addEventListener("click",async e=>{const t=e.target.closest("button");if(!t)return;
   if(t.dataset.useprog!==undefined){const i=+t.dataset.useprog;if(i!==cfg.activeProgram)useProgram(i);return}
   if(t.id==="progAdd"){const n=await askText("New program","Name (for example “Blender”, “Photo editing” or “Gaming”)","Program "+(cfg.programs.length+1));if(n===null)return;
-    const blank=JSON.parse(JSON.stringify(S.defaults));cfg.programs.push({name:n||("Program "+(cfg.programs.length+1)),buttons:blank.buttons,rightWheel:blank.rightWheel,leftWheel:blank.leftWheel,orbitKeys:blank.orbitKeys,panKeys:blank.panKeys,zoomKeys:blank.zoomKeys,gestures:{}});
+    const choice=await modal("Start with which controls?","Choose a complete setup, including pointer speed, motion feel and 3D keys.",[["Cancel","",false],["Normal mouse","","normal"],["3D modelling","","3d"],["Current program","primary","current"]]);if(!choice)return;
+    const blank=choice==="current"?snapshotProgram():clone(S.programDefaults[choice==="3d"?1:0]);blank.defaultKind=blank.defaultKind||blank.name;blank.name=n||("Program "+(cfg.programs.length+1));cfg.programs.push(blank);
     await doSave();useProgram(cfg.programs.length-1);return}
   if(t.id==="progRename"){const p=cfg.programs[cfg.activeProgram];const n=await askText("Rename program","Name",p.name);if(n){p.name=n;renderPrograms();save(true)}return}
-  if(t.id==="progCopy"){const p=JSON.parse(JSON.stringify(cfg.programs[cfg.activeProgram]));p.name+=" copy";Object.assign(p,{buttons:JSON.parse(JSON.stringify(cfg.buttons)),rightWheel:cfg.rightWheel,leftWheel:cfg.leftWheel,orbitKeys:cfg.orbitKeys,panKeys:cfg.panKeys,zoomKeys:cfg.zoomKeys});
+  if(t.id==="progCopy"){const p=snapshotProgram();p.defaultKind=p.defaultKind||p.name;p.name+=" copy";
     cfg.programs.push(p);await doSave();useProgram(cfg.programs.length-1);return}
   if(t.id==="progDel"){if(cfg.programs.length<2)return;const p=cfg.programs[cfg.activeProgram];
     if(!await modal("Delete “"+p.name+"”?","Its buttons, keys and gestures are removed. Your other programs and your macros stay.",[["Cancel","",false],["Delete","primary",true]]))return;
@@ -1043,7 +1092,7 @@ document.addEventListener("click",async e=>{const t=e.target.closest("button");i
     const fix=x=>x>del?x-1:(x===del?0:x);
     cfg.programs.forEach(pg=>{Object.values(pg.buttons||{}).forEach(b=>{if(b.action==="program")b.program=fix(b.program||0)});Object.values(pg.gestures||{}).forEach(c=>{if(c.type==="program")c.program=fix(c.program||0)})});
     cfg.activeProgram=Math.min(del,cfg.programs.length-1);const np=cfg.programs[cfg.activeProgram];
-    Object.assign(cfg,{buttons:np.buttons,rightWheel:np.rightWheel,leftWheel:np.leftWheel,orbitKeys:np.orbitKeys,panKeys:np.panKeys,zoomKeys:np.zoomKeys});
+    loadProgramFields(np);
     await doSave();reloadConfig();toast("Program deleted");return}
   if(t.id==="progKeyRec"){const k=await recordKeys("Shortcut to switch program");if(k){cfg.programKeys=k.split(",")[0];renderPrograms();save(true)}return}
   if(t.id==="progKeyClr"){cfg.programKeys="";renderPrograms();save(true);return}

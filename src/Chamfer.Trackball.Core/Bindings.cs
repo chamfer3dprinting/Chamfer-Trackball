@@ -32,7 +32,7 @@ public static class ModeResolver {
             if(spec is "" or "none")continue;
             try{
                 var chord=KeyChord.Parse(spec);
-                // Alt is an intentional navigation modifier while backtick is held.
+                // Alt is an intentional navigation height modifier for the held chord.
                 if(mode==NavMode.Navigate&&keys.Contains(18)&&!chord.Keys.Contains(18)){
                     var withoutAlt=new HashSet<int>(keys);withoutAlt.Remove(18);
                     if(chord.Matches(withoutAlt))return mode;
