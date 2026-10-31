@@ -37,6 +37,9 @@ public string AppName{get;private set;}="";
     public void Log(string text,string kind="ok"){logs.Enqueue(new(){["seq"]=++seq,["time"]=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),["text"]=text,["kind"]=kind});while(logs.Count>100)logs.Dequeue();}
     public JsonArray LogAfter(long s)=>new(logs.Where(x=>ConfigStore.D(x,"seq")>s).Select(x=>x.DeepClone()).ToArray());
     void Tick(object? sender,EventArgs e){
+        const int idleInterval=50;
+        int interval=mode==NavMode.Idle?idleInterval:16;
+        if(timer.Interval!=interval)timer.Interval=interval;
         if(revision!=store.Revision){End();cfg=store.Snapshot();revision=store.Revision;foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
         var w=Win32.GetForegroundWindow();
         if(w!=foregroundWindow){
@@ -78,7 +81,7 @@ public string AppName{get;private set;}="";
     void Change(NavMode next){
         if(mode!=NavMode.Idle&&IsCad&&input.Ready)Flush();
         End();if(next==NavMode.Idle||!IsCad||!input.Ready)return;
-        if(next==NavMode.Gestures){mode=next;return;}
+        if(next==NavMode.Gestures){mode=next;timer.Interval=16;return;}
         native=server.Find(ConfigStore.S(profile,"id"),foregroundPid);
         bool demo=ConfigStore.S(profile,"id")=="demo";
         if(native!=null&&!server.Supports(native,next))native=null;
@@ -86,7 +89,7 @@ public string AppName{get;private set;}="";
             Integration=next+" requires the native integration for "+ConfigStore.S(profile,"name");return;
         }
         if(native==null&&!demo&&!ConfigStore.B(cfg,"allowEmulation",true)){Integration="Native integration required";return;}
-        mode=next;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
+        mode=next;timer.Interval=16;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
         if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y);}
     }
     void End(){

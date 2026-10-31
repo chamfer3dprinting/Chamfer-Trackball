@@ -1,3 +1,4 @@
+- Replace per-8ms polling in the native WebSocket sender with event-driven delivery and a one-second idle heartbeat. Check the foreground app at 20 Hz while idle, retain 16 ms updates during navigation, and only reload guide settings when configuration changes.
 - Make ball-only orbit, Back-button orbit/pan switching and circle zoom ready by default in the 3D modelling program. Migrate existing settings once while preserving the separate Normal mouse program and custom controls.
 - Implement the existing soft-stop setting for 3D motion and discard stale camera poses when a native client falls behind, keeping the newest view responsive.
 - Clarify that circle zoom starts with an almost-full circle over the 3D viewport: clockwise zooms in, anticlockwise zooms out; straight rolling resumes orbit or pan.

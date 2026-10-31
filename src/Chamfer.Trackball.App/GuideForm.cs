@@ -4,7 +4,7 @@ using Chamfer.Trackball.Core;
 namespace Chamfer.Trackball.App;
 internal sealed class GuideForm:Form{
  readonly Controller controller;readonly ConfigStore store;readonly System.Windows.Forms.Timer timer=new(){Interval=100};
- readonly Image logo=Brand.Image();bool compact,dragging;Point drag;string last="";
+ readonly Image logo=Brand.Image();bool compact,dragging;Point drag;string last="";long guideConfigRevision=-1;bool showGuide=true;
  public GuideForm(Controller controller,ConfigStore store){
   this.controller=controller;this.store=store;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;
   DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,300);BackColor=Color.FromArgb(39,43,46);ForeColor=Color.FromArgb(220,225,230);
@@ -12,7 +12,7 @@ internal sealed class GuideForm:Form{
   var area=Screen.PrimaryScreen!.WorkingArea;Location=new(area.Right-Width-18,area.Bottom-Height-18);
   var c=store.Snapshot();int x=ConfigStore.I(c,"guideX",Location.X),y=ConfigStore.I(c,"guideY",Location.Y);
   if(Screen.AllScreens.Any(s=>s.WorkingArea.IntersectsWith(new Rectangle(x,y,Width,Height))))Location=new(x,y);
-  timer.Tick+=(_,_)=>{var cfg=store.Snapshot();if(ConfigStore.B(cfg,"modePanel",true)){if(!Visible)Show();var now=controller.GuideState().ToJsonString();if(now!=last){last=now;Invalidate();}}else if(Visible)Hide();};
+  timer.Tick+=(_,_)=>{var revision=store.Revision;if(revision!=guideConfigRevision){showGuide=ConfigStore.B(store.Snapshot(),"modePanel",true);guideConfigRevision=revision;}if(showGuide){if(!Visible)Show();var now=controller.GuideState().ToJsonString();if(now!=last){last=now;Invalidate();}}else if(Visible)Hide();};
   timer.Start();
  }
  protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ClientSize=new((int)(330*DeviceDpi/96f),(int)((compact?70:300)*DeviceDpi/96f));var a=Screen.FromPoint(Location).WorkingArea;Location=new(Math.Clamp(Left,a.Left,Math.Max(a.Left,a.Right-Width)),Math.Clamp(Top,a.Top,Math.Max(a.Top,a.Bottom-Height)));}

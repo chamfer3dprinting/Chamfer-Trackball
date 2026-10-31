@@ -15,6 +15,7 @@ internal sealed class NativeServer:IDisposable {
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
         public bool Focus=true;public DateTime Began;public CameraPose? Pose,BasePose;public float SnapX,SnapY;
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
+        public readonly SemaphoreSlim OutSignal=new(0,1);
         public object Gate=new();
     }
     readonly TcpListener listener=new(IPAddress.Loopback,47613);
@@ -52,6 +53,7 @@ internal sealed class NativeServer:IDisposable {
             }
             while(c.Out.Count>=64&&c.Out.TryDequeue(out _)){ }
             c.Out.Enqueue(msg);
+            if(c.Socket!=null&&c.OutSignal.CurrentCount==0)c.OutSignal.Release();
         }
     }
     void Receive(Client c,JsonObject m){
@@ -116,10 +118,14 @@ internal sealed class NativeServer:IDisposable {
         using var quit=CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
         var sender=Task.Run(async()=>{
             while(!quit.IsCancellationRequested&&socket.State==WebSocketState.Open){
+                bool signaled=await c.OutSignal.WaitAsync(TimeSpan.FromSeconds(1),quit.Token);
                 c.Seen=DateTime.UtcNow;
-                JsonObject? item=null;lock(c.Gate){if(c.Out.TryDequeue(out var next))item=next;}
-                if(item!=null){var bytes=Encoding.UTF8.GetBytes(item.ToJsonString());await socket.SendAsync(bytes,WebSocketMessageType.Text,true,quit.Token);}
-                else await Task.Delay(8,quit.Token);
+                if(!signaled)continue;
+                while(socket.State==WebSocketState.Open){
+                    JsonObject? item=null;lock(c.Gate){if(c.Out.TryDequeue(out var next))item=next;}
+                    if(item==null)break;
+                    var bytes=Encoding.UTF8.GetBytes(item.ToJsonString());await socket.SendAsync(bytes,WebSocketMessageType.Text,true,quit.Token);
+                }
             }
         },quit.Token);
         try{
