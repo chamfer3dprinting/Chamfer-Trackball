@@ -47,7 +47,7 @@ public sealed class CircleZoom {
                 Active=true;straightTravel=0;consumed=true;
                 // Apply the winding collected before recognition so a first circle
                 // produces a visible zoom instead of only a tiny final-step change.
-                wheel+=accumulatedTurn*(480/(2*Math.PI));
+                wheel+=accumulatedTurn*(480/(2*MathF.PI));
             }
         }
         return (consumed,wheel);
