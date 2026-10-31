@@ -4,7 +4,7 @@ namespace Chamfer.Trackball.Core;
 // Recognizes a deliberate closed roll path. This derives a gesture from X/Y;
 // it does not measure a third physical rotation axis.
 public sealed class CircleZoom {
-    const float SharpTurnLimit=1.05f;
+    const float SharpTurnLimit=1.45f
     const int MaxSamples=192;
     readonly List<Vector2> points=[];
     readonly List<float> turns=[];
@@ -88,7 +88,7 @@ public sealed class CircleZoom {
             bool sharp=sharpTurnPrefix[end]!=sharpTurnPrefix[start+1];
             var extent=hi-lo;float widest=Math.Max(extent.X,extent.Y),narrowest=Math.Min(extent.X,extent.Y);
             var first=points[start];
-            if(!sharp&&length>=40&&MathF.Abs(turn)>=4.8f&&MathF.Abs(turn)/Math.Max(absoluteTurn,.001f)>=.78f
+            if(!sharp&&length>=40&&MathF.Abs(turn)>=5.0f&&MathF.Abs(turn)/Math.Max(absoluteTurn,.001f)>=.78f
                 &&widest<=maxDiameter&&narrowest>=8&&narrowest/widest>=.35f
                 &&Vector2.Distance(first,points[end])/length<=.38f){
                 accumulatedTurn=turn;return true;
