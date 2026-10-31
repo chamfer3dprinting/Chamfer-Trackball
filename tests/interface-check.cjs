@@ -8,6 +8,16 @@ assert.ok(html.includes('data-install-integration="fusion"'));
 assert.ok(!html.includes('cfg.orbitKeys="ctrl"'));
 console.log('Interface scripts parse and include all requested held-key controls.');
 
+const pollAt=html.indexOf('const ACTIVE_STATUS_POLL_MS=50;');
+assert.ok(pollAt>=0,'active status polling must be capped at 20 Hz');
+const pollEnd=html.indexOf('/* ---------- live ball picture ---------- */',pollAt);
+const pollSource=html.slice(pollAt,pollEnd);
+assert.ok(!pollSource.includes('requestAnimationFrame(poll)'),'status polling must not run on every display frame');
+assert.ok(pollSource.includes('page==="home"||page==="controls"?ACTIVE_STATUS_POLL_MS:250'));
+const controller=fs.readFileSync('src/Chamfer.Trackball.App/Controller.cs','utf8');
+assert.ok(controller.includes('System.Windows.Forms.Timer timer=new(){Interval=16}'),'native sensor processing must retain its 16 ms timer');
+console.log('Maximized UI polling is capped at 20 Hz; native sensor processing remains at 16 ms.');
+
 for(const key of ['ctIdentify','trackballSwapButtons','trackballSwapWheels','adminConnect','modePanel'])assert.ok(html.includes(key));
 assert.ok(html.includes('data-k="trackballSwapWheels"'));
 assert.ok(!html.includes('No sign-in needed'));

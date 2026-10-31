@@ -945,6 +945,7 @@ const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"P
 function liveText(selector,value){const el=$(selector),text=String(value??"");if(el&&el.textContent!==text)el.textContent=text}
 function liveClass(selector,value){const el=$(selector);if(el&&el.className!==value)el.className=value}
 function liveAttr(el,name,value){if(el&&el.getAttribute(name)!==String(value))el.setAttribute(name,value)}
+const ACTIVE_STATUS_POLL_MS=50; // 20 Hz; device input continues on its independent 16 ms timer.
 async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
   if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;if(!savePending&&!saveFlight)reloadConfig()}
   let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}
@@ -961,10 +962,9 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   liveText("#stApp",appTxt);liveText("#integrationState",s.integration||"Normal mouse");liveClass("#stApp",s.appState==="cad"?"ok":"");liveText("#footApp",s.appState==="cad"?s.app:(s.enabled?"Waiting for a CAD app":"Normal mouse everywhere"));
   if(s.lastBtn&&s.lastBtnAge<1500){const key=s.lastBtn+":"+s.lastBtnSeq;if(key!==lastBtnSeen){lastBtnSeen=key;liveText("#lastPressed",BTN[s.lastBtn]||s.lastBtn);if(page==="controls"&&focused){flashRow(s.lastBtn);selectRow(s.lastBtn,false)}}}
   if(s.lastAction)liveText("#lastDid",s.lastAction);
-  if(page==="home"&&focused)requestAnimationFrame(poll);else setTimeout(poll,document.hidden?1000:focused?70:250)}
+  setTimeout(poll,document.hidden?1000:!focused?250:(page==="home"||page==="controls"?ACTIVE_STATUS_POLL_MS:250))}
 
-// Status labels are updated only when their value changes. The hidden/background
-// settings view never competes with the CAD viewport for a 60 Hz animation loop.
+// Keep status polling below display refresh. Sensor processing runs on its own timer.
 /* ---------- live ball picture ---------- */
 // Shows every movement of the ball: an arrow for the direction, the shine rolls with it,
 // and the label says Moving, Orbiting, Panning or Zooming.

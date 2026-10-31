@@ -1,3 +1,4 @@
+- Cap active settings UI polling at 20 Hz instead of sending status requests every display frame; preserve the independent 16 ms trackball input loop.
 - Batch sensor movement into display-rate camera updates instead of sending one camera message for every input packet. Preserve fine movement and wheel zoom at low sensitivity.
 - Ctrl+Shift Pan + zoom now allows enabled ball-circle zoom while held. Shift orbit continues to rotate; the separate Zoom key remains optional and customizable.
 - Apply zoom sensitivity consistently to ball and wheel zoom, including simultaneous pan/zoom. Sensitivity now matches the speed displayed in the interface.
