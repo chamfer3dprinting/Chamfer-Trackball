@@ -176,7 +176,7 @@ internal sealed class MainForm:Form{
         async Task BrowserSend(JsonObject value)=>await browser.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(value.ToJsonString())),WebSocketMessageType.Text,true,browserTimeout.Token);
         async Task<JsonObject> BrowserRead(string type){
             var bytes=new byte[16384];
-            for(int tries=0;tries<12;tries++){int length=0;WebSocketReceiveResult received;
+            for(int tries=0;tries<128;tries++){int length=0;WebSocketReceiveResult received;
                 do{received=await browser.ReceiveAsync(new ArraySegment<byte>(bytes,length,bytes.Length-length),browserTimeout.Token);length+=received.Count;}while(!received.EndOfMessage);
                 var message=JsonNode.Parse(bytes.AsSpan(0,length))!.AsObject();if(ConfigStore.S(message,"t")==type)return message;
             }throw new Exception("Missing browser camera message: "+type);
