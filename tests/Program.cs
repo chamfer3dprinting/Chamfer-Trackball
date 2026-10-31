@@ -466,4 +466,9 @@ foreach(int rawStroke in new[]{80,300,1000,4000}){
  Check(Vector3.Distance(actualStroke.Eye,oldStroke.Eye)<.0001&&Vector3.Distance(actualStroke.Up,oldStroke.Up)<.0001,"Raw snap gestures retain the original directional response at "+rawStroke+" counts");
 }
 
+
+var reverseSnap=new FaceSnap();reverseSnap.Reset(studioView);bool straightReversal=true;
+for(int sample=0;sample<120;sample++){reverseSnap.Step(studioView,sample<40?5:sample<80?-5:0,sample>=80?5:0,0,.2f,1000+sample*16);straightReversal&=!reverseSnap.Turning&&reverseSnap.Orientation==0;}
+Check(straightReversal,"Reversing or cornering a straight face-switch stroke does not reserve a turn gesture");
+
 Console.WriteLine(count+" regression checks passed.");

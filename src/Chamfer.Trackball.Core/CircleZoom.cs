@@ -17,7 +17,7 @@ public sealed class CircleZoom(bool allowTurnArc=false) {
         get{
             if(Active)return true;
             int first=Math.Max(1,turns.Count-8);float signed=0,absolute=0;
-            for(int i=first;i<turns.Count;i++){signed+=turns[i];absolute+=MathF.Abs(turns[i]);}
+            for(int i=first;i<turns.Count;i++){if(MathF.Abs(turns[i])>SharpTurnLimit)return false;signed+=turns[i];absolute+=MathF.Abs(turns[i]);}
             return MathF.Abs(signed)>(allowTurnArc?.06f:.45f)&&MathF.Abs(signed)>absolute*.8f;
         }
     }
