@@ -138,3 +138,7 @@ assert.ok(controller.includes('["keys"]=KeysState()')&&controller.includes('Poin
 assert.ok(controller.includes('pointer.Move(x,y,PointerGain)')&&controller.includes('pointer.Tick('));
 assert.ok(inputDriver.includes('if(k is 91 or 92||Keys.Contains(91))usedDeferred.Add(k)'));
 console.log('Physical keyboard display lights held Windows/Alt and clears on release; speed reaches real pointer delivery.');
+
+const inputConstructor=inputDriver.slice(inputDriver.indexOf('    public InputDriver(){'),inputDriver.indexOf('    bool RouteKey('));
+assert.ok(!inputConstructor.includes('Win32.GetAsyncKeyState('),'startup must not treat aggregate/injected OS state as physical keyboard holds');
+console.log('Keyboard starts with observed physical edges, so an inherited Backtick cannot block every held control.');

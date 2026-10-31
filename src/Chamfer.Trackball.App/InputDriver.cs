@@ -227,7 +227,9 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     }
     public InputDriver(){
         CreateHandle(new CreateParams{Caption="Chamfer Trackball input",Parent=new nint(-3)});
-        foreach(var k in new[]{160,161,162,163,164,165,91,92,192})if(Win32.GetAsyncKeyState(k)<0)physical.Add(k);
+        // Start with no held keys. GetAsyncKeyState is an aggregate OS state,
+        // including injected/stale keys; it cannot establish a physical hold.
+        // The hook records real down/up edges after startup.
         mouseProc=OnMouse;keyProc=OnKey;
         try{hooks=new HookPump(mouseProc,keyProc);}
         catch{Dispose();throw;}
