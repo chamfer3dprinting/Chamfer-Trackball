@@ -6,12 +6,17 @@ namespace Chamfer.Trackball.Core;
 public sealed class FaceTurnGesture{
  static readonly float[] Sizes=[80,320,1280,5120];
  readonly CircleZoom[] bands=Sizes.Select(_=>new CircleZoom(true)).ToArray();
- int winner=-1,straightFrames;Vector2 straightAnchor;float straightTravel;
+ int winner=-1,straightFrames;Vector2 straightAnchor,previousDelta;float straightTravel;
  public bool Active=>winner>=0&&bands[winner].Active;
  public bool Curving=>Active||bands.Any(band=>band.Curving);
  public float DetectedSize=>winner<0?0:Sizes[winner];
- public void Reset(){foreach(var band in bands)band.Reset();winner=-1;straightFrames=0;straightTravel=0;straightAnchor=Vector2.Zero;}
+ public void Reset(){foreach(var band in bands)band.Reset();winner=-1;straightFrames=0;straightTravel=0;straightAnchor=previousDelta=Vector2.Zero;}
  public (bool Consumed,float Wheel) Add(float x,float y,long now){
+  var raw=new Vector2(x,y);
+  // Reject a real sharp corner before size-band resampling can round it.
+  // Tiny quantized vectors do not establish a reliable physical heading.
+  if(raw.LengthSquared()>=9&&previousDelta.LengthSquared()>=9&&Vector2.Dot(raw,previousDelta)<.1205f*MathF.Sqrt(raw.LengthSquared()*previousDelta.LengthSquared()))Reset();
+  if(raw.LengthSquared()>0)previousDelta=raw;
   Span<bool> consumed=stackalloc bool[4];Span<float> wheel=stackalloc float[4];
   for(int index=0;index<bands.Length;index++){var value=bands[index].Add(x,y,now,Sizes[index]);consumed[index]=value.Consumed;wheel[index]=value.Wheel;}
   if(winner>=0){

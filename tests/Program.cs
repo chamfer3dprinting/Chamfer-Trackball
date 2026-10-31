@@ -514,4 +514,13 @@ Check(stillFace.TurnCount==0&&stillFace.Samples==0&&Vector3.Distance(stillView.U
 var wheelFeedback=new FaceSnap();wheelFeedback.Reset(studioRight);wheelFeedback.Step(studioRight,0,0,120,.2f,1000);
 Check(wheelFeedback.TurnCount==1&&wheelFeedback.LastTurnDirection==-1&&wheelFeedback.LastTurnAt==1000,"The existing wheel turn has accurate counterclockwise feedback");
 
+foreach(int stroke in new[]{5,20,100,400}){
+ var cornerInput=new FaceSnap();cornerInput.Reset(studioRight);bool noCornerTurn=true;
+ for(int sample=0;sample<120;sample++){
+  cornerInput.Step(studioRight,sample<40?stroke:sample<80?-stroke:0,sample>=80?stroke:0,0,.2f,1000+sample*16);
+  noCornerTurn&=!cornerInput.Turning&&cornerInput.TurnCount==0;
+ }
+ Check(noCornerTurn,"Raw sharp corners and reversals remain face-switch strokes at "+stroke+" counts");
+}
+
 Console.WriteLine(count+" regression checks passed.");
