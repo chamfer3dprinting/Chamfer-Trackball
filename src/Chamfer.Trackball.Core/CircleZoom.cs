@@ -31,7 +31,7 @@ public sealed class CircleZoom(bool allowTurnArc=false) {
         }
         if(lastTime!=0&&(now<lastTime||now-lastTime>700))Reset();
         lastTime=now;
-        float diameter=Math.Clamp(maxDiameter,60,400);
+        float diameter=allowTurnArc?Math.Clamp(maxDiameter,60,8192):Math.Clamp(maxDiameter,60,400);
         if(delta.Length()>diameter){Reset();return (false,0);}
         if(Active){
             var heading=Vector2.Normalize(delta);
@@ -46,7 +46,7 @@ public sealed class CircleZoom(bool allowTurnArc=false) {
             for(int i=0;i<points.Count;i++)points[i]-=origin;
         }
         float wheel=0;bool consumed=Active;int remaining=128;
-        float step=Math.Clamp(diameter/60f,3,8);
+        float step=Math.Clamp(diameter/60f,3,allowTurnArc?128:8);
         while(Vector2.Distance(position,sampled)>=step){
             if(remaining--==0){Reset();return (false,0);}
             var direction=Vector2.Normalize(position-sampled);sampled+=direction*step;

@@ -471,4 +471,47 @@ var reverseSnap=new FaceSnap();reverseSnap.Reset(studioView);bool straightRevers
 for(int sample=0;sample<120;sample++){reverseSnap.Step(studioView,sample<40?5:sample<80?-5:0,sample>=80?5:0,0,.2f,1000+sample*16);straightReversal&=!reverseSnap.Turning&&reverseSnap.Orientation==0;}
 Check(straightReversal,"Reversing or cornering a straight face-switch stroke does not reserve a turn gesture");
 
+
+(CameraPose View,FaceSnap Input) QuantizedFaceTurn(CameraPose initial,int radius,int duration,int sign,float gain,int loops=1,float ellipse=1){
+ var input=new FaceSnap();input.Reset(initial);var view=initial;
+ int oldX=radius,oldY=0,frameX=0,frameY=0;
+ for(int ms=1;ms<=duration*loops;ms++){
+  double angle=sign*Math.Tau*ms/duration;
+  int x=(int)Math.Round(radius*Math.Cos(angle)),y=(int)Math.Round(radius*ellipse*Math.Sin(angle));
+  frameX+=x-oldX;frameY+=y-oldY;oldX=x;oldY=y;
+  if(ms%16==0||ms==duration*loops){view=input.Step(initial,frameX,frameY,0,gain,1000+ms);frameX=frameY=0;}
+ }
+ return (view,input);
+}
+foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ})
+foreach(int radius in new[]{8,18,24,60,180,600,1800}){
+ var initial=CameraMath.AlignFace(studioView,axis);bool validTurns=true;
+ foreach(int duration in new[]{400,1600})
+ foreach(int sign in new[]{1,-1})
+ foreach(float gain in new[]{.2f,5.66f}){
+  var (view,input)=QuantizedFaceTurn(initial,radius,duration,sign,gain);
+  var direction=Vector3.Normalize(view.Eye-view.Target);var right=Vector3.Normalize(Vector3.Cross(view.Up,direction));
+  validTurns&=view.Valid&&input.TurnCount==1&&input.LastTurnDirection==sign&&Vector3.Dot(direction,axis)>.999f&&sign*Vector3.Dot(initial.Up,right)>.99f;
+ }
+ Check(validTurns,"Quantized small/large turns preserve face and direction at radius "+radius+" on "+axis);
+}
+foreach(int radius in new[]{18,60,180,600,1800})
+foreach(int sign in new[]{1,-1}){
+ var (view,input)=QuantizedFaceTurn(studioRight,radius,900,sign,.2f,4);
+ Check(input.TurnCount==4&&Vector3.Distance(view.Up,studioRight.Up)<.0001,"Overlapping size bands produce exactly four quarter turns at radius "+radius+" direction "+sign);
+ for(int sample=1;sample<=20;sample++)view=input.Step(studioRight,5,0,0,.2f,4600+sample*16);
+ Check(!input.Turning,"A straight stroke exits a large/small turn without waiting for another circle at radius "+radius+" direction "+sign);
+}
+foreach(int radius in new[]{18,180,600}){
+ var (view,input)=QuantizedFaceTurn(studioRight,radius,1100,1,.2f,1,.65f);
+ Check(input.TurnCount==1&&Vector3.Dot(Vector3.Normalize(view.Eye-view.Target),Vector3.UnitX)>.999f,"Uneven elliptical roll turns the current face at radius "+radius);
+ input.Reset(view);input.Step(view,0,0,0,.2f,8000);
+ Check(input.Samples==0&&input.TurnCount==0&&input.LastTurnDirection==0,"Reholding starts turn feedback without stale samples at radius "+radius);
+}
+var stillFace=new FaceSnap();stillFace.Reset(studioRight);var stillView=studioRight;
+for(int frame=0;frame<100;frame++)stillView=stillFace.Step(studioRight,0,0,0,.2f,1000+frame*16);
+Check(stillFace.TurnCount==0&&stillFace.Samples==0&&Vector3.Distance(stillView.Up,studioRight.Up)<.0001,"No X/Y input cannot invent a physical twist or orientation change");
+var wheelFeedback=new FaceSnap();wheelFeedback.Reset(studioRight);wheelFeedback.Step(studioRight,0,0,120,.2f,1000);
+Check(wheelFeedback.TurnCount==1&&wheelFeedback.LastTurnDirection==-1&&wheelFeedback.LastTurnAt==1000,"The existing wheel turn has accurate counterclockwise feedback");
+
 Console.WriteLine(count+" regression checks passed.");

@@ -41,6 +41,21 @@ internal sealed class NativeServer:IDisposable {
             Queue(c,PoseMessage(c));return true;
         }
     }
+    public JsonObject SnapState(Client? c){
+        if(c==null)return new(){["state"]="unavailable",["message"]="Face turns need a native 3D connection."};
+        lock(c.Gate){
+            var snap=c.Snap;bool recent=snap.TurnCount>0&&Environment.TickCount64-snap.LastTurnAt<1400;
+            string state=c.Pose==null?"waiting":recent?"turned":snap.Turning?"curving":snap.Samples==0?"ready":"rolling";
+            string message=state switch{
+                "waiting"=>"Waiting for the 3D view…",
+                "turned"=>snap.LastTurnDirection>0?"Clockwise 90°":"Counterclockwise 90°",
+                "curving"=>"Curve detected — keep curling",
+                "ready"=>"Roll straight for faces; curl to turn",
+                _=>"Ball received — curl to turn"
+            };
+            return new(){["state"]=state,["message"]=message,["samples"]=snap.Samples,["turns"]=snap.TurnCount,["direction"]=snap.LastTurnDirection};
+        }
+    }
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
     static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
     public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";}}

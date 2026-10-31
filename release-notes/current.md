@@ -1,3 +1,11 @@
+## Face orientation recognition
+
+- Recognize curved face-turn rolls across small and larger sensor paths instead of rejecting anything wider than 80 raw counts.
+- Keep the selected cube face while the gesture develops; clockwise/counterclockwise motion turns its orientation by 90°. Continue circling for more turns, or roll straight to change cube faces.
+- Show live “Curve detected” and clockwise/counterclockwise turn feedback in Home, Buttons & keys and the floating guide.
+- Keep Alt + wheel as an alternative quarter turn. Preserve all saved programs, bindings, speeds, presets and native mouse controls.
+- This uses the shape of X/Y rolling. A pure in-place twist with no X/Y report still cannot be measured by the M512.
+
 # Chamfer Trackball Admin update
 
 - Make slow 3D movement substantially slower: 1% at the low end, 100% at the center, up to 400%, and 0 to stop the selected motion. The previous minimum was about 18%. Show active pointer/orbit/pan/zoom settings.
