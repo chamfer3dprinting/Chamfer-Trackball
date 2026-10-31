@@ -74,12 +74,16 @@ public static class CameraMath {
 
 public sealed class FaceSnap{
  CameraPose? virtualPose,lastAligned;Vector3 face;float wheelRemainder,turnRemainder;int quarterTurns;
- readonly CircleZoom ballTurn=new(true);bool turning;
+ readonly FaceTurnGesture ballTurn=new();readonly Queue<CameraPose> headingHistory=new(4);bool turning;long lastMotion;
+ public long Samples{get;private set;}
+ public int TurnCount{get;private set;}
+ public int LastTurnDirection{get;private set;}
+ public long LastTurnAt{get;private set;}
  public bool Turning=>ballTurn.Curving;
  public int Orientation=>quarterTurns;
  public void Reset(CameraPose? pose=null){
   virtualPose=lastAligned=pose;face=pose==null?Vector3.Zero:CameraMath.NearestFace(Vector3.Normalize(pose.Eye-pose.Target));
-  quarterTurns=0;wheelRemainder=turnRemainder=0;turning=false;ballTurn.Reset();
+  quarterTurns=0;wheelRemainder=turnRemainder=0;turning=false;ballTurn.Reset();headingHistory.Clear();lastMotion=0;Samples=0;TurnCount=LastTurnDirection=0;LastTurnAt=0;
   if(pose!=null&&Vector3.Dot(Vector3.Normalize(pose.Eye-pose.Target),face)>.999f){
    var canonical=CameraMath.AlignFace(pose,face).Up;
    var seen=Vector3.Normalize(pose.Up-face*Vector3.Dot(pose.Up,face));
@@ -89,18 +93,30 @@ public sealed class FaceSnap{
  }
  public CameraPose Step(CameraPose start,float x,float y,float wheel=0,float gain=1,long now=0){
   virtualPose??=start;if(face==Vector3.Zero)face=CameraMath.NearestFace(Vector3.Normalize(start.Eye-start.Target));
+  long time=now==0?Environment.TickCount64:now;
+  if(lastMotion!=0&&(time<lastMotion||time-lastMotion>100))headingHistory.Clear();
+  if(x!=0||y!=0)lastMotion=time;
+  var before=lastAligned??CameraMath.AlignFace(virtualPose,face,quarterTurns);
+  if(x!=0||y!=0)Samples++;
   bool wasActive=ballTurn.Active;
-  var dial=ballTurn.Add(x,y,now==0?Environment.TickCount64:now,80);
+  var dial=ballTurn.Add(x,y,time);
   bool candidate=ballTurn.Curving;
   if(candidate){
    // Freeze the current face while the ball curls, rather than navigating
    // through other faces before a deliberate dial gesture is recognized.
-   if(!turning){virtualPose=lastAligned??CameraMath.AlignFace(virtualPose,face,quarterTurns);turning=true;}
+   if(!turning){
+    // The first vector cannot reveal curvature. Keep the preceding aligned
+    // face so a fast first segment cannot become the turn's new face.
+    virtualPose=headingHistory.TryPeek(out var preceding)?preceding:before;headingHistory.Clear();face=CameraMath.NearestFace(Vector3.Normalize(virtualPose.Eye-virtualPose.Target));
+    var canonical=CameraMath.AlignFace(virtualPose,face).Up;
+    float angle=MathF.Atan2(Vector3.Dot(face,Vector3.Cross(canonical,virtualPose.Up)),Vector3.Dot(canonical,virtualPose.Up));
+    quarterTurns=(int)MathF.Round(-angle/(MathF.PI/2));turning=true;
+   }
    if(dial.Consumed){
-    if(!wasActive){quarterTurns-=Math.Sign(dial.Wheel);turnRemainder=0;}
+    if(!wasActive){int turn=Math.Sign(dial.Wheel);quarterTurns-=turn;turnRemainder=0;ReportTurn(turn,time);}
     else{
      turnRemainder+=dial.Wheel;int turns=(int)(turnRemainder/480);
-     quarterTurns-=turns;turnRemainder-=turns*480;
+     quarterTurns-=turns;turnRemainder-=turns*480;if(turns!=0)ReportTurn(turns,time);
     }
    }
   }else{
@@ -112,7 +128,10 @@ public sealed class FaceSnap{
   wheelRemainder+=wheel;int wheelTurns=(int)(wheelRemainder/120);wheelRemainder-=wheelTurns*120;
   quarterTurns=(quarterTurns+wheelTurns)%4;
   lastAligned=CameraMath.AlignFace(virtualPose,face,quarterTurns);
-  if(wheelTurns!=0)virtualPose=lastAligned;
+  if(wheelTurns!=0){virtualPose=lastAligned;headingHistory.Clear();ballTurn.Reset();turning=false;turnRemainder=0;ReportTurn(-wheelTurns,time);}
+  else if((x!=0||y!=0)&&!candidate){headingHistory.Enqueue(before);while(headingHistory.Count>4)headingHistory.Dequeue();}
   return lastAligned;
  }
+ void ReportTurn(int turns,long now){if(turns==0)return;TurnCount+=Math.Abs(turns);LastTurnDirection=Math.Sign(turns);LastTurnAt=now;}
+
 }

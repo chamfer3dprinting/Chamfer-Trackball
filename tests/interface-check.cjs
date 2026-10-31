@@ -174,3 +174,18 @@ assert.ok(controller.includes('MotionPolicy.Scale(output,x,y,w,OrbitGain,PanGain
 assert.ok(controller.includes('MotionPolicy.SnapGain(')&&controller.includes('server.Move(native,output,x,y,w,input.Keys.Contains(18),nativeGain)'));
 assert.ok(html.includes('id="activeSpeeds"'));
 console.log('3D slider labels span 0 to 400 percent and use the same widened curve as actual motion; snap gestures keep raw movement.');
+
+const faceFeedbackStart=html.indexOf('function updateFaceTurn('),faceFeedbackEnd=html.indexOf('/* cheat sheet on Home */',faceFeedbackStart);
+assert.ok(faceFeedbackStart>0&&faceFeedbackEnd>faceFeedbackStart);
+const faceMessages={},faceContext={cfg:{snapKeys:'alt'},holdLabel:key=>key,liveText:(selector,text)=>faceMessages[selector]=text};
+vm.runInNewContext(html.slice(faceFeedbackStart,faceFeedbackEnd),faceContext);
+for(const message of ['Curve detected — keep curling','Clockwise 90°','Counterclockwise 90°','Face turns need a native 3D connection.']){
+ faceContext.updateFaceTurn({snapTurn:{message}});
+ assert.equal(faceMessages['#homeFaceTurn'],'Face orientation: '+message);
+ assert.equal(faceMessages['#controlFaceTurn'],faceMessages['#homeFaceTurn']);
+}
+faceContext.cfg.snapKeys='shift+q';faceContext.updateFaceTurn({});
+assert.ok(faceMessages['#homeFaceTurn'].includes('shift+q'));
+faceContext.cfg.snapKeys='none';faceContext.updateFaceTurn({});
+assert.ok(faceMessages['#homeFaceTurn'].includes('Assign Snap keys'));
+console.log('Face orientation feedback shows the live curve/turn state and the actual saved shortcut.');

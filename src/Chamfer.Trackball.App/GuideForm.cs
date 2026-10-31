@@ -59,7 +59,7 @@ internal sealed class GuideForm:Form{
    g.DrawString(label,tiny,held?accent:muted,new RectangleF(13,y,156,18));
    g.DrawString(ConfigStore.S(item,"label"),tiny,held?accent:text,180,y);
   }
-  g.DrawString("Physical keyboard · held keys light up",tiny,muted,13,392);
+  g.DrawString(mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll straight for faces; curl to turn"):"Physical keyboard · held keys light up",tiny,mode=="Snap"?accent:muted,new RectangleF(13,392,304,18));
 
  }
  protected override void OnMouseDown(MouseEventArgs e){

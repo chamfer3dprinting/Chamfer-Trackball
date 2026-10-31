@@ -46,7 +46,7 @@ The Normal mouse program preserves the manufacturer's clicks and wheel axes. The
 | Shift | Orbit |
 | Ctrl + Shift | Pan; the wheel zooms |
 | Ctrl | Zoom in/out by rolling up/down |
-| Alt | Straight rolls change faces; a small clockwise/counterclockwise ball loop turns the face by 90° |
+| Alt | Straight rolls change faces; a clockwise/counterclockwise curved roll turns the face by 90° |
 | Alt + wheel | Turn the aligned face by 90 degrees |
 | Windows | Move through the scene |
 | Windows + Alt | Move vertically through the scene |
@@ -55,7 +55,7 @@ Windows release does not open Start when reserved by the active program in a 3D 
 
 Pointer speed/effective DPI now changes the identified trackball's delivered pointer counts. Hardware DPI selection only calibrates the estimate. Pointer speed, Orbit/Pan/Zoom speed, soft stop and glide are saved per program and retained by Add, Duplicate, switching and restart. Pointer gain does not multiply camera speed. Smooth 3D speed has a 1% low end, 100% at the center and a zero stop value. Normal mouse pointer DPI and glide are independent program settings. Soft stop applies to pointing and navigation; clicks and mode changes stop the tail. A live keyboard on Home and in the guide highlights currently held shortcut keys without recording typed text.
 
-Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep their coordinate convention. While snapping, a small clockwise/counterclockwise X/Y loop turns the selected face like the cube arrows; roll straight again to change faces. The standard M512 sensor still supplies only X/Y ball movement. A pure in-place twist with no X/Y report cannot be sensed; the face turn is a gesture inferred from a curved roll path.
+Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep their coordinate convention. While snapping, a clockwise/counterclockwise X/Y loop turns the selected face like the cube arrows; roll straight again to change faces. Recognition adapts to the size of the roll. The floating guide and Home show “Curve detected” then “Clockwise 90°” or “Counterclockwise 90°” when a turn is recognized. The standard M512 sensor still supplies only X/Y ball movement. A pure in-place twist with no X/Y report cannot be sensed; the face turn is a gesture inferred from a curved roll path.
 
 
 ### Saved presets

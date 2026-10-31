@@ -293,6 +293,7 @@ details .ver{margin-top:10px;font-weight:600}
         <div class="card">
           <div class="row" style="margin-bottom:10px"><h2 style="margin:0">Your controls</h2><span class="spacer"></span><button class="btn sm" data-go="controls">Change</button></div>
           <div class="cheat" id="cheat"></div>
+          <p class="mu" id="homeFaceTurn" style="margin:10px 0 0"></p>
         </div>
       </div>
       <div class="card" style="margin-top:16px">
@@ -397,6 +398,7 @@ details .ver{margin-top:10px;font-weight:600}
       <div class="card" style="margin-top:16px">
         <h2>Hold keys + roll</h2>
         <div class="binds" id="keyBinds"></div>
+        <p class="mu" id="controlFaceTurn" style="margin:10px 0 0"></p>
       </div>
       <div class="card" style="margin-top:16px">
         <h2>Circle zoom</h2>
@@ -687,7 +689,7 @@ function renderBinds(){
     const warn=bs.length<2?'<div class="desc wn">Pick at least two buttons.</div>':"";
     out.push(`<div class="bind" data-row="combo-${ci}"><div class="nm"><b>${bs.length?bs.map(n=>"btn"+n).join(" + "):"New combination"}</b><small>Combination ${ci+1}</small></div><div class="opts"><div class="line">${boxes}</div><div class="line"><select data-cact="${ci}">${opts(CACT,bd.action)}</select><button class="btn sm" data-cdel="${ci}">Remove</button></div>${warn}${extra}</div></div>`)});
   $("#binds").innerHTML=out.join("");
-  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll straight up, down, left or right to change the cube face. Curl the ball path into a small clockwise or counterclockwise loop to turn that face 90° in the same direction, like the cube’s rotate arrow. Roll straight again to change faces. The wheel also turns the face. Requires a native integration; the gesture uses X/Y movement, not a separately sensed physical twist."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Windows release will not open Start in this program’s 3D view. Requires a native integration."]].map(([k,n,d])=>
+  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll straight up, down, left or right to change the cube face. Curl the ball path into a clockwise or counterclockwise loop to turn that face 90° in the same direction, like the cube’s rotate arrow. Roll straight again to change faces. Watch the floating guide for “Curve detected” then “Clockwise 90°” or “Counterclockwise 90°”. The wheel also turns the face. Requires a native integration; the gesture uses X/Y movement, not a separately sensed physical twist."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Windows release will not open Start in this program’s 3D view. Requires a native integration."]].map(([k,n,d])=>
     `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):`<span class="mu">${k==="zoomKeys"&&cfg.panKeys&&cfg.panKeys!=="none"?"Included in Pan + zoom":"Off"}</span>` }<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key, except Windows, which stays reserved for navigation.</div></div></div>`).join("");
   $$("[data-k]").forEach(i=>{const k=i.dataset.k;if(i.type==="checkbox")i.checked=!!cfg[k];else i.value=cfg[k]});
   $$("[data-v]").forEach(v=>v.textContent=valLabel(v.dataset.v,cfg[v.dataset.v]));
@@ -824,6 +826,12 @@ function updateKeyboard(s){
  const keys=new Set(s.keys||[]);
  $$("#liveKeyboard [data-vk]").forEach(el=>{const down=keys.has(+el.dataset.vk);if(el.classList.contains("down")!==down)el.classList.toggle("down",down)});
  liveText("#keyboardMode",s.appState==="cad"?"3D controls: "+(MODEN[s.mode]||s.mode):"Normal keyboard — 3D shortcuts activate in a supported 3D view.");
+}
+
+function updateFaceTurn(s){
+ const hint=cfg.snapKeys==="none"?"Assign Snap keys to change faces and turn their orientation.":"Hold "+holdLabel(cfg.snapKeys)+" and draw a curved roll to turn the face; roll straight to change faces.";
+ const message="Face orientation: "+(s.snapTurn?.message||hint);
+ liveText("#homeFaceTurn",message);liveText("#controlFaceTurn",message);
 }
 
 /* cheat sheet on Home */
@@ -1000,6 +1008,7 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
   const focused=!document.hidden&&document.hasFocus();
   if(page==="home"&&!document.hidden)updateKeyboard(s);
+  if((page==="home"||page==="controls")&&!document.hidden)updateFaceTurn(s);
   if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1));
   if(changed&&page==="home"&&focused)drawPad();
   const live=s.mode!=="Idle";liveText("#padMode",live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
