@@ -5,10 +5,11 @@ namespace Chamfer.Trackball.Core;
 // it does not measure a third physical rotation axis.
 public sealed class CircleZoom {
     readonly List<Vector2> points=[];
+    readonly List<float> turns=[];
     Vector2 position,sampled,previous,straightAnchor;float straightTravel;
     long lastTime;bool hasHeading;
     public bool Active {get;private set;}
-    public void Reset(){points.Clear();position=sampled=previous=Vector2.Zero;lastTime=0;straightTravel=0;straightAnchor=Vector2.Zero;hasHeading=Active=false;}
+    public void Reset(){points.Clear();turns.Clear();position=sampled=previous=Vector2.Zero;lastTime=0;straightTravel=0;straightAnchor=Vector2.Zero;hasHeading=Active=false;}
     public (bool Consumed,float Wheel) Add(float dx,float dy,long now,float maxDiameter=160){
         if(!float.IsFinite(dx)||!float.IsFinite(dy)||!float.IsFinite(maxDiameter)){Reset();return (false,0);}
         if(lastTime!=0&&(now<lastTime||now-lastTime>300))Reset();
@@ -28,7 +29,7 @@ public sealed class CircleZoom {
             var direction=Vector2.Normalize(position-sampled);sampled+=direction*step;
             float turn=hasHeading?MathF.Atan2(previous.X*direction.Y-previous.Y*direction.X,Vector2.Dot(previous,direction)):0;
             previous=direction;hasHeading=true;
-            points.Add(sampled);if(points.Count>96)points.RemoveAt(0);
+            points.Add(sampled);turns.Add(turn);if(points.Count>96){points.RemoveAt(0);turns.RemoveAt(0);}
             if(Active){
                 // A sharp kink, reversal or sustained straight roll returns control
                 // immediately; no queued orbit motion is replayed after zoom.
@@ -51,22 +52,36 @@ public sealed class CircleZoom {
         return true;
     }
     bool IsCircle(float maxDiameter){
-        // Inspect recent suffixes so a straight approach to a circle cannot prevent
-        // recognition. Require roughly four fifths of a turn, consistent winding,
-        // a small bounding box and an almost closed, two-dimensional path.
-        for(int start=Math.Max(0,points.Count-96);start<=points.Count-12;start++){
-            var first=points[start];Vector2 lo=first,hi=first,prior=Vector2.Zero;
-            float length=0,turn=0,absoluteTurn=0;bool heading=false,sharp=false;
-            for(int i=start+1;i<points.Count;i++){
-                var segment=points[i]-points[i-1];float size=segment.Length();if(size<.01f)continue;
-                var direction=segment/size;length+=size;lo=Vector2.Min(lo,points[i]);hi=Vector2.Max(hi,points[i]);
-                if(heading){float a=MathF.Atan2(prior.X*direction.Y-prior.Y*direction.X,Vector2.Dot(prior,direction));turn+=a;absoluteTurn+=MathF.Abs(a);if(MathF.Abs(a)>1.05f)sharp=true;}
-                prior=direction;heading=true;
-            }
+        // Cache each segment's turning angle once in Add(). Check every suffix
+        // with prefix sums instead of recalculating atan2 in a nested scan.
+        int count=points.Count;if(count<12)return false;
+        int end=count-1;
+        Span<float> lengthPrefix=stackalloc float[count];
+        Span<float> turnPrefix=stackalloc float[count];
+        Span<float> absoluteTurnPrefix=stackalloc float[count];
+        Span<int> sharpTurnPrefix=stackalloc int[count];
+        lengthPrefix[0]=turnPrefix[0]=absoluteTurnPrefix[0]=0;
+        sharpTurnPrefix[0]=0;
+        for(int i=1;i<count;i++){
+            float a=turns[i];
+            lengthPrefix[i]=lengthPrefix[i-1]+Vector2.Distance(points[i],points[i-1]);
+            turnPrefix[i]=turnPrefix[i-1]+a;
+            absoluteTurnPrefix[i]=absoluteTurnPrefix[i-1]+MathF.Abs(a);
+            sharpTurnPrefix[i]=sharpTurnPrefix[i-1]+(MathF.Abs(a)>1.05f?1:0);
+        }
+        Vector2 lo=points[end],hi=points[end];
+        for(int start=end;start>=0;start--){
+            lo=Vector2.Min(lo,points[start]);hi=Vector2.Max(hi,points[start]);
+            if(start>count-12)continue;
+            float length=lengthPrefix[end]-lengthPrefix[start];
+            float turn=turnPrefix[end]-turnPrefix[start+1];
+            float absoluteTurn=absoluteTurnPrefix[end]-absoluteTurnPrefix[start+1];
+            bool sharp=sharpTurnPrefix[end]!=sharpTurnPrefix[start+1];
             var extent=hi-lo;float widest=Math.Max(extent.X,extent.Y),narrowest=Math.Min(extent.X,extent.Y);
+            var first=points[start];
             if(!sharp&&length>=60&&MathF.Abs(turn)>=5.0f&&MathF.Abs(turn)/Math.Max(absoluteTurn,.001f)>=.90f
                 &&widest<=maxDiameter&&narrowest>=12&&narrowest/widest>=.5f
-                &&Vector2.Distance(first,points[^1])/length<=.23f)return true;
+                &&Vector2.Distance(first,points[end])/length<=.23f)return true;
         }
         return false;
     }
