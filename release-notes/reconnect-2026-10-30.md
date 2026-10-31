@@ -37,3 +37,17 @@ Verified delivery:
   after restart. Physical button/wheel testing was requested and remains pending.
 
 Evidence: https://github.com/chamfer3dprinting/Chamfer-Trackball/actions/runs/41146239617
+
+Manufacturer-default correction:
+- The owner subsequently reported that buttons/wheels were still wrong and supplied
+  the manufacturer's diagram: btn1 Middle, btn2 Back, btn3 Left, btn4 Right.
+- The desktop capture confirmed that an optional software swap was converting native
+  right-button packets into injected left-button packets. It did not establish which
+  physical button produced those packets, and contained no wheel test; do not treat it
+  as a physical btn3 or wheel calibration.
+- Disabled both optional swaps to restore native clicks and wheel axes. This matches
+  the existing GitHub factory defaults; no executable change was needed.
+- Verified the saved flags are false and that all other settings matched exactly,
+  including the owner's existing combination and active Normal mouse program.
+- Physical confirmation of the restored defaults remains pending. Do not automatically
+  re-enable correction flags in a later update.

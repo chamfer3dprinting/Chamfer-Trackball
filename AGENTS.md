@@ -21,3 +21,12 @@ Before editing, read the current main branch. Preserve other agents' changes and
 do not force-push. Add a dated note with changes, validation, limitations and next work.
 Keep credentials and local user settings out of source. Use the GitHub connector for
 repository updates; keep all source changes reviewable.
+
+Manufacturer defaults confirmed by the owner's M512 diagram:
+btn1 = Middle, btn2 = Back, btn3 = Left click, btn4 = Right click.
+Preserve native wheel axes. The optional trackballSwapButtons and
+trackballSwapWheels corrections default to false. Do not enable them based on
+button numbers or the UI's descriptive labels; enable a correction only when
+a physical test establishes that it is needed. Retain the owner's confirmed
+choice across updates and preserve custom programs/combinations when restoring
+native mouse inputs.
