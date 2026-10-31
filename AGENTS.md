@@ -7,7 +7,8 @@ on the owner's PC. Deliver only the executable as the user-facing download.
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
 mouse button swapping to implement app bindings. The owner's latest requested controls
 are Shift orbit, Ctrl+Shift pan, Ctrl plus ball for zoom, Alt plus ball for six-face
-snapping, and backtick navigation with Alt for height. Ctrl alone is permitted for
+snapping, and Windows navigation with Alt for height. Reserve the Windows tap in the 3D
+context so releasing it never opens Start; keep system shortcuts and non-3D Windows input normal. Ctrl alone is permitted for
 Zoom in 3D apps; other Ctrl keyboard shortcuts must remain normal. The 3D program
 points normally until a held navigation command is used.
 
@@ -96,3 +97,13 @@ The owner explicitly replaces the temporary Z zoom binding with Ctrl and confirm
 Set factory 3D ball behavior to pointer and Zoom to Ctrl. Migrate the old 3D default from automatic orbit to pointer while keeping existing custom chords; configure this owner's active program to Ctrl Zoom and Alt Snap. Retain the optional explicit Ball navigation preset and native button/wheel mappings. Permit Ctrl alone only for Zoom in the resolver, validator and shortcut recorder; exact modifiers keep Ctrl+Shift Pan separate and typing shortcuts normal.
 
 Restrict native snap candidates to the six signed world axes, preserving camera radius and cursor pivot. Update interface and control documentation. Focused actual C# camera checks pass for all six faces, diagonal starting poses, perspective/orthographic views and the existing off-center pivot behavior. PR workflow 41244064016 and main workflow 41244421172 passed 175 core regressions, syntax checks, both executable builds and both actual WebView interface checks. Admin v1.5.20 was downloaded with GitHub SHA-256 cdbdc5c5ab7671a745e77de7545f5191b639bb4ca58afba61feb45eddaec0321 and installed into the existing Downloads executable used by the desktop shortcut. The owner's active 3D program was set to pointer, Ctrl Zoom and Alt Snap, preserving Shift Orbit, Ctrl+Shift Pan, device identity and native click/wheel corrections off. After restart, Home reports v1.5.20 Admin, Trackball identified, Mouse with no held key, and the requested held bindings. Physical camera behavior in Studio was not retested in this turn; the six-face camera behavior is covered by the passing focused and full regression checks.
+
+# 2026-10-31 — Apply program motion settings and show physical keyboard holds
+
+The owner confirms the current native click/wheel layout and held controls as the defaults. Replace the old 3D backtick navigation default with Windows + ball, including Alt height. Consume an unused or used Windows hold in the 3D context so release cannot open Start, normalize both Windows keys, and retain Windows+D and ordinary Windows input elsewhere. Keep custom chords and the selected trackball across migration to schema 25.
+
+Connect the per-program pointer speed / effective DPI slider to selected-device Raw Input, with immediate fractional movement delivery and a separate soft-stop tail. Apply saved glide to pointer and 3D movement, stop it at clicks/mode/focus/configuration changes, preserve the hook heartbeat fail-open, and bypass software routing at neutral speed with glide off. Hardware DPI selection calibrates an estimate rather than changing the physical sensor. Keep Orbit/Pan/Zoom gains independent of pointer gain. Added, copied, deleted and reset programs transfer the complete fields and motion feel instead of partial button/key subsets.
+
+Studio's native view cube is Y-up. Use that host convention (and optional scene worldUp metadata), retain Z-up for other existing adapters, and track a continuous virtual orbit with face-selection hysteresis for six-face snap. Continued rolling can pass from Top through an adjacent face to Bottom. Snap does not coast. While snapping, the wheel makes quarter turns of the aligned face. This is software wheel input, not a claim of physical twist sensing. Add a live Home keyboard and held shortcut indicators to the floating guide; key states are transient and are not logged as text.
+
+Validation pending the PR and main Windows workflows. New regressions cover actual pointer count scaling/subpixels/tails, per-program persistence, Windows suppression and system-shortcut routing without emitting test Windows keystrokes, Y-up faces/opposite-face rolling/quarter turns/pivot invariance, complete program UI copies and keyboard highlighting. Physical M512 feel remains for owner confirmation after installation.

@@ -48,6 +48,11 @@ public sealed class ConfigStore {
             }
             LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=24;
         }
+        if(oldVersion<25){
+            var navigation=nodeProgram(config,"3D");
+            if(navigation!=null&&S(navigation,"navigateKeys")=="backtick")navigation["navigateKeys"]="win";
+            LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=25;
+        }
         Validate(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
@@ -96,7 +101,7 @@ public sealed class ConfigStore {
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
             foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=24;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=25;
     }
     public static void Validate(JsonObject c){
         foreach(var node in c["programs"]!.AsArray()){

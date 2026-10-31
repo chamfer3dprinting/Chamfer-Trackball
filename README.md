@@ -36,6 +36,27 @@ The M512's standard mouse report supplies X/Y and separate wheels. It cannot ind
 
 Blender and Fusion adapters are embedded and can be installed from CAD apps inside the executable, then enabled in the host. They exchange scene camera/pivot data, ray-pick a cursor pivot when available and support aligned snapping and navigation. Other applications use editable orbit/pan/zoom emulation profiles. True scene pivot and navigation require a native adapter for that application. Live CAD hosts have not been verified in this environment.
 
+
+## Current controls and motion settings
+
+The Normal mouse program preserves the manufacturer's clicks and wheel axes. The confirmed btn3 + btn4 rotation toggle is retained as a program default and only acts in a 3D context. The 3D modelling program also points normally until a command is held:
+
+| Hold with the ball | Action |
+| --- | --- |
+| Shift | Orbit |
+| Ctrl + Shift | Pan; the wheel zooms |
+| Ctrl | Zoom in/out by rolling up/down |
+| Alt | Six-face snap; continued rolling reaches the opposite face |
+| Alt + wheel | Turn the aligned face by 90 degrees |
+| Windows | Move through the scene |
+| Windows + Alt | Move vertically through the scene |
+
+Windows release does not open Start when reserved by the active program in a 3D view. Other system shortcuts and Windows input outside that context remain normal. All held controls are editable. Snap and Navigate require a native integration.
+
+Pointer speed/effective DPI now changes the identified trackball's delivered pointer counts. Hardware DPI selection only calibrates the estimate. Pointer speed, Orbit/Pan/Zoom speed, soft stop and glide are saved per program and retained by Add, Duplicate, switching and restart. Pointer gain does not multiply camera speed. Soft stop applies to pointing and navigation; clicks and mode changes stop the tail. A live keyboard on Home and in the guide highlights currently held shortcut keys without recording typed text.
+
+Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep their coordinate convention. The standard M512 sensor still supplies only X/Y ball movement; use a wheel for the additional roll.
+
 ## Build and verification
 
 The Windows workflow runs core regressions, JavaScript/Python syntax checks, builds Admin and public editions, then starts each real WebView2 interface and tests its bridge, logo and saved combination. It captures the settings interface and floating guide. Only successful current-main builds upload an Admin prerelease and an unpublished public candidate.

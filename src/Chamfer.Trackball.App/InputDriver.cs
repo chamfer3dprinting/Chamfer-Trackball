@@ -16,7 +16,8 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     readonly Dictionary<nint,string> deviceNames=[];
     readonly HashSet<int> deferred=[];
     readonly HashSet<int> usedDeferred=[];
-    public event Action<int,int,string>? Motion;
+    public event Action<int,int,string,bool>? Motion;
+    public event Action? OtherPointerMotion;
     public event Func<int,int,bool>? MouseEvent;
     public event Action? KeysChanged;
     public event Action? RoutingReset;
@@ -162,6 +163,21 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
             RouteKey(81,true);RouteKey(87,true);RouteKey(81,false);RouteKey(87,false);
             if(!keyReplays.ToArray().SequenceEqual(new[]{(81,true),(87,true),(81,false),(87,false)}))
                 throw new InvalidOperationException("Deferred typing lost key order or a matching release.");
+            while(keyReplays.TryDequeue(out _)){ }
+            IsNavigationChord=keys=>keys.Contains(91)&&keys.All(key=>key is 91 or 18);
+            foreach(int win in new[]{91,92}){
+                if(!RouteKey(win,true)||!Keys.Contains(91)||!RouteKey(win,false)||!keyReplays.IsEmpty)
+                    throw new InvalidOperationException("Windows navigation opened Start or lost right-Windows normalization.");
+            }
+            RouteKey(91,true);RouteKey(68,true);RouteKey(91,false);RouteKey(68,false);
+            if(!keyReplays.ToArray().SequenceEqual(new[]{(91,true),(68,true),(91,false),(68,false)}))
+                throw new InvalidOperationException("Windows+D did not retain its ordered system shortcut.");
+            while(keyReplays.TryDequeue(out _)){ }
+            IsCad=()=>false;
+            if(RouteKey(91,true)||RouteKey(91,false)||!keyReplays.IsEmpty)
+                throw new InvalidOperationException("Windows was intercepted outside the 3D context.");
+            IsCad=()=>true;Enabled=()=>false;
+            if(RouteKey(92,true)||RouteKey(92,false))throw new InvalidOperationException("Disabled controls intercepted Windows.");
             if(directCalls!=0)throw new InvalidOperationException("Keyboard routing called the controller inside the hook.");
         }finally{
             KeysChanged-=Changed;SelectedDevice=selected;Enabled=enabled;IsCad=cad;IsNavigationChord=chord;
@@ -199,16 +215,17 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     }
     public IReadOnlySet<int> Keys {
         get{lock(keysGate){
-            var result=new HashSet<int>(physical.Where(x=>x is not (160 or 161 or 162 or 163 or 164 or 165)));
+            var result=new HashSet<int>(physical.Where(x=>x is not (160 or 161 or 162 or 163 or 164 or 165 or 91 or 92)));
             if(physical.Any(x=>x is 16 or 160 or 161))result.Add(16);
             if(physical.Any(x=>x is 17 or 162 or 163))result.Add(17);
             if(physical.Any(x=>x is 18 or 164 or 165))result.Add(18);
+            if(physical.Any(x=>x is 91 or 92))result.Add(91);
             return result;
         }}
     }
     public InputDriver(){
         CreateHandle(new CreateParams{Caption="Chamfer Trackball input",Parent=new nint(-3)});
-        foreach(var k in new[]{160,161,162,163,164,165,192})if(Win32.GetAsyncKeyState(k)<0)physical.Add(k);
+        foreach(var k in new[]{160,161,162,163,164,165,91,92,192})if(Win32.GetAsyncKeyState(k)<0)physical.Add(k);
         mouseProc=OnMouse;keyProc=OnKey;
         try{hooks=new HookPump(mouseProc,keyProc);}
         catch{Dispose();throw;}
@@ -222,7 +239,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                 ReplayKey(k,down);if(!down)delayedKeys.Remove(k);return true;
             }
             bool trigger=k is not (16 or 17 or 160 or 161 or 162 or 163)&&HookHealthy&&IsNavigationChord(Keys);
-            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);NotifyKeys();return true;}
+            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);if(k is 91 or 92)usedDeferred.Add(k);NotifyKeys();return true;}
             if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)&&deferred.Count>0){
                 foreach(var old in deferred.ToArray()){
                     ReplayKey(old,true);delayedKeys.Add(old);deferred.Remove(old);usedDeferred.Remove(old);
@@ -306,12 +323,15 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                             bool target=device.Length>0&&device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
                             if(target){LastDevice=device;connected=true;if(recoverOnInput){failed=false;recoverOnInput=false;}if(!failed&&!learning)DeviceStatus="Trackball connected";}
                             if(dx!=0||dy!=0)lock(routingGate)motionHealth.Raw();
-                            bool capture=Ready&&Enabled()&&IsCapture();
+                            bool capture=Ready&&Enabled()&&HookHealthy&&IsCapture();
                             if((flags&1)==0&&(dx!=0||dy!=0)){
                                 if(target&&Enabled()&&!failed&&Volatile.Read(ref stalled)==0){
                                     if(IsCad())lock(keysGate)foreach(var k in deferred)usedDeferred.Add(k);
-                                    Motion?.Invoke(dx,dy,device);
-                                }else if(motionBlocked||capture)Win32.Mouse(1,dx,dy);
+                                    Motion?.Invoke(dx,dy,device,motionBlocked||capture);
+                                }else{
+                                    OtherPointerMotion?.Invoke();
+                                    if(motionBlocked||capture)Win32.Mouse(1,dx,dy);
+                                }
                                 motionBlocked=false;
                             }else if((flags&1)!=0&&(motionBlocked||capture)){
                                 // Absolute mice/tablets must also keep pointing during

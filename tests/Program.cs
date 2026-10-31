@@ -12,8 +12,8 @@ Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&Mode
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom,"Ctrl+Shift wins over Shift");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap,"Alt snaps");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Backtick navigates");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{192,18})==NavMode.Navigate,"Alt modifies navigation height");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{91})==NavMode.Navigate,"Windows navigates");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{91,18})==NavMode.Navigate,"Alt modifies navigation height");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{18,70})==NavMode.Idle,"Alt shortcuts remain normal");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,65})==NavMode.Idle,"Shift typing remains normal");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>())==NavMode.Idle,"Release exits mode");
@@ -90,6 +90,16 @@ try{
  store.Save(preferences);store.Select(0);store.Select(1);
  Check(ConfigStore.I(store.Snapshot(),"orbitSens")==73,"Navigation speed survives program switches");
  Check(ConfigStore.S(store.Snapshot()["programs"]![1]!["gestures"]!["up"],"keys")=="F","Gesture edits survive saving");
+
+ var programFeel=store.Snapshot();programFeel["pointerSpeed"]=16;programFeel["glide"]=77;programFeel["smooth"]=false;programFeel["panSens"]=68;programFeel["zoomSens"]=28;
+ programFeel["snapKeys"]="Alt+S";programFeel["navigateKeys"]="win";store.Save(programFeel);
+ store.Select(0);var normalFeel=store.Snapshot();normalFeel["pointerSpeed"]=7;normalFeel["glide"]=9;store.Save(normalFeel);store.Select(1);
+ var restoredFeel=new ConfigStore(path).Snapshot();
+ Check(ConfigStore.I(restoredFeel,"pointerSpeed")==16&&ConfigStore.I(restoredFeel,"glide")==77&&!ConfigStore.B(restoredFeel,"smooth"),"Pointer speed and glide switch together and survive restart");
+ Check(ConfigStore.I(restoredFeel,"panSens")==68&&ConfigStore.I(restoredFeel,"zoomSens")==28&&ConfigStore.S(restoredFeel,"snapKeys")=="Alt+S"&&ConfigStore.S(restoredFeel,"navigateKeys")=="win","Each program retains independent 3D speeds and all held controls");
+ store.Select(0);Check(ConfigStore.I(store.Snapshot(),"pointerSpeed")==7&&ConfigStore.I(store.Snapshot(),"glide")==9,"Normal mouse retains its own pointer and glide choices");
+ store.Select(1);
+
  var dialSettings=store.Snapshot();dialSettings["circleZoom"]=true;dialSettings["circleSize"]=210;
  dialSettings["orbitKeys"]="Alt+Q";dialSettings["panKeys"]="Ctrl+Space";dialSettings["zoomKeys"]="Shift+Z";
  store.Save(dialSettings);store.Select(0);
@@ -110,7 +120,7 @@ try{
  Check(reset["programs"]![0]!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")&&reset["programs"]![1]!["buttons"]!.AsObject().Where(b=>b.Key!="back").All(b=>ConfigStore.S(b.Value,"action")=="normal")&&ConfigStore.S(reset["programs"]![1]!["buttons"]!["back"],"action")=="panToggle","Reset restores normal mouse clicks and the 3D Back toggle");
  var bad=store.Snapshot();bad["orbitKeys"]="ctrl";bool rejected=false;try{store.Save(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"Saving Ctrl-only navigation is rejected");
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==24,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==25,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
@@ -276,5 +286,55 @@ Check(Vector2.Distance(OrthoPivot(offOrtho),OrthoPivot(orthoZoom))<.0001,"Orthog
 Check(Math.Abs(Vector3.Distance(offOrtho.Eye,offOrtho.Target)-Vector3.Distance(orthoZoom.Eye,orthoZoom.Target))<.0001,"Orthographic zoom preserves camera depth");
 var closeUp=c;for(int i=0;i<1000;i++)closeUp=CameraMath.Move(closeUp,NavMode.Zoom,0,-40,120);
 Check(closeUp.Valid&&Vector3.Distance(closeUp.Eye,closeUp.Target)>=.00009f,"Repeated close-up zoom cannot collapse the camera or disable navigation");
+
+
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{91,68})==NavMode.Idle,"Windows+D is not a navigation chord");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Idle,"Backtick is available for ordinary typing");
+var mouseDefaults=ConfigStore.Defaults();
+Check(ModeResolver.Resolve(mouseDefaults,new HashSet<int>{91})==NavMode.Idle,"Normal mouse does not reserve Windows");
+Check(mouseDefaults["combos"]!.AsArray().Any(n=>n?["buttons"]?.ToJsonString()=="[3,4]"&&ConfigStore.S(n?["bind"],"action")=="lockRotate"),"Confirmed btn3+btn4 combination is a default without swapping clicks");
+Check(PointerPolicy.Gain(1)==1f/32&&PointerPolicy.Gain(10)==1&&PointerPolicy.Gain(20)==3.5f,"Pointer gain matches every displayed DPI endpoint and neutral speed");
+Check(!PointerPolicy.Capture(10,false)&&PointerPolicy.Capture(1,false)&&PointerPolicy.Capture(10,true),"Neutral pointing can pass through; speed and glide request device routing");
+foreach(int step in new[]{1,6,10,15,20}){
+ var pointerTest=new PointerMotion();int x=0,y=0;
+ for(int sample=0;sample<320;sample++){var output=pointerTest.Move(1,-2,PointerPolicy.Gain(step));x+=output.X;y+=output.Y;}
+ Check(x==(int)MathF.Round(320*PointerPolicy.Gain(step))&&y==(int)MathF.Round(-640*PointerPolicy.Gain(step)),"Pointer speed "+step+" changes actual counts without losing subpixels");
+}
+var pointerGlide=new PointerMotion();pointerGlide.Move(16,0,1);
+Check(pointerGlide.Tick(100,.1f,true,1)==(0,0),"Immediate pointer delivery is never repeated by the frame timer");
+var pointerTail=pointerGlide.Tick(116,.1f,true,1);
+Check(pointerTail.X>0&&pointerTail.Y==0,"Pointer glide emits a real decaying tail after the ball stops");
+pointerGlide.Reset();Check(pointerGlide.Tick(132,1,true,1)==(0,0),"Click, app change and navigation transition can stop pointer glide");
+pointerGlide.Move(16,0,1);pointerGlide.Tick(148,1,false,1);
+Check(pointerGlide.Tick(164,1,false,1)==(0,0),"Disabling soft stop stops pointer momentum immediately");
+float TailDistance(float seconds){
+ var motion=new PointerMotion();motion.Move(16,0,1);motion.Tick(100,seconds,true,1);float distance=0;
+ for(long now=116;now<5100;now+=16)distance+=motion.Tick(now,seconds,true,1).X;
+ return distance;
+}
+Check(TailDistance(1)>TailDistance(.1f)*5,"Increasing Glide visibly increases pointer coasting distance");
+var studioView=new CameraPose(new(0,0,10),Vector3.Zero,Vector3.UnitY,Vector3.Zero,.8f,10,1200,800,false,Vector3.UnitY);
+var studioRight=CameraMath.AlignFace(studioView,Vector3.UnitX);
+Check(Vector3.Dot(studioRight.Up,Vector3.UnitY)>.999f&&Vector3.Dot(Vector3.Normalize(studioRight.Eye-studioRight.Target),Vector3.UnitX)>.999f,"Studio Right face uses its Y-up cube convention");
+var studioTop=CameraMath.AlignFace(studioView,Vector3.UnitY);var studioBottom=CameraMath.AlignFace(studioView,-Vector3.UnitY);
+Check(studioTop.Valid&&studioBottom.Valid&&Vector3.Dot(studioTop.Up,-Vector3.UnitZ)>.999f&&Vector3.Dot(studioBottom.Up,Vector3.UnitZ)>.999f,"Studio Top and Bottom have upright opposite-face orientations");
+var stepSnap=new FaceSnap();stepSnap.Reset(studioTop);var seenFaces=new HashSet<string>();var reachedBottom=false;
+for(int sample=0;sample<40;sample++){
+ var face=stepSnap.Step(studioTop,0,5);var direction=Vector3.Normalize(face.Eye-face.Target);seenFaces.Add(CameraMath.NearestFace(direction).ToString());
+ reachedBottom|=Vector3.Dot(direction,-Vector3.UnitY)>.999f;
+ Check(IsFace(face),"Continuous face snap remains aligned at sample "+sample);
+}
+Check(reachedBottom&&seenFaces.Count>=3,"Continued rolling from Top passes through an adjacent face and reaches Bottom");
+var turnSnap=new FaceSnap();turnSnap.Reset(studioRight);
+var quarterTurn=turnSnap.Step(studioRight,0,0,120);var fullTurn=quarterTurn;
+for(int turn=0;turn<3;turn++)fullTurn=turnSnap.Step(studioRight,0,0,120);
+Check(Vector3.Dot(Vector3.Normalize(quarterTurn.Eye-quarterTurn.Target),Vector3.UnitX)>.999f&&Math.Abs(Vector3.Dot(quarterTurn.Up,studioRight.Up))<.0001,"Alt wheel turns a face by 90 degrees without changing the face");
+Check(Vector3.Distance(fullTurn.Up,studioRight.Up)<.0001,"Four face turns return to the upright view");
+var jitterSnap=new FaceSnap();jitterSnap.Reset(studioView with{Eye=new(7.05f,0,7),Up=Vector3.UnitY});
+var stableFace=jitterSnap.Step(studioView,0,0);bool stable=true;
+for(int sample=0;sample<100;sample++){var face=jitterSnap.Step(studioView,sample%2==0?.1f:-.1f,0);stable&=Vector3.Dot(Vector3.Normalize(stableFace.Eye-stableFace.Target),Vector3.Normalize(face.Eye-face.Target))>.999f;}
+Check(stable,"Face-boundary noise does not flicker between adjacent views");
+var snappedOff=CameraMath.AlignFace(offCenter with{WorldUp=Vector3.UnitY},Vector3.UnitX,1);
+Check(Vector2.Distance(ProjectPivot(offCenter),ProjectPivot(snappedOff))<.0001,"Upright face turns preserve an off-center cursor pivot");
 
 Console.WriteLine(count+" regression checks passed.");

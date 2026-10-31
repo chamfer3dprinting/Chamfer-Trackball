@@ -51,3 +51,24 @@ public static class MotionPolicy{
  }
  public static float ZoomAmount(NavMode mode,float dy,float wheel)=>mode==NavMode.Zoom?-dy*.008f+wheel*.0015f:mode is NavMode.PanZoom or NavMode.Roll?wheel*.0015f:0;
 }
+
+public static class PointerPolicy{
+ static readonly float[] Multipliers=[0,1f/32,1f/16,1f/8,1f/4,3f/8,1f/2,5f/8,3f/4,7f/8,1,1.25f,1.5f,1.75f,2,2.25f,2.5f,2.75f,3,3.25f,3.5f];
+ public static float Gain(int step)=>Multipliers[Math.Clamp(step,1,20)];
+ public static bool Capture(int step,bool smooth)=>step!=10||smooth;
+}
+public sealed class PointerMotion{
+ readonly MotionFrames samples=new();readonly MotionGlide glide=new();readonly FractionalInput fractions=new();
+ public bool Active=>glide.Active||samples.Peek().HasPrimary;
+ public (int X,int Y) Move(int x,int y,float gain){
+  samples.Move(x,y);var whole=fractions.Add(x*gain,y*gain,0);return (whole.X,whole.Y);
+ }
+ public (int X,int Y) Tick(long now,float seconds,bool smooth,float gain){
+  var frame=samples.Peek();samples.ClearMove();
+  var tail=glide.Step(frame.X,frame.Y,now,seconds,smooth);
+  // Real samples were already delivered immediately. Only emit the decay tail.
+  if(frame.HasPrimary)return (0,0);
+  var whole=fractions.Add(tail.X*gain,tail.Y*gain,0);return (whole.X,whole.Y);
+ }
+ public void Reset(){samples.Reset();glide.Reset();fractions.Reset();}
+}

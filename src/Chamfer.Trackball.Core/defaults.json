@@ -1,5 +1,5 @@
 {
-  "configVersion": 24,
+  "configVersion": 25,
   "enabled": true,
   "buttons": {
     "middle": {
@@ -22,7 +22,18 @@
   "rightWheel": "normal",
   "leftWheel": "normal",
   "modeButtons": {},
-  "combos": [],
+  "combos": [
+    {
+      "buttons": [
+        3,
+        4
+      ],
+      "bind": {
+        "action": "lockRotate",
+        "tap": "click"
+      }
+    }
+  ],
   "wheelPrograms": [
     0,
     1,
@@ -663,7 +674,18 @@
         "glide": 5
       },
       "modeButtons": {},
-      "combos": [],
+      "combos": [
+        {
+          "buttons": [
+            3,
+            4
+          ],
+          "bind": {
+            "action": "lockRotate",
+            "tap": "click"
+          }
+        }
+      ],
       "snapKeys": "none",
       "navigateKeys": "none",
       "circleZoom": false,
@@ -719,7 +741,7 @@
       "modeButtons": {},
       "combos": [],
       "snapKeys": "alt",
-      "navigateKeys": "backtick",
+      "navigateKeys": "win",
       "circleZoom": true,
       "circleSize": 160
     }
