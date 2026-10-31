@@ -51,3 +51,10 @@ Manufacturer-default correction:
   including the owner's existing combination and active Normal mouse program.
 - Physical confirmation of the restored defaults remains pending. Do not automatically
   re-enable correction flags in a later update.
+
+Owner confirmation:
+- The owner tested the restored manufacturer defaults and replied "Yes, correct now"
+  for button 3, button 4 and both wheels.
+- Both optional correction flags are confirmed OFF. Retain that choice in future updates.
+- The Normal mouse program and custom combination remain intact; the 3D modelling program
+  retains ball orbit, Back orbit/pan switching, circle zoom and its held keys.
