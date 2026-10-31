@@ -11,3 +11,4 @@
 - Add Studio protocol-2 negotiation for native Alt + ball aligned snapping and backtick navigation/Alt height. Older Studio links retain their orbit/pan/zoom connection.
 - Keep mouse and wheel defaults, custom keys and saved combinations unchanged. Public candidate v{{PUBLIC_VERSION}} remains unpublished; Admin v{{ADMIN_VERSION}} is a new version.
 - Physical responsiveness and held commands require owner testing with the updated Studio camera link. Standard M512 X/Y input does not measure independent ball twist.
+- Resume ball-only Orbit, Pan and circle zoom on the next trackball movement after a normal click briefly restores pointer input.
