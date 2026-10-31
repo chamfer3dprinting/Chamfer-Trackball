@@ -1,3 +1,5 @@
+- Keep the identified trackball when an older settings page saves controls or combinations. Device selection now has its own persisted write and survives program changes, reset and restart.
+- Add Identify trackball and Cancel directly to Home, show when a 3D app still needs device setup, and allow 60 seconds to roll the ball during identification.
 - Keep Windows mouse and keyboard hooks on their own message thread, queue keyboard/controller work outside hook callbacks, and restore normal input when the settings window is busy.
 - Reduce lag during ball-only zoom classification by evaluating the circle gesture once per existing 16 ms camera frame instead of once per raw sensor packet.
 - Recognize smaller, imperfect circle paths with brief pauses; apply the accumulated turn when the first loop is recognized so a single circle creates visible zoom. Straight rolls, half-turn curves and circles beyond the configured size remain orbit or pan.

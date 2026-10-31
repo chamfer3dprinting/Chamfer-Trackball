@@ -28,7 +28,7 @@ public string AppName{get;private set;}="";
         this.store=store;this.input=input;this.server=server;cfg=store.Snapshot();
         input.IsCad=()=>IsCad;input.IsCapture=()=>mode!=NavMode.Idle;input.SelectedDevice=()=>ConfigStore.S(cfg,"selectedDevice");
         input.SwapButtons=()=>ConfigStore.B(cfg,"trackballSwapButtons");input.SwapWheels=()=>ConfigStore.B(cfg,"trackballSwapWheels");input.Enabled=()=>ConfigStore.B(cfg,"enabled");
-        input.Identified+=device=>{var n=store.Snapshot();n["selectedDevice"]=device;store.Save(n);cfg=store.Snapshot();Log("Trackball identified; original clicks and wheel axes are preserved unless you enable a correction.");};
+        input.Identified+=device=>{store.IdentifyDevice(device);cfg=store.Snapshot();Log("Trackball identified; original clicks and wheel axes are preserved unless you enable a correction.");};
         input.IsNavigationChord=keys=>ModeResolver.Resolve(cfg,keys)!=NavMode.Idle;
         input.RoutingReset+=()=>{End();latched=NavMode.Idle;pressed.Clear();intercepted.Clear();comboUsed.Clear();combos.Clear();stoppedByClick=false;};
         input.KeysChanged+=KeysChanged;input.Motion+=Motion;input.MouseEvent+=MouseEvent;
@@ -272,7 +272,7 @@ public string AppName{get;private set;}="";
         }catch(OperationCanceledException){ }catch(Exception ex){Log(ex.Message,"err");}finally{if(macro==cancellation)macro=null;cancellation.Dispose();}
     }
     public JsonObject Status(){
-        var result=new JsonObject{["mode"]=Mode,["navigationMode"]=Mode,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?"cad":"mouse",["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
+        var result=new JsonObject{["mode"]=Mode,["navigationMode"]=Mode,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?(input.Ready?"cad":"setup"):"mouse",["deviceReady"]=input.Ready,["identifying"]=input.Identifying,["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
         ox=oy=px=py=zoom=zoomLog=rawX=rawY=0;fit=false;return result;
     }
     public void Pad(int x,int y,int w,int h,bool visible,Point origin){pad=new(x,y,w,h);padVisible=visible;padOrigin=origin;}
