@@ -142,3 +142,5 @@ console.log('Physical keyboard display lights held Windows/Alt and clears on rel
 const inputConstructor=inputDriver.slice(inputDriver.indexOf('    public InputDriver(){'),inputDriver.indexOf('    bool RouteKey('));
 assert.ok(!inputConstructor.includes('Win32.GetAsyncKeyState('),'startup must not treat aggregate/injected OS state as physical keyboard holds');
 console.log('Keyboard starts with observed physical edges, so an inherited Backtick cannot block every held control.');
+
+assert.ok(html.includes('.slider:has(input[data-k="pointerSpeed"]){grid-template-columns:90px 1fr 165px}'),'effective DPI value needs readable space at the normal app width');

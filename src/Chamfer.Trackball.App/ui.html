@@ -172,6 +172,7 @@ select{cursor:pointer}
 /* speed */
 .slider{display:grid;grid-template-columns:90px 1fr 60px;gap:14px;align-items:center;padding:10px 0}
 input[type=range]{accent-color:var(--accent);width:100%}
+.slider:has(input[data-k="pointerSpeed"]){grid-template-columns:90px 1fr 165px}
 .val{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
 /* apps */
 .apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
@@ -689,7 +690,7 @@ function dpiOf(v){return Math.max(1,Math.round((cfg.trackballDpi||1600)*WIN_MULT
 $("#dpiDefault").onclick=()=>{cfg.pointerSpeed=10;renderBinds();save(true)};
 document.addEventListener("change",e=>{if(e.target.id==="hwDpi"){cfg.trackballDpi=+e.target.value;renderBinds();save()}},true);
 function speedLabel(v){return(Math.pow(2,(v-50)/20)).toFixed(2)+"×"}
-function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" effective DPI · "+WIN_MULT[v||10].toFixed(2)+"×"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
+function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" DPI · "+WIN_MULT[v||10].toFixed(2)+"×"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
 document.addEventListener("change",e=>{const t=e.target;
   if(t.dataset.act){const b=t.dataset.act,a=t.value;const cur=cfg.buttons[b];cur.action=a;
     if(["orbit","pan","zoom"].includes(a)&&!cur.tap)cur.tap=b==="back"?"fit":"click";
