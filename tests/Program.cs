@@ -176,6 +176,15 @@ for(int i=1;i<=360;i++){
  var result=slowLoop.Add(delta.X,delta.Y,1000+i*5+(i>180?450:0));slowWheel+=result.Wheel;
 }
 Check(slowLoop.Active&&slowWheel>250,"Imperfect small circles survive a brief pause and zoom on the first loop");
+var framedCircle=new CircleZoom();Vector2 frameMove=Vector2.Zero,lastPosition=new(18,0);float framedWheel=0;int recognitionCalls=0;
+for(int ms=1;ms<=3200;ms++){
+ var angle=ms*MathF.Tau/1600;var at=new Vector2(MathF.Round(18*MathF.Cos(angle)),MathF.Round(14*MathF.Sin(angle)));
+ frameMove+=at-lastPosition;lastPosition=at;
+ if(ms%16==0){var result=framedCircle.Add(frameMove.X,frameMove.Y,1000+ms);framedWheel+=result.Wheel;recognitionCalls++;frameMove=Vector2.Zero;}
+}
+Check(recognitionCalls==200&&framedWheel>500,"Quantized 1000 Hz sensor input still recognizes circle zoom at 16 ms frames");
+var longRoll=new CircleZoom();for(int i=0;i<30000;i++)longRoll.Add(30,0,1000+i*5);
+Check(!longRoll.Active,"A long continuous straight roll stays bounded and never activates zoom");
 var figureEight=Trace(new CircleZoom(),a=>new(35*MathF.Sin(a),20*MathF.Sin(2*a)),MathF.PI*6,800);
 Check(figureEight.Captured==0,"Alternating figure-eight curvature does not activate dial zoom");
 clockwise.Add(6,0,3705);clockwise.Add(6,0,3710);clockwise.Add(6,0,3715);clockwise.Add(6,0,3720);clockwise.Add(6,0,3725);

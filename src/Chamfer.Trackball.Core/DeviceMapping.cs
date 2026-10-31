@@ -24,7 +24,8 @@ public sealed class DeviceMapping{
  }
  public MouseEdge[] ReleaseAll(){var r=held.Values.Select(x=>x.Release()).Distinct().ToArray();held.Clear();return r;}
 }
-// Raw Input and low-level hooks may reach the UI thread in either order.
+// Raw Input and low-level hooks may arrive in either order. The app synchronizes
+// access between its input hook thread and the UI thread.
 // Keep both observations, including hooks that passed through, so a stale raw
 // event can never become a duplicate click when routing is enabled later.
 public readonly record struct MouseMatch(string Device,MouseEdge Edge,bool Blocked);

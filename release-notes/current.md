@@ -1,3 +1,4 @@
+- Keep Windows mouse and keyboard hooks on their own message thread, queue keyboard/controller work outside hook callbacks, and restore normal input when the settings window is busy.
 - Reduce lag during ball-only zoom classification by evaluating the circle gesture once per existing 16 ms camera frame instead of once per raw sensor packet.
 - Recognize smaller, imperfect circle paths with brief pauses; apply the accumulated turn when the first loop is recognized so a single circle creates visible zoom. Straight rolls, half-turn curves and circles beyond the configured size remain orbit or pan.
 - Reduce circle-zoom gesture detection from repeated quadratic turn-angle scans to one linear pass using precomputed turns, lowering CPU work while rolling in 3D navigation. Gesture thresholds and behavior remain unchanged.

@@ -1,10 +1,17 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using Chamfer.Trackball.Core;
 namespace Chamfer.Trackball.App;
 internal sealed class InputDriver:NativeWindow,IDisposable {
     readonly Win32.Hook mouseProc,keyProc;
-    nint mouseHook,keyHook;
+    HookPump? hooks;
+    readonly object keysGate=new(),routingGate=new();
+    readonly ConcurrentQueue<(int Key,bool Down)> keyReplays=new();
+    readonly HashSet<int> delayedKeys=[];
+    int keysPending,stalled,heldRouting;
+    long uiPulse=Environment.TickCount64;
+    string? hookError;
     readonly HashSet<int> physical=[];
     readonly Dictionary<nint,string> deviceNames=[];
     readonly HashSet<int> deferred=[];
@@ -18,36 +25,52 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public Func<IReadOnlySet<int>,bool> IsNavigationChord=_=>false;
     public Func<string> SelectedDevice=()=>"";
     readonly DeviceMapping mapping=new();readonly MouseGate gate=new();
-    readonly MotionHealth motionHealth=new();readonly Queue<MouseMatch> matched=[];
-    const int DispatchEdges=0x8001;
+    readonly MotionHealth motionHealth=new();readonly ConcurrentQueue<MouseMatch> matched=[];
+    const int DispatchEdges=0x8001,DispatchKeys=0x8002,DispatchFailure=0x8003;
     readonly System.Windows.Forms.Timer watchdog=new(){Interval=30};
     readonly HashSet<(int,int)> consumed=[];
-    bool failed,learning,connected,motionBlocked,recoverOnInput;
+    volatile bool failed,connected,motionBlocked;
+    bool learning,recoverOnInput;
     long learnUntil,nextRegistrationCheck,nextPresenceCheck;
     public Func<bool> SwapButtons=()=>false,SwapWheels=()=>false,Enabled=()=>true;
     public event Action<string>? Identified;
     public string DeviceStatus {get;private set;}="Identify your trackball to enable device-only controls.";
     public string LastDevice {get;private set;}="";
     public bool Ready=>connected&&!failed&&SelectedDevice().Length>0;
-    bool Routing=>(Ready&&(Enabled()||SwapButtons()||SwapWheels()))||mapping.HeldCount>0||consumed.Count>0;
+    bool Routing=>(Ready&&(Enabled()||SwapButtons()||SwapWheels()))||Volatile.Read(ref heldRouting)>0;
+    bool HookHealthy{
+        get{
+            if(hooks?.Running==true&&Environment.TickCount64-Volatile.Read(ref uiPulse)<=150)return true;
+            Interlocked.Exchange(ref stalled,1);return false;
+        }
+    }
+    void NotifyKeys(){if(Interlocked.Exchange(ref keysPending,1)==0)Win32.PostMessage(Handle,DispatchKeys,0,0);}
+    void ReplayKey(int key,bool down){keyReplays.Enqueue((key,down));NotifyKeys();}
+    void HookFailed(string message){failed=true;Interlocked.Exchange(ref hookError,message);Win32.PostMessage(Handle,DispatchFailure,0,0);}
     public void Identify(){learning=true;learnUntil=Environment.TickCount64+15000;DeviceStatus="Roll only the trackball now…";failed=false;recoverOnInput=false;}
     public void CancelIdentify(){learning=false;DeviceStatus=Ready?"Trackball connected":"Trackball not identified";}
     void Watchdog(object? sender,EventArgs e){
-        var now=Environment.TickCount64;
+        var now=Environment.TickCount64;Volatile.Write(ref uiPulse,now);
+        if(Interlocked.Exchange(ref stalled,0)!=0)FailOpen("App was busy. Normal mouse restored; reconnecting automatically.",true);
         if(now>=nextRegistrationCheck){EnsureRegistration();nextRegistrationCheck=now+250;}
         if(now>=nextPresenceCheck){RefreshPresence();nextPresenceCheck=now+1000;}
         if(learning&&now>learnUntil)CancelIdentify();
-        if(!IsCapture()){motionHealth.Reset();motionBlocked=false;}
-        if(gate.Expired(now)||motionHealth.Expired(now))FailOpen("Input interrupted. Normal mouse restored; reconnecting automatically.",true);
+        bool expired;
+        lock(routingGate){
+            if(!IsCapture()){motionHealth.Reset();motionBlocked=false;}
+            expired=gate.Expired(now)||motionHealth.Expired(now);
+        }
+        if(expired)FailOpen("Input interrupted. Normal mouse restored; reconnecting automatically.",true);
     }
     void FailOpen(string message,bool reconnect=false){
-        failed=true;recoverOnInput=reconnect;motionBlocked=false;motionHealth.Reset();DeviceStatus=message;
+        failed=true;recoverOnInput=reconnect;motionBlocked=false;lock(routingGate)motionHealth.Reset();DeviceStatus=message;
         RoutingReset?.Invoke();
         // Finish matched physical edges before releasing the mapped state.
         while(matched.TryDequeue(out var match))try{Edge(match.Device,match.Edge);}catch(InvalidOperationException){}
         foreach(var edge in mapping.ReleaseAll())try{Emit(edge);}catch(InvalidOperationException){}
-        consumed.Clear();
-        foreach(var edge in gate.Drain())try{Emit(edge);}catch(InvalidOperationException){}
+        consumed.Clear();Volatile.Write(ref heldRouting,0);
+        MouseEdge[] drained;lock(routingGate)drained=gate.Drain();
+        foreach(var edge in drained)try{Emit(edge);}catch(InvalidOperationException){}
     }
     bool OwnsRegistration(){
         uint count=0,size=(uint)Marshal.SizeOf<Win32.RawDevice>();
@@ -94,6 +117,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(!failed&&!learning)DeviceStatus="Trackball connected";
     }
     internal void VerifyRecovery(){
+        hooks?.VerifyResponsive();VerifyKeyDispatch();
         var original=SelectedDevice;var originalEnabled=Enabled;var originalButtons=SwapButtons;var originalWheels=SwapWheels;bool originalConnected=connected,originalFailed=failed,originalRecover=recoverOnInput;string originalStatus=DeviceStatus;
         try{
             SelectedDevice=()=>"saved-trackball";
@@ -117,6 +141,35 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         }finally{SelectedDevice=original;Enabled=originalEnabled;SwapButtons=originalButtons;SwapWheels=originalWheels;connected=originalConnected;failed=originalFailed;recoverOnInput=originalRecover;DeviceStatus=originalStatus;RefreshPresence();EnsureRegistration();}
         Console.WriteLine("Input recovery verified: startup presence, exact-device identity, disconnect/reconnect, corrections with 3D off and replaced Raw Input registration.");
     }
+    void VerifyKeyDispatch(){
+        var selected=SelectedDevice;var enabled=Enabled;var cad=IsCad;var chord=IsNavigationChord;
+        bool wasConnected=connected,wasFailed=failed;
+        int directCalls=0;void Changed()=>directCalls++;
+        if(!keyReplays.IsEmpty)throw new InvalidOperationException("Keyboard test requires an empty dispatch queue.");
+        int[] originalKeys;lock(keysGate)originalKeys=physical.ToArray();
+        try{
+            SelectedDevice=()=>"keyboard-fixture";Enabled=()=>true;IsCad=()=>true;
+            IsNavigationChord=keys=>keys.Contains(81)&&!keys.Contains(87);
+            connected=true;failed=false;Volatile.Write(ref uiPulse,Environment.TickCount64);KeysChanged+=Changed;
+            if(!RouteKey(81,true)||!RouteKey(81,false)||directCalls!=0)
+                throw new InvalidOperationException("A held-key callback ran controller work or lost an unused tap.");
+            if(!keyReplays.ToArray().SequenceEqual(new[]{(81,true),(81,false)}))
+                throw new InvalidOperationException("An unused navigation key did not queue one tap.");
+            while(keyReplays.TryDequeue(out _)){ }
+            RouteKey(81,true);lock(keysGate)usedDeferred.Add(81);RouteKey(81,false);
+            if(!keyReplays.IsEmpty)throw new InvalidOperationException("A used navigation hold replayed a stray key.");
+            RouteKey(81,true);RouteKey(87,true);RouteKey(81,false);RouteKey(87,false);
+            if(!keyReplays.ToArray().SequenceEqual(new[]{(81,true),(87,true),(81,false),(87,false)}))
+                throw new InvalidOperationException("Deferred typing lost key order or a matching release.");
+            if(directCalls!=0)throw new InvalidOperationException("Keyboard routing called the controller inside the hook.");
+        }finally{
+            KeysChanged-=Changed;SelectedDevice=selected;Enabled=enabled;IsCad=cad;IsNavigationChord=chord;
+            connected=wasConnected;failed=wasFailed;
+            lock(keysGate){physical.Clear();foreach(var key in originalKeys)physical.Add(key);deferred.Clear();usedDeferred.Clear();delayedKeys.Clear();}
+            while(keyReplays.TryDequeue(out _)){ }Interlocked.Exchange(ref keysPending,0);
+        }
+        Console.WriteLine("Keyboard routing verified: queued unused tap, used hold, ordered typing and no synchronous controller callback.");
+    }
     sealed class RegistrationProbe:NativeWindow,IDisposable{
         public RegistrationProbe()=>CreateHandle(new CreateParams{Caption="Input recovery fixture",Parent=new nint(-3)});
         public void Dispose()=>DestroyHandle();
@@ -134,7 +187,8 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(edge.Down&&handled)consumed.Add(key);
         if(edge.Up&&consumed.Remove(key))handled=true;
         if(!handled)Emit(edge);
-        else foreach(var k in deferred)usedDeferred.Add(k);
+        else lock(keysGate)foreach(var k in deferred)usedDeferred.Add(k);
+        Volatile.Write(ref heldRouting,mapping.HeldCount+consumed.Count);
     }
     void Match(MouseMatch? match){
         if(match is not MouseMatch item||!item.Blocked)return;
@@ -143,68 +197,83 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         Win32.PostMessage(Handle,DispatchEdges,0,0);
     }
     public IReadOnlySet<int> Keys {
-        get{
+        get{lock(keysGate){
             var result=new HashSet<int>(physical.Where(x=>x is not (160 or 161 or 162 or 163 or 164 or 165)));
             if(physical.Any(x=>x is 16 or 160 or 161))result.Add(16);
             if(physical.Any(x=>x is 17 or 162 or 163))result.Add(17);
             if(physical.Any(x=>x is 18 or 164 or 165))result.Add(18);
             return result;
-        }
+        }}
     }
     public InputDriver(){
         CreateHandle(new CreateParams{Caption="Chamfer Trackball input",Parent=new nint(-3)});
         foreach(var k in new[]{160,161,162,163,164,165,192})if(Win32.GetAsyncKeyState(k)<0)physical.Add(k);
         mouseProc=OnMouse;keyProc=OnKey;
-        mouseHook=Win32.SetWindowsHookEx(14,mouseProc,Win32.GetModuleHandle(null),0);
-        keyHook=Win32.SetWindowsHookEx(13,keyProc,Win32.GetModuleHandle(null),0);
-        if(mouseHook==0||keyHook==0){Dispose();throw new InvalidOperationException("Cannot listen for mouse/keyboard input.");}
+        try{hooks=new HookPump(mouseProc,keyProc);}
+        catch{Dispose();throw;}
         if(!Win32.RegisterRawInputDevices([new Win32.RawDevice{Page=1,Usage=2,Flags=0x2100,Target=Handle}],1,(uint)Marshal.SizeOf<Win32.RawDevice>())){Dispose();throw new InvalidOperationException("Cannot register Raw Input.");}
         watchdog.Tick+=Watchdog;watchdog.Start();
     }
-    nint OnKey(int code,nint w,nint l){
-        if(code<0)return Win32.CallNextHookEx(keyHook,code,w,l);
-        var e=Marshal.PtrToStructure<Win32.KeyHook>(l);
-        if((e.Flags&16)!=0||e.Extra==(nuint)Win32.Marker)return Win32.CallNextHookEx(keyHook,code,w,l);
-        var down=(int)w is 0x100 or 0x104;int k=(int)e.Key;
-        if(down)physical.Add(k);else physical.Remove(k);
-        // Defer the configured non-modifier navigation key (or Alt) only when
-        // that chord is active on the identified trackball. An unused tap is replayed.
-        bool trigger=k is not (16 or 17 or 160 or 161 or 162 or 163) && IsNavigationChord(Keys);
-        if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);KeysChanged?.Invoke();return 1;}
-        if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)){
-            if(deferred.Count>0){
-                foreach(var old in deferred.ToArray()){Win32.Key(old,true);deferred.Remove(old);usedDeferred.Remove(old);}
-                Win32.Key(k,true);KeysChanged?.Invoke();return 1;
+    bool RouteKey(int k,bool down){
+        lock(keysGate){
+            if(down)physical.Add(k);else physical.Remove(k);
+            if(delayedKeys.Contains(k)){
+                ReplayKey(k,down);if(!down)delayedKeys.Remove(k);return true;
             }
+            bool trigger=k is not (16 or 17 or 160 or 161 or 162 or 163)&&HookHealthy&&IsNavigationChord(Keys);
+            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);NotifyKeys();return true;}
+            if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)&&deferred.Count>0){
+                foreach(var old in deferred.ToArray()){
+                    ReplayKey(old,true);delayedKeys.Add(old);deferred.Remove(old);usedDeferred.Remove(old);
+                }
+                ReplayKey(k,true);delayedKeys.Add(k);return true;
+            }
+            NotifyKeys();
+            if(!down&&deferred.Remove(k)){
+                if(!usedDeferred.Remove(k)){ReplayKey(k,true);ReplayKey(k,false);}
+                return true;
+            }
+            return false;
         }
-        KeysChanged?.Invoke();
-        if(!down&&deferred.Remove(k)){
-            if(!usedDeferred.Remove(k)){Win32.Key(k,true);Win32.Key(k,false);}
-            return 1;
-        }
-        return Win32.CallNextHookEx(keyHook,code,w,l);
+    }
+    nint OnKey(int code,nint w,nint l){
+        if(code<0)return Win32.CallNextHookEx(0,code,w,l);
+        var e=Marshal.PtrToStructure<Win32.KeyHook>(l);
+        if((e.Flags&16)!=0||e.Extra==(nuint)Win32.Marker)return Win32.CallNextHookEx(0,code,w,l);
+        try{if(RouteKey((int)e.Key,(int)w is 0x100 or 0x104))return 1;}
+        catch(Exception ex){HookFailed("Normal keyboard restored: "+ex.Message);}
+        return Win32.CallNextHookEx(0,code,w,l);
     }
     nint OnMouse(int code,nint w,nint l){
-        if(code<0)return Win32.CallNextHookEx(mouseHook,code,w,l);
+        if(code<0)return Win32.CallNextHookEx(0,code,w,l);
         var e=Marshal.PtrToStructure<Win32.MouseHook>(l);
-        if((e.Flags&1)!=0||e.Extra==(nuint)Win32.Marker)return Win32.CallNextHookEx(mouseHook,code,w,l);
+        if((e.Flags&1)!=0||e.Extra==(nuint)Win32.Marker)return Win32.CallNextHookEx(0,code,w,l);
         try{
             int msg=(int)w;
-            if(msg==0x200&&Ready&&Enabled()&&IsCapture()){
-                motionBlocked=true;motionHealth.Block(Environment.TickCount64);
-                foreach(var key in deferred)usedDeferred.Add(key);
+            if(msg==0x200&&Ready&&Enabled()&&HookHealthy&&IsCapture()){
+                lock(routingGate){motionBlocked=true;motionHealth.Block(Environment.TickCount64);}
+                lock(keysGate)foreach(var key in deferred)usedDeferred.Add(key);
                 return 1;
             }
             if(msg is 0x201 or 0x202 or 0x204 or 0x205 or 0x207 or 0x208 or 0x20b or 0x20c or 0x20a or 0x20e){
                 var data=msg is 0x20a or 0x20e or 0x20b or 0x20c?unchecked((short)(e.Data>>16)):0;
-                bool blocked=Routing;
-                Match(gate.Hook(new(msg,data),Environment.TickCount64,blocked));
+                bool blocked=HookHealthy&&Routing;
+                MouseMatch? match;lock(routingGate)match=gate.Hook(new(msg,data),Environment.TickCount64,blocked);
+                Match(match);
                 if(blocked)return 1;
             }
-        }catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}
-        return Win32.CallNextHookEx(mouseHook,code,w,l);
+        }catch(Exception ex){HookFailed("Normal input restored: "+ex.Message);}
+        return Win32.CallNextHookEx(0,code,w,l);
     }
     protected override void WndProc(ref Message m){
+        if(m.Msg==DispatchKeys){
+            Interlocked.Exchange(ref keysPending,0);
+            try{
+                while(keyReplays.TryDequeue(out var key))Win32.Key(key.Key,key.Down);
+                KeysChanged?.Invoke();
+            }catch(Exception ex){FailOpen("Normal keyboard restored: "+ex.Message);}
+        }
+        if(m.Msg==DispatchFailure)FailOpen(Interlocked.Exchange(ref hookError,null)??"Normal input restored.",true);
         if(m.Msg==DispatchEdges){
             while(matched.TryDequeue(out var match))try{Edge(match.Device,match.Edge);}catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}
         }
@@ -235,11 +304,11 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                             }
                             bool target=device.Length>0&&device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
                             if(target){LastDevice=device;connected=true;if(recoverOnInput){failed=false;recoverOnInput=false;}if(!failed&&!learning)DeviceStatus="Trackball connected";}
-                            if(dx!=0||dy!=0)motionHealth.Raw();
+                            if(dx!=0||dy!=0)lock(routingGate)motionHealth.Raw();
                             bool capture=Ready&&Enabled()&&IsCapture();
                             if((flags&1)==0&&(dx!=0||dy!=0)){
-                                if(target&&Enabled()&&!failed){
-                                    if(IsCad())foreach(var k in deferred)usedDeferred.Add(k);
+                                if(target&&Enabled()&&!failed&&Volatile.Read(ref stalled)==0){
+                                    if(IsCad())lock(keysGate)foreach(var k in deferred)usedDeferred.Add(k);
                                     Motion?.Invoke(dx,dy,device);
                                 }else if(motionBlocked||capture)Win32.Mouse(1,dx,dy);
                                 motionBlocked=false;
@@ -249,7 +318,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                                 Win32.Mouse(0x8001u|((flags&2)!=0?0x4000u:0u),dx,dy);motionBlocked=false;
                             }
                             foreach(var (flag,msg,value) in new (int,int,int)[]{(1,0x201,0),(2,0x202,0),(4,0x204,0),(8,0x205,0),(16,0x207,0),(32,0x208,0),(64,0x20b,1),(128,0x20c,1),(256,0x20b,2),(512,0x20c,2),(1024,0x20a,data),(2048,0x20e,data)})
-                                if((buttons&flag)!=0)Match(gate.Raw(device,new(msg,value),Environment.TickCount64));
+                                if((buttons&flag)!=0){MouseMatch? match;lock(routingGate)match=gate.Raw(device,new(msg,value),Environment.TickCount64);Match(match);}
                         }
                     }
                 }catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}
@@ -259,8 +328,8 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         base.WndProc(ref m);
     }
     public void Dispose(){
-        watchdog.Stop();watchdog.Dispose();FailOpen("Closed");
-        if(mouseHook!=0)Win32.UnhookWindowsHookEx(mouseHook);if(keyHook!=0)Win32.UnhookWindowsHookEx(keyHook);
-        mouseHook=keyHook=0;deferred.Clear();usedDeferred.Clear();physical.Clear();DestroyHandle();
+        watchdog.Stop();watchdog.Dispose();hooks?.Dispose();hooks=null;FailOpen("Closed");
+        lock(keysGate){deferred.Clear();usedDeferred.Clear();delayedKeys.Clear();physical.Clear();}
+        while(keyReplays.TryDequeue(out _)){ }DestroyHandle();
     }
 }
