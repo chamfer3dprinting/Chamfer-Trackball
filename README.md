@@ -24,9 +24,10 @@ The draggable, always-on-top guide shows the same four-button arrangement, curre
 
 - Hold **Shift** and roll: orbit.
 - Hold **Ctrl+Shift** and roll: pan; use the wheel simultaneously for zoom.
-- Hold **Alt** and roll: snap to aligned face/edge/corner views.
+- Hold **Ctrl** and roll up/down: zoom.
+- Hold **Alt** and roll: snap to Top, Bottom, Left, Right, Front or Back. Diagonal edge and corner views are excluded.
 - Hold **backtick** and roll: navigate; add **Alt** for height.
-- Ctrl by itself remains normal. All held bindings, including separate orbit, pan and zoom chords, are editable and saved; complete and incomplete button combinations survive restart.
+- The 3D modelling program starts with ordinary pointer movement. Hold a navigation key to move the camera; release it to point again. Ctrl+C, Ctrl+V and other typing shortcuts stay normal. Held orbit, pan and zoom bindings are editable and saved; complete and incomplete button combinations survive restart.
 - **Ball navigation** is an optional quick setup: roll to orbit; tap Back to switch only between orbit and pan; draw small clockwise/anticlockwise circles to zoom in/out. Straight rolling returns to orbit or pan. The Circle size and Zoom sensitivity settings tune the gesture. Held keys/buttons override circle recognition.
 
 Factory startup and Reset to normal select **Normal mouse**, with original buttons/wheels and no navigation bindings. Reset also disables optional device corrections. Identifying a trackball does not enable swaps automatically. Settings writes are queued so a slow save cannot replace a newer combination or binding edit.

@@ -5,9 +5,11 @@ Keep source, tests and version history on GitHub. Do not create development fold
 on the owner's PC. Deliver only the executable as the user-facing download.
 
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
-mouse button swapping to implement app bindings. Never use Ctrl alone for navigation.
-The requested held controls are Shift orbit, Ctrl+Shift pan plus zoom, Alt plus ball
-for aligned snapping, and backtick navigation with Alt for height.
+mouse button swapping to implement app bindings. The owner's latest requested controls
+are Shift orbit, Ctrl+Shift pan, Ctrl plus ball for zoom, Alt plus ball for six-face
+snapping, and backtick navigation with Alt for height. Ctrl alone is permitted for
+Zoom in 3D apps; other Ctrl keyboard shortcuts must remain normal. The 3D program
+points normally until a held navigation command is used.
 
 Keep existing release history. Advance the real application version for a delivered
 update; do not reuse a release tag for a different executable. Build and test before
@@ -85,4 +87,12 @@ The owner reports continued failure. The saved configuration has 3D ball navigat
 
 Add identification and cancellation to Home, expose device readiness/listening state, show an app setup warning when CAD is detected without a ready trackball, and extend identification to 60 seconds. Cover the stale-empty-save and old-device-save races, program changes, restart, reset and invalid identity in the core suite. The actual WebView smoke check also saves an older UI object after a device is identified and confirms that the ID survives; interface checks exercise the Home buttons.
 
-Validation is pending in the Windows workflow. Next: build and install a new Admin version, identify the physical M512 once, verify that it remains selected after a control save/restart, then confirm orbit, pan and zoom in Chamfer Studio. Physical input cannot be supplied by remote pointer injection.
+PR workflow 41241163778 and main workflow 41241400653 passed 158 core checks, interface/integration syntax, both builds and actual WebView smoke checks. Admin v1.5.19 was installed to the existing Downloads folder, and a desktop shortcut was added. The owner rolled the M512 and the app identified it; identification survived a settings write and an app restart. A temporary Z zoom binding was applied and verified in Home. Computer Use then stopped the Studio browser test because it could not confidently verify the Chrome URL. Physical camera feel remained unverified.
+
+# 2026-10-31 — Default to held controls, Ctrl zoom and six-face snap
+
+The owner explicitly replaces the temporary Z zoom binding with Ctrl and confirms Alt for snapping. They request ordinary pointing when no navigation key is held and snaps restricted to Top, Bottom, Left, Right, Front and Back. This request supersedes the earlier blanket Ctrl-alone restriction.
+
+Set factory 3D ball behavior to pointer and Zoom to Ctrl. Migrate the old 3D default from automatic orbit to pointer while keeping existing custom chords; configure this owner's active program to Ctrl Zoom and Alt Snap. Retain the optional explicit Ball navigation preset and native button/wheel mappings. Permit Ctrl alone only for Zoom in the resolver, validator and shortcut recorder; exact modifiers keep Ctrl+Shift Pan separate and typing shortcuts normal.
+
+Restrict native snap candidates to the six signed world axes, preserving camera radius and cursor pivot. Update interface and control documentation. Focused actual C# camera checks pass for all six faces, diagonal starting poses, perspective/orthographic views and the existing off-center pivot behavior. Full Windows validation and the next Admin release are pending. Next: finish the workflow, install the new Admin build, apply the requested bindings while preserving the identified M512, and verify the loaded defaults.

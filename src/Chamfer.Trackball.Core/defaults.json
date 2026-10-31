@@ -1,5 +1,5 @@
 {
-  "configVersion": 22,
+  "configVersion": 24,
   "enabled": true,
   "buttons": {
     "middle": {
@@ -699,10 +699,10 @@
       ],
       "orbitKeys": "shift",
       "panKeys": "ctrl+shift",
-      "zoomKeys": "none",
+      "zoomKeys": "ctrl",
       "gestures": {},
       "pointerSpeed": 10,
-      "ball": "orbit",
+      "ball": "pointer",
       "feel": {
         "orbitSens": 50,
         "panSens": 50,

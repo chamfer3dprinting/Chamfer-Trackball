@@ -1,3 +1,6 @@
+- Default 3D modelling to ordinary pointer movement. Hold Shift for Orbit, Ctrl+Shift for Pan and Ctrl for Zoom; release the navigation keys to point normally.
+- Restrict Alt + ball snapping to Top, Bottom, Left, Right, Front and Back. Exclude diagonal edge and corner views while preserving the cursor pivot.
+- Allow Ctrl as the Zoom hold key in both saved settings and the key recorder. Ctrl+C, Ctrl+V and other ordinary shortcuts remain normal; existing custom bindings are preserved during migration.
 - Keep the identified trackball when an older settings page saves controls or combinations. Device selection now has its own persisted write and survives program changes, reset and restart.
 - Add Identify trackball and Cancel directly to Home, show when a 3D app still needs device setup, and allow 60 seconds to roll the ball during identification.
 - Keep Windows mouse and keyboard hooks on their own message thread, queue keyboard/controller work outside hook callbacks, and restore normal input when the settings window is busy.

@@ -17,7 +17,7 @@ internal sealed class MainForm:Form{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer native;readonly Controller controller;
     readonly string settingsPath;readonly GuideForm guide;readonly AdminService admin;
     readonly System.Windows.Forms.Timer updateTimer=new(){Interval=900000};
-    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Editable source rebuild: Shift orbit, Ctrl+Shift pan/zoom, Alt snap and backtick navigation with native integrations.")};
+    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Hold Shift to orbit, Ctrl+Shift to pan, Ctrl to zoom and Alt for six-face snapping. Release the keys for normal pointing.")};
     string updateUrl="",updateHash="";
     readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(30)};
     public MainForm(bool smoke=false,bool startTray=false){
@@ -63,7 +63,7 @@ internal sealed class MainForm:Form{
         try{
             var message=JsonNode.Parse(e.WebMessageAsJson)!.AsObject();id=message["id"]!.GetValue<long>();var args=message["args"]!.AsArray();object? result=null;
             switch(ConfigStore.S(message,"name")){
-                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Ball navigation: orbit/pan toggle, circle zoom and customizable held keys.","Normal mouse reset and queued saving preserve your settings.","Updates now advance the application version; click Update to download, install and restart."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
+                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Default pointer movement with held Shift orbit, Ctrl+Shift pan, Ctrl zoom and Alt face snapping.","Normal mouse reset and queued saving preserve your settings.","Updates now advance the application version; click Update to download, install and restart."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
                 case "ctSave":store.Save(args[0]!.AsObject());result=store.Snapshot();break;
                 case "ctStatus":result=controller.Status();break;
                 case "ctResetAll":result=store.Reset();break;
