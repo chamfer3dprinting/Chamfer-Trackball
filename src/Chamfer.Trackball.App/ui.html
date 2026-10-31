@@ -314,8 +314,8 @@ details .ver{margin-top:10px;font-weight:600}
 <div class="card" style="margin-bottom:16px" id="deviceCorrection">
   <h2>Trackball only</h2><p class="mu">Identify the trackball once by rolling its ball. Corrections and 3D controls then use that device.</p>
   <div class="row" style="margin:12px 0"><button class="btn primary" id="identifyTrackball">Identify trackball</button><button class="btn sm" id="cancelIdentify">Cancel</button><span class="mu" id="deviceIdentity">Loading…</span></div>
-  <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapButtons"> Swap trackball left / right clicks (btn3 = Left, btn4 = Right)</label>
-  <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapWheels"> Left wheel = up / down; right wheel = horizontal (keep scroll direction)</label>
+  <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapButtons"> Swap the trackball’s native left / right clicks</label>
+  <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapWheels"> Swap the trackball’s native vertical / horizontal wheel axes</label>
   <label class="row" style="margin:8px 0"><input type="checkbox" data-k="modePanel"> Show floating control guide</label>
 </div>
 </div><span class="spacer"></span><span class="saved" id="saved1"></span></div>
@@ -381,7 +381,7 @@ details .ver{margin-top:10px;font-weight:600}
       </div>
       <div class="card" style="margin-top:16px">
         <h2>Circle zoom</h2>
-        <div class="opt"><div class="t">Draw circles to zoom<small>During ball-only orbit or pan, draw a small circle: clockwise zooms in, anticlockwise zooms out. Recognition needs most of a circle; keep circling for continuous zoom. Roll straight to return. Held keys and held buttons take priority.</small></div><label class="sw"><input type="checkbox" data-k="circleZoom"><span></span></label></div>
+        <div class="opt"><div class="t">Draw circles to zoom<small>During ball-only orbit or pan, draw a small circle: clockwise zooms in, anticlockwise zooms out. Recognition needs most of a circle; keep circling for continuous zoom. Roll straight to return. Circle zoom also works while holding your Pan + zoom keys or pan button. Held orbit keeps rotating.</small></div><label class="sw"><input type="checkbox" data-k="circleZoom"><span></span></label></div>
         <div class="opt"><div class="t">Circle size<small>Increase this if your circles are larger; decrease it if broad curved orbits trigger zoom. Zoom speed uses Zoom sensitivity in Speed &amp; direction.</small></div><input type="range" min="60" max="400" step="10" data-k="circleSize"></div>
         <p class="mu" style="font-size:12.5px">This recognizes the shape of a roll. Physical ball twist is not measured by the M512's standard mouse reports. Use the Ball navigation setup above to enable orbit, pan and circle zoom together.</p>
       </div>
@@ -666,8 +666,8 @@ function renderBinds(){
     const warn=bs.length<2?'<div class="desc wn">Pick at least two buttons.</div>':"";
     out.push(`<div class="bind" data-row="combo-${ci}"><div class="nm"><b>${bs.length?bs.map(n=>"btn"+n).join(" + "):"New combination"}</b><small>Combination ${ci+1}</small></div><div class="opts"><div class="line">${boxes}</div><div class="line"><select data-cact="${ci}">${opts(CACT,bd.action)}</select><button class="btn sm" data-cdel="${ci}">Remove</button></div>${warn}${extra}</div></div>`)});
   $("#binds").innerHTML=out.join("");
-  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan; turn the wheel at the same time to move in or out."],["zoomKeys","Zoom","Optional separate hold keys: roll up/down to zoom."],["snapKeys","Snap to angle","Hold and roll to align to a face, edge or corner. Requires a native integration."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Requires a native integration."]].map(([k,n,d])=>
-    `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):'<span class="mu">Off</span>'}<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key.</div></div></div>`).join("");
+  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Optional extra zoom command: hold these keys and roll up/down. Pan + zoom above already includes wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll to align to a face, edge or corner. Requires a native integration."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Requires a native integration."]].map(([k,n,d])=>
+    `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):`<span class="mu">${k==="zoomKeys"&&cfg.panKeys&&cfg.panKeys!=="none"?"Included in Pan + zoom":"Off"}</span>` }<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key.</div></div></div>`).join("");
   $$("[data-k]").forEach(i=>{const k=i.dataset.k;if(i.type==="checkbox")i.checked=!!cfg[k];else i.value=cfg[k]});
   $$("[data-v]").forEach(v=>v.textContent=valLabel(v.dataset.v,cfg[v.dataset.v]));
 }
@@ -942,23 +942,29 @@ document.addEventListener("visibilitychange",reportPad);
 
 /* ---------- live status ---------- */
 const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Rolling",Snap:"Snap to angle",Navigate:"Navigating",Gestures:"Gesture"};
+function liveText(selector,value){const el=$(selector),text=String(value??"");if(el&&el.textContent!==text)el.textContent=text}
+function liveClass(selector,value){const el=$(selector);if(el&&el.className!==value)el.className=value}
+function liveAttr(el,name,value){if(el&&el.getAttribute(name)!==String(value))el.setAttribute(name,value)}
 async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
   if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;if(!savePending&&!saveFlight)reloadConfig()}
   let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}
-  if(s.zoom){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(s.zoom/700)));changed=true}if(s.fit){padReset();changed=true}
-  if(changed&&page==="home")drawPad();
-  const live=s.mode!=="Idle";$("#padMode").textContent=live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll";$("#padMode").classList.toggle("live",live);
-  const dirTxt=s.ballDir?(s.ballDir==="in"||s.ballDir==="out"?" "+s.ballDir:" "+s.ballDir):"";
-  $("#stMode").textContent=(s.lock3d?"3D mode · ":"")+(MODEN[s.mode]||s.mode)+(live?dirTxt:"");$("#stMode").className=live?"ok":"";
-  updateBall(s,live);
-  $("#stDevice").textContent=s.device||"No mouse found";$("#stDevice").className=s.device?"":"wn";
+  const amount=s.zoomLog===undefined?(s.zoom||0)/700:s.zoomLog;
+  if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
+  const focused=!document.hidden&&document.hasFocus();
+  if(changed&&page==="home"&&focused)drawPad();
+  const live=s.mode!=="Idle";liveText("#padMode",live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
+  const dirTxt=s.ballDir?" "+s.ballDir:"";
+  liveText("#stMode",(s.lock3d?"3D mode · ":"")+(MODEN[s.mode]||s.mode)+(live?dirTxt:""));liveClass("#stMode",live?"ok":"");
+  if(page==="controls"&&focused)updateBall(s,live);
+  liveText("#stDevice",s.device||"No mouse found");liveClass("#stDevice",s.device?"":"wn");
   const appTxt=s.app?(s.appState==="cad"?s.app+" — 3D on":s.appState==="off"?s.app+" — 3D off":s.app+" — normal mouse"):"—";
-  $("#stApp").textContent=appTxt;$("#integrationState").textContent=s.integration||"Normal mouse";$("#stApp").className=s.appState==="cad"?"ok":"";$("#footApp").textContent=s.appState==="cad"?s.app:(s.enabled?"Waiting for a CAD app":"Normal mouse everywhere");
-  if(s.lastBtn&&s.lastBtnAge<1500){const key=s.lastBtn+":"+Math.round((Date.now()-s.lastBtnAge)/50);if(key!==lastBtnSeen){lastBtnSeen=key;$("#lastPressed").textContent=BTN[s.lastBtn]||s.lastBtn;
-    if(page==="controls"){flashRow(s.lastBtn);selectRow(s.lastBtn,false)}}}
-  if(s.lastAction)$("#lastDid").textContent=s.lastAction;
-  const fast=(page==="home"||page==="controls")&&!document.hidden;if(fast)requestAnimationFrame(poll);else setTimeout(poll,400)}
+  liveText("#stApp",appTxt);liveText("#integrationState",s.integration||"Normal mouse");liveClass("#stApp",s.appState==="cad"?"ok":"");liveText("#footApp",s.appState==="cad"?s.app:(s.enabled?"Waiting for a CAD app":"Normal mouse everywhere"));
+  if(s.lastBtn&&s.lastBtnAge<1500){const key=s.lastBtn+":"+s.lastBtnSeq;if(key!==lastBtnSeen){lastBtnSeen=key;liveText("#lastPressed",BTN[s.lastBtn]||s.lastBtn);if(page==="controls"&&focused){flashRow(s.lastBtn);selectRow(s.lastBtn,false)}}}
+  if(s.lastAction)liveText("#lastDid",s.lastAction);
+  if(page==="home"&&focused)requestAnimationFrame(poll);else setTimeout(poll,document.hidden?1000:focused?70:250)}
 
+// Status labels are updated only when their value changes. The hidden/background
+// settings view never competes with the CAD viewport for a 60 Hz animation loop.
 /* ---------- live ball picture ---------- */
 // Shows every movement of the ball: an arrow for the direction, the shine rolls with it,
 // and the label says Moving, Orbiting, Panning or Zooming.
@@ -972,12 +978,12 @@ function updateBall(s,live){const now=performance.now(),dt=Math.min(.2,Math.max(
   let txt="";if(s.sense)txt=s.sense==="cw"?"↻":"↺";else if(live&&s.ballDir)txt=s.ballDir==="in"?"+":s.ballDir==="out"?"−":s.ballDir;
   else if(sp>.6){const a=(Math.atan2(ballV.y,ballV.x)*180/Math.PI+360)%360;txt=ARROWS[Math.round(a/45)%8][0]}
   else if(live)txt="•";
-  arrow.textContent=txt;arrow.setAttribute("opacity",Math.min(1,.35+sp/4).toFixed(2));
-  $("#ballMode").textContent=s.sense?(s.sense==="cw"?"Circles ↻ = zoom in":"Circles ↺ = zoom out"):live?MODEN[s.mode]:(sp>.6?"Moving":"");
-  $("#ballRing").setAttribute("opacity",moving?Math.min(1,live?1:.3+sp/6).toFixed(2):0);
+  if(arrow.textContent!==txt)arrow.textContent=txt;liveAttr(arrow,"opacity",Math.min(1,.35+sp/4).toFixed(2));
+  liveText("#ballMode",s.sense?(s.sense==="cw"?"Circles ↻ = zoom in":"Circles ↺ = zoom out"):live?MODEN[s.mode]:(sp>.6?"Moving":""));
+  liveAttr($("#ballRing"),"opacity",moving?Math.min(1,live?1:.3+sp/6).toFixed(2):0);
   // roll the shine: offset the gradient's highlight with the movement
-  const g=$("#ballg");if(g){const ox=36+Math.max(-14,Math.min(14,-ballV.x*1.5)),oy=30+Math.max(-14,Math.min(14,-ballV.y*1.5));g.setAttribute("cx",ox+"%");g.setAttribute("cy",oy+"%")}
-  const sh=$("#ballShine");if(sh){sh.setAttribute("transform",`translate(${Math.max(-18,Math.min(18,ballV.x*2)).toFixed(1)} ${Math.max(-18,Math.min(18,ballV.y*2)).toFixed(1)})`)}}
+  const g=$("#ballg");if(g){const ox=36+Math.max(-14,Math.min(14,-ballV.x*1.5)),oy=30+Math.max(-14,Math.min(14,-ballV.y*1.5));liveAttr(g,"cx",ox+"%");liveAttr(g,"cy",oy+"%")}
+  const sh=$("#ballShine");if(sh){liveAttr(sh,"transform",`translate(${Math.max(-18,Math.min(18,ballV.x*2)).toFixed(1)} ${Math.max(-18,Math.min(18,ballV.y*2)).toFixed(1)})`)}}
 
 /* ---------- activity log ---------- */
 let logSeq=0,logRows=[];

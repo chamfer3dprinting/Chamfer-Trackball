@@ -14,16 +14,16 @@ internal sealed class Controller:IDisposable{
     readonly HashSet<int> sentMods=[];readonly HashSet<string> sentButtons=[];
     NavMode mode=NavMode.Idle,latched=NavMode.Idle;string gestureButton="";
     readonly CircleZoom circle=new();
-    double gx,gy;float pendingX,pendingY,pendingWheel,pendingDial;NavMode emulationMode=NavMode.Idle;
-    bool stoppedByClick,emulating;int foregroundPid; nint foregroundWindow;
+    double gx,gy;readonly MotionFrames pending=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
+    bool stoppedByClick,emulating,nativeFocusAllowed=true;int foregroundPid; nint foregroundWindow;
     Rectangle pad;bool padVisible;Point padOrigin;
-    double ox,oy,px,py,zoom,rawX,rawY;bool fit;string lastBtn="",lastAction="";DateTime lastBtnTime;
+    double ox,oy,px,py,zoom,zoomLog,rawX,rawY;bool fit;string lastBtn="",lastAction="";DateTime lastBtnTime;long lastBtnSeq;
     CancellationTokenSource? macro;
     public string Mode=>circle.Active?"Zoom":mode.ToString();
     public JsonObject GuideState()=>new(){["mode"]=Mode,["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
-    public bool IsCad=>profile!=null&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
+    public bool IsCad=>profile!=null&&nativeFocusAllowed&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
     public Controller(ConfigStore store,InputDriver input,NativeServer server){
         this.store=store;this.input=input;this.server=server;cfg=store.Snapshot();
         input.IsCad=()=>IsCad;input.IsCapture=()=>mode!=NavMode.Idle;input.SelectedDevice=()=>ConfigStore.S(cfg,"selectedDevice");
@@ -52,16 +52,18 @@ public string AppName{get;private set;}="";
         }else if(profile!=null&&ConfigStore.S(profile,"id")=="demo"){
             if(!padVisible||!Win32.GetCursorPos(out var cursor2)||!new Rectangle(padOrigin.X+pad.X,padOrigin.Y+pad.Y,pad.Width,pad.Height).Contains(cursor2.X,cursor2.Y)){End();profile=null;}
         }
+        nativeFocusAllowed=profile==null||ConfigStore.S(profile,"id")=="demo"||server.AllowsNavigation(ConfigStore.S(profile,"id"),foregroundPid);
         if(!input.Ready){if(mode!=NavMode.Idle)End();Integration=input.DeviceStatus;return;}
         if(!IsCad){if(mode!=NavMode.Idle)End();Integration=server.Error.Length>0?server.Error:"Normal mouse";return;}
         var desired=Resolve();
-        if(stoppedByClick){if(desired==NavMode.Idle)stoppedByClick=false;else desired=NavMode.Idle;}
+        if(desired==NavMode.Idle)stoppedByClick=false;
+        desired=MotionPolicy.WhilePaused(desired,stoppedByClick,HeldNavigation);
         if(desired!=mode)Change(desired);
         if(native!=null&&mode!=NavMode.Idle){
             if(native.Version>=2&&native.Pose==null&&DateTime.UtcNow-native.Began>TimeSpan.FromMilliseconds(300)){End();stoppedByClick=true;Integration="Place the pointer over a 3D viewport, release the keys, and try again.";return;}
             if(server.Find(ConfigStore.S(profile,"id"),foregroundPid)!=native){End();Integration="Integration disconnected";return;}
-            Flush();
         }
+        if(mode!=NavMode.Idle)Flush();
     }
     static bool Match(string text,string pattern)=>pattern.Length>0&&pattern.Length<200&&Regex.IsMatch(text,"^"+Regex.Escape(pattern).Replace("\\*",".*")+"$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(10));
     NavMode Resolve(){
@@ -71,8 +73,10 @@ public string AppName{get;private set;}="";
         if(latched!=NavMode.Idle)return latched;
         return ConfigStore.S(cfg,"ball","pointer") switch{"orbit"=>NavMode.Orbit,"pan"=>NavMode.PanZoom,"zoom"=>NavMode.Zoom,_=>NavMode.Idle};
     }
-    void KeysChanged(){if(!IsCad||!input.Ready)return;var n=Resolve();if(n!=mode)Change(n);if(n==NavMode.Idle)stoppedByClick=false;}
+    bool HeldNavigation=>ModeResolver.Resolve(cfg,input.Keys)!=NavMode.Idle||pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
+    void KeysChanged(){if(!IsCad||!input.Ready)return;var n=Resolve();if(n==NavMode.Idle)stoppedByClick=false;n=MotionPolicy.WhilePaused(n,stoppedByClick,HeldNavigation);if(n!=mode)Change(n);}
     void Change(NavMode next){
+        if(mode!=NavMode.Idle&&IsCad&&input.Ready)Flush();
         End();if(next==NavMode.Idle||!IsCad||!input.Ready)return;
         if(next==NavMode.Gestures){mode=next;return;}
         native=server.Find(ConfigStore.S(profile,"id"),foregroundPid);
@@ -86,7 +90,7 @@ public string AppName{get;private set;}="";
         if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y);}
     }
     void End(){
-        server.End(native);native=null;pendingX=pendingY=pendingWheel=pendingDial=0;circle.Reset();
+        server.End(native);native=null;pending.Reset();circle.Reset();
         ReleaseEmulation();mode=NavMode.Idle;
     }
     void ReleaseEmulation(){
@@ -94,47 +98,50 @@ public string AppName{get;private set;}="";
         foreach(var k in sentMods.ToArray())try{Win32.Key(k,false);}catch(InvalidOperationException){ }sentMods.Clear();
         // Restore only modifiers the person is still physically holding.
         if(emulating)foreach(var k in input.Keys.Where(x=>x is 16 or 17 or 18))try{Win32.Key(k,true);}catch(InvalidOperationException){ }
-        emulating=false;emulationMode=NavMode.Idle;
+        emulating=false;emulationMode=NavMode.Idle;fractions.Reset();
     }
     void Motion(int x,int y,string device){
         rawX+=x;rawY+=y;if(mode==NavMode.Idle)return;
         if(mode==NavMode.Gestures){gx+=x;gy+=y;return;}
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
-        if(ConfigStore.B(cfg,"circleZoom")&&freeBall&&mode is NavMode.Orbit or NavMode.PanZoom){
+        if(MotionPolicy.Circle(mode,ConfigStore.B(cfg,"circleZoom"),!freeBall)){
             var dial=circle.Add(x,y,Environment.TickCount64,(float)ConfigStore.D(cfg,"circleSize",160));
-            if(dial.Consumed){pendingDial+=dial.Wheel;Flush();return;}
+            if(dial.Consumed){pending.Dial(dial.Wheel);return;}
         }else circle.Reset();
-        pendingX=Math.Clamp(pendingX+x,-4000,4000);pendingY=Math.Clamp(pendingY+y,-4000,4000);
-        Flush();
+        pending.Move(x,y);
     }
     void Flush(){
-        if(pendingX!=0||pendingY!=0||pendingWheel!=0){
-            if(!SendMotion(mode,pendingX,pendingY,pendingWheel))return;
-            pendingX=pendingY=pendingWheel=0;
+        var frame=pending.Peek();
+        if(frame.HasPrimary){
+            if(!SendMotion(mode,frame.X,frame.Y,frame.Wheel))return;
+            pending.ClearPrimary();
         }
-        if(pendingDial!=0){
-            if(!SendMotion(NavMode.Zoom,0,0,pendingDial))return;
-            pendingDial=0;
+        if(frame.HasDial){
+            if(!SendMotion(NavMode.Zoom,0,0,frame.Dial))return;
+            pending.ClearDial();
         }
     }
     bool SendMotion(NavMode output,float x,float y,float w){
-        float gain=(float)ConfigStore.D(cfg,output==NavMode.Orbit?"orbitSens":output==NavMode.Zoom?"zoomSens":"panSens",50)/50f;
+
         if(output==NavMode.Orbit){x*=ConfigStore.B(cfg,"invertOrbitX")?-1:1;y*=ConfigStore.B(cfg,"invertOrbitY")?-1:1;}
         if(output==NavMode.PanZoom&&ConfigStore.B(cfg,"invertPan")){x=-x;y=-y;}
         if(output==NavMode.Zoom&&ConfigStore.B(cfg,"invertZoom"))y=-y;
         if(ConfigStore.B(cfg,"invertZoom"))w=-w;
+        var scaled=MotionPolicy.Scale(output,x,y,w,MotionPolicy.Gain(ConfigStore.D(cfg,"orbitSens",50)),MotionPolicy.Gain(ConfigStore.D(cfg,"panSens",50)),MotionPolicy.Gain(ConfigStore.D(cfg,"zoomSens",50)));
+        x=scaled.X;y=scaled.Y;w=scaled.Wheel;
         bool demo=ConfigStore.S(profile,"id")=="demo";
-        if(native!=null&&!server.Move(native,output,x,y,w,input.Keys.Contains(18),gain))return false;
+        if(native!=null&&!server.Move(native,output,x,y,w,input.Keys.Contains(18),1))return false;
         if(native==null&&!demo){
             try{
                 PrepareEmulation(output);
-                if(output is NavMode.Orbit or NavMode.PanZoom)Win32.Mouse(1,(int)Math.Round(x*gain),(int)Math.Round(y*gain));
-                if(output==NavMode.Zoom)Win32.Mouse(0x800,0,0,(int)Math.Round((-y*8+w)*gain));
-                else if(w!=0)Win32.Mouse(0x800,0,0,(int)w);
+                var whole=fractions.Add(output is NavMode.Orbit or NavMode.PanZoom?x:0,output is NavMode.Orbit or NavMode.PanZoom?y:0,output==NavMode.Zoom?MotionPolicy.ZoomAmount(output,y,w)/.0015f:w);
+                if(whole.X!=0||whole.Y!=0)Win32.Mouse(1,whole.X,whole.Y);
+                if(whole.Wheel!=0)Win32.Mouse(0x800,0,0,whole.Wheel);
             }catch(Exception ex){Log(ex.Message,"err");End();return false;}
         }
         if(output==NavMode.Orbit){ox+=x;oy+=y;}if(output is NavMode.PanZoom or NavMode.Navigate){px+=x;py+=y;}
-        zoom+=output==NavMode.Zoom?-y+w:w;return true;
+        zoomLog+=MotionPolicy.ZoomAmount(output,y,w);
+        zoom+=output==NavMode.Zoom?-y*5.6f+w:w;return true;
     }
     void PrepareEmulation(NavMode output){
         if(emulating&&emulationMode==output)return;
@@ -151,7 +158,7 @@ public string AppName{get;private set;}="";
     }
     bool MouseEvent(int msg,int data){
         bool wheel=msg is 0x20a or 0x20e;
-        if(wheel&&mode!=NavMode.Idle){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pendingDial+=data;else pendingWheel+=data;Flush();return true;}
+        if(wheel&&mode!=NavMode.Idle){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);else pending.Wheel(data);return true;}
         if(wheel){
             var prefix=msg==0x20a?"right":"left";var wheelAction=ConfigStore.S(cfg,prefix+"Wheel","normal");
             if(wheelAction=="normal")return false;
@@ -166,7 +173,7 @@ public string AppName{get;private set;}="";
         }
         var (id,down)=msg switch{0x201=>(3,true),0x202=>(3,false),0x204=>(4,true),0x205=>(4,false),0x207=>(1,true),0x208=>(1,false),0x20b=>(data==1?2:5,true),0x20c=>(data==1?2:5,false),_=>(0,false)};
         if(id==0)return false;
-        lastBtn=ButtonName(id);lastBtnTime=DateTime.UtcNow;
+        lastBtn=ButtonName(id);lastBtnTime=DateTime.UtcNow;lastBtnSeq++;
         if(down)pressed.Add(id);else pressed.Remove(id);
         var combo=combos.Change(id,down,cfg["combos"]?.AsArray());
         bool member=cfg["combos"]?.AsArray().Any(c=>c?["buttons"] is JsonArray ids&&ids.Count(v=>v!=null)>=2&&ids.Any(v=>v?.GetValue<int>()==id)&&ConfigStore.S(c?["bind"],"action") is not "" and not "normal"&&(IsCad||ActionPolicy.Global(ConfigStore.S(c?["bind"],"action"))))==true;
@@ -247,8 +254,8 @@ public string AppName{get;private set;}="";
         }catch(OperationCanceledException){ }catch(Exception ex){Log(ex.Message,"err");}finally{if(macro==cancellation)macro=null;cancellation.Dispose();}
     }
     public JsonObject Status(){
-        var result=new JsonObject{["mode"]=Mode,["navigationMode"]=Mode,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?"cad":"mouse",["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
-        ox=oy=px=py=zoom=rawX=rawY=0;fit=false;return result;
+        var result=new JsonObject{["mode"]=Mode,["navigationMode"]=Mode,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?"cad":"mouse",["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
+        ox=oy=px=py=zoom=zoomLog=rawX=rawY=0;fit=false;return result;
     }
     public void Pad(int x,int y,int w,int h,bool visible,Point origin){pad=new(x,y,w,h);padVisible=visible;padOrigin=origin;}
     public void Dispose(){timer.Stop();timer.Dispose();macro?.Cancel();End();}

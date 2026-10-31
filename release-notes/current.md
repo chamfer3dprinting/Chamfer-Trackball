@@ -1,7 +1,7 @@
-- Reconnect the saved trackball automatically when the app starts. Existing button and wheel corrections apply without re-identifying or waiting for ball movement.
-- Keep the device's Raw Input connection attached when an embedded component replaces the process registration.
-- Recover from a transient input interruption when the trackball reconnects; release held navigation actions cleanly.
-- Device selection remains exact: other mice keep normal clicks, wheels and pointing.
-- Added actual Windows recovery checks to both Admin and public executable tests, including startup presence, unrelated devices, reconnect and replaced input registration.
-- Admin v{{ADMIN_VERSION}} retains saved keys, programs, combinations and corrections. Public candidate v{{PUBLIC_VERSION}} uses the same control code and remains unpublished.
-- Physical M512 button, wheel and navigation testing remains required; ordinary X/Y reports do not measure independent three-axis ball twist.
+- Batch sensor movement into display-rate camera updates instead of sending one camera message for every input packet. Preserve fine movement and wheel zoom at low sensitivity.
+- Ctrl+Shift Pan + zoom now allows enabled ball-circle zoom while held. Shift orbit continues to rotate; the separate Zoom key remains optional and customizable.
+- Apply zoom sensitivity consistently to ball and wheel zoom, including simultaneous pan/zoom. Sensitivity now matches the speed displayed in the interface.
+- Held commands work after a click returns to normal pointing. Background settings stop rebuilding unchanged labels and no longer run the CAD view's animation loop.
+- Add Studio protocol-2 negotiation for native Alt + ball aligned snapping and backtick navigation/Alt height. Older Studio links retain their orbit/pan/zoom connection.
+- Keep mouse and wheel defaults, custom keys and saved combinations unchanged. Public candidate v{{PUBLIC_VERSION}} remains unpublished; Admin v{{ADMIN_VERSION}} is a new version.
+- Physical responsiveness and held commands require owner testing with the updated Studio camera link. Standard M512 X/Y input does not measure independent ball twist.

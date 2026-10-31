@@ -23,13 +23,15 @@ internal sealed class NativeServer:IDisposable {
     static readonly JsonSerializerOptions json=new(){PropertyNamingPolicy=JsonNamingPolicy.CamelCase};
     public string Error {get;private set;}="";
     public NativeServer(){try{listener.Start();_ = Accept();}catch(SocketException){Error="Port 47613 is in use. Quit the previous Trackball app, then reopen this version.";}}
-    public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>c.App==app&&c.Focus&&(c.Pid==pid||c.Version==1&&app=="chamfer3d")&&DateTime.UtcNow-c.Seen<TimeSpan.FromSeconds(3));
+    static bool Matches(Client c,string app,int pid)=>c.App==app&&(c.Pid==pid||c.Socket!=null&&c.Pid==0&&app=="chamfer3d")&&DateTime.UtcNow-c.Seen<TimeSpan.FromSeconds(3);
+    public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
+    public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
     public void Begin(Client c,NavMode mode,int x,int y){lock(c.Gate){c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.SnapX=c.SnapY=0;Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
     public bool Move(Client c,NavMode mode,float dx,float dy,float wheel,bool vertical,float gain){
         lock(c.Gate){
             if(c.Version==1){
-                Queue(c,new(){["t"]="m",["ox"]=mode==NavMode.Orbit?dx*gain:0,["oy"]=mode==NavMode.Orbit?dy*gain:0,["roll"]=mode==NavMode.Roll?-dx*gain*.005f:mode==NavMode.Orbit?wheel*-.0015f:0,["px"]=mode==NavMode.PanZoom?dx*gain:0,["py"]=mode==NavMode.PanZoom?dy*gain:0,["zoom"]=mode==NavMode.Zoom?(-dy*.008f+wheel*.0015f):mode is NavMode.PanZoom or NavMode.Roll?wheel*.0015f:0});
+                Queue(c,new(){["t"]="m",["ox"]=mode==NavMode.Orbit?dx*gain:0,["oy"]=mode==NavMode.Orbit?dy*gain:0,["roll"]=mode==NavMode.Roll?-dx*gain*.005f:mode==NavMode.Orbit?wheel*gain*-.0015f:0,["px"]=mode==NavMode.PanZoom?dx*gain:0,["py"]=mode==NavMode.PanZoom?dy*gain:0,["zoom"]=MotionPolicy.ZoomAmount(mode,dy,wheel)*gain});
                 return true;
             }
             if(c.Pose==null)return false;
@@ -117,6 +119,7 @@ internal sealed class NativeServer:IDisposable {
                 var m=JsonNode.Parse(buffer.AsSpan(0,count))!.AsObject();
                 if(ConfigStore.S(m,"t")=="hello"){
                     c.App=ConfigStore.S(m,"app");c.Version=ConfigStore.I(m,"v",1);c.Pid=ConfigStore.I(m,"pid");clients[c.Id]=c;
+                    if(c.App=="chamfer3d"&&c.Version==1)Queue(c,new(){["t"]="ready",["v"]=2});
                 }else Receive(c,m);
             }
         }catch(Exception ex)when(ex is WebSocketException or OperationCanceledException or IOException or JsonException or InvalidOperationException){ }

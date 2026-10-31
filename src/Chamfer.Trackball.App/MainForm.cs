@@ -1,3 +1,4 @@
+using System.Net.WebSockets;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -160,6 +161,39 @@ internal sealed class MainForm:Form{
         forbidden.Headers.Add("Origin","https://untrusted.example");
         using var denied=await client.SendAsync(forbidden);
         if(denied.StatusCode!=System.Net.HttpStatusCode.Forbidden)throw new Exception("Native origin restriction failed.");
+
+        // Real WebSocket negotiation from a focused Studio browser tab. Its
+        // process ID is not exposed to web JavaScript, unlike native adapters.
+        using var browser=new ClientWebSocket();
+        browser.Options.SetRequestHeader("Origin","https://studio.chamfer3dprinting.com");
+        using var browserTimeout=new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        await browser.ConnectAsync(new Uri("ws://127.0.0.1:47613"),browserTimeout.Token);
+        async Task BrowserSend(JsonObject value)=>await browser.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(value.ToJsonString())),WebSocketMessageType.Text,true,browserTimeout.Token);
+        async Task<JsonObject> BrowserRead(string type){
+            var bytes=new byte[16384];
+            for(int tries=0;tries<12;tries++){int length=0;WebSocketReceiveResult received;
+                do{received=await browser.ReceiveAsync(new ArraySegment<byte>(bytes,length,bytes.Length-length),browserTimeout.Token);length+=received.Count;}while(!received.EndOfMessage);
+                var message=JsonNode.Parse(bytes.AsSpan(0,length))!.AsObject();if(ConfigStore.S(message,"t")==type)return message;
+            }throw new Exception("Missing browser camera message: "+type);
+        }
+        await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=1});
+        var offer=await BrowserRead("ready");if(ConfigStore.I(offer,"v")!=2)throw new Exception("Studio protocol upgrade missing.");
+        await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=2});
+        NativeServer.Client? studio=null;
+        for(int tries=0;tries<50;tries++){studio=native.Find("chamfer3d",Environment.ProcessId);if(studio?.Version==2)break;await Task.Delay(10);}
+        if(studio?.Version!=2||!native.Supports(studio,NavMode.Snap)||!native.Supports(studio,NavMode.Navigate))throw new Exception("Focused Studio browser did not support snap/navigation.");
+        foreach(var command in new[]{NavMode.Snap,NavMode.Navigate,NavMode.PanZoom,NavMode.Zoom}){
+            native.Begin(studio,command,240,120);var request=await BrowserRead("begin");
+            var browserScene=(JsonObject)scene.DeepClone();browserScene["session"]=ConfigStore.S(request,"session");
+            await BrowserSend(browserScene);
+            for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
+            if(studio.Pose==null||!native.Move(studio,command,30,20,120,command==NavMode.Navigate,1))throw new Exception("Studio camera command did not run: "+command);
+            var result=await BrowserRead("camera");if(ConfigStore.S(result,"session")!=studio.Session)throw new Exception("Studio camera session mismatch.");
+            native.End(studio);await BrowserRead("end");
+        }
+        await BrowserSend(new(){["t"]="focus",["on"]=false});
+        for(int tries=0;tries<50&&native.Find("chamfer3d",Environment.ProcessId)!=null;tries++)await Task.Delay(10);
+        if(native.Find("chamfer3d",Environment.ProcessId)!=null||native.AllowsNavigation("chamfer3d",Environment.ProcessId))throw new Exception("Unfocused Studio browser retained navigation or mouse emulation.");
     }
     async Task SmokeTest(){
         try{
@@ -171,7 +205,7 @@ internal sealed class MainForm:Form{
             else{bool denied=false;try{admin.State();}catch(UnauthorizedAccessException){denied=true;}if(!denied)throw new Exception("Public edition accepted an Admin command.");}
             using(var image=new Bitmap(guide.Width,guide.Height)){guide.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-guide-smoke.png"));}
             await Task.Delay(1200);
-            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(!state.version||state.version.split('.').length!==3)throw Error('version');if(!document.querySelector('.brand img').src.startsWith('data:image/png;base64,')||document.querySelector('.brand img').naturalWidth<64)throw Error('logo missing');if(state.edition==='admin'&&document.querySelector('#navAdmin').hidden)throw Error('admin missing');if(state.edition==='admin'){goTo('admin');if(!document.querySelector('#publicVersion')||!document.querySelector('#releasePublic')||document.querySelector('#releasePublic').getBoundingClientRect().width===0)throw Error('custom release control missing');}renderNotes();if(document.querySelector('#sideVer').textContent!=='v'+state.version||document.querySelector('#abVer').textContent.includes('build'))throw Error('version label uses internal build');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');if(!document.querySelector('[data-preset=ballnav]')||!document.querySelector('[data-k=circleZoom]')||!document.querySelector('[data-hold=zoomKeys]'))throw Error('missing ball navigation controls');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");
+            var check=await web.CoreWebView2.ExecuteScriptAsync("(async()=>{const state=await ctState();if(!state.version||state.version.split('.').length!==3)throw Error('version');if(!document.querySelector('.brand img').src.startsWith('data:image/png;base64,')||document.querySelector('.brand img').naturalWidth<64)throw Error('logo missing');if(state.edition==='admin'&&document.querySelector('#navAdmin').hidden)throw Error('admin missing');if(state.edition==='admin'){goTo('admin');if(!document.querySelector('#publicVersion')||!document.querySelector('#releasePublic')||document.querySelector('#releasePublic').getBoundingClientRect().width===0)throw Error('custom release control missing');}renderNotes();if(document.querySelector('#sideVer').textContent!=='v'+state.version||document.querySelector('#abVer').textContent.includes('build'))throw Error('version label uses internal build');goTo('controls');renderBinds();if(!document.querySelector('[data-hold=snapKeys]')||!document.querySelector('[data-hold=navigateKeys]'))throw Error('missing held keys');if(!document.querySelector('[data-preset=ballnav]')||!document.querySelector('[data-k=circleZoom]')||!document.querySelector('[data-hold=zoomKeys]'))throw Error('missing ball navigation controls');cfg.combos.push({buttons:[],bind:{action:'keys',keys:'Ctrl+S'}});await doSave();const saved=await ctState();if(!saved.config.combos.some(c=>c.buttons.length===0&&c.bind.keys==='Ctrl+S'))throw Error('draft not saved');renderAll();await new Promise(r=>setTimeout(r,700));let mutations=0;const observer=new MutationObserver(rows=>mutations+=rows.length);for(const id of ['footApp','stMode','stDevice','stApp','integrationState','padMode'])observer.observe(document.getElementById(id),{childList:true,characterData:true,subtree:true});await new Promise(r=>setTimeout(r,600));observer.disconnect();if(mutations>2)throw Error('Idle status labels are rebuilding: '+mutations);return true;})().then(()=>window.__smokeResult={ok:true}).catch(e=>window.__smokeResult={ok:false,error:String(e.stack||e)})");
             // ExecuteScriptAsync returns a Promise object for async expressions. Confirm
             // persisted state from C# after the bridge has completed, then inspect DOM.
             string outcome="null";
@@ -183,7 +217,7 @@ internal sealed class MainForm:Form{
             if(passed!="true"||ready!="true"||store.Snapshot()["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, floating guide, held controls, input reconnect/registration recovery, integration installer and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, floating guide, held controls, input reconnect/registration recovery, Studio snap/navigation negotiation, quiet idle status, integration installer and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }

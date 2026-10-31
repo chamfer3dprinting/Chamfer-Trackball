@@ -89,9 +89,9 @@ try{
 var dm=new DeviceMapping();var leftDown=new MouseEdge(0x201);var rightDown=new MouseEdge(0x204);
 Check(dm.Map("mouse","ball",leftDown,true,true)==leftDown,"Other mouse keeps left click");
 Check(dm.Map("mouse","ball",new(0x202),true,true)==new MouseEdge(0x202),"Other mouse keeps left release");
-Check(dm.Map("ball","ball",rightDown,true,true)==leftDown,"Trackball btn3 signal becomes left click");
+Check(dm.Map("ball","ball",rightDown,true,true)==leftDown,"Optional trackball right-to-left correction");
 Check(dm.Map("ball","other",new(0x205),false,false)==new MouseEdge(0x202),"Mapped release remains paired across settings/device changes");
-Check(dm.Map("ball","ball",leftDown,true,true)==rightDown,"Trackball btn4 signal becomes right click");
+Check(dm.Map("ball","ball",leftDown,true,true)==rightDown,"Optional trackball left-to-right correction");
 Check(dm.Map("ball","ball",new(0x202),true,true)==new MouseEdge(0x205),"Right click receives matching release");
 foreach(var delta in new[]{-240,-120,60,120,240}){
  Check(dm.Map("ball","ball",new(0x20a,delta),true,true)==new MouseEdge(0x20e,delta),"Trackball vertical-to-horizontal axis retains direction "+delta);
@@ -187,4 +187,26 @@ foreach(var badVersion in new[]{"1.2","01.2.3","1.2.3-beta","1.2.65535","1.2.3.4
  bool invalidVersion=false;try{PublicVersion.Normalize(badVersion);}catch(ArgumentException){invalidVersion=true;}
  Check(invalidVersion,"Reject invalid executable version "+badVersion);
 }
+
+var sensorFrames=new MotionFrames();float totalX=0,totalY=0,totalWheel=0,totalDial=0;int deliveredFrames=0;
+void DeliverFrame(){var frame=sensorFrames.Peek();if(frame.HasPrimary||frame.HasDial){totalX+=frame.X;totalY+=frame.Y;totalWheel+=frame.Wheel;totalDial+=frame.Dial;deliveredFrames++;}sensorFrames.Reset();}
+for(int i=1;i<=1000;i++){sensorFrames.Move(1,-2);if(i%125==0)sensorFrames.Wheel(120);if(i%100==0)sensorFrames.Dial(5);if(i%16==0)DeliverFrame();}DeliverFrame();
+Check(deliveredFrames<=64&&totalX==1000&&totalY==-2000&&totalWheel==960&&totalDial==50,"1000 Hz input becomes display-rate frames without lost motion, wheel or dial zoom");
+Check(!sensorFrames.Peek().HasPrimary&&!sensorFrames.Peek().HasDial,"Idle frames do not resend old movement");
+sensorFrames.Move(20,10);sensorFrames.Dial(7);sensorFrames.ClearPrimary();Check(!sensorFrames.Peek().HasPrimary&&sensorFrames.Peek().Dial==7,"A delayed zoom keeps its own pending sample");sensorFrames.Reset();
+var fractions=new FractionalInput();int fractionalX=0,fractionalY=0,fractionalWheel=0;
+for(int i=0;i<100;i++){var whole=fractions.Add(.1f,-.2f,.3f);fractionalX+=whole.X;fractionalY+=whole.Y;fractionalWheel+=whole.Wheel;}
+Check(fractionalX==10&&fractionalY==-20&&fractionalWheel==30,"Fine emulated motion and zoom survive fractional sensitivity");
+fractions.Reset();Check(fractions.Add(0,0,0)==(0,0,0),"Ending navigation clears fractional output");
+Check(Math.Abs(MotionPolicy.Gain(50)-1)<.0001&&Math.Abs(MotionPolicy.Gain(30)-.5f)<.0001&&Math.Abs(MotionPolicy.Gain(70)-2)<.0001,"Sensitivity matches the speed shown in the interface");
+var scaledPan=MotionPolicy.Scale(NavMode.PanZoom,20,-10,120,1,2,.25f);
+Check(scaledPan==(40,-20,30),"Pan speed and simultaneous zoom speed are independent");
+var scaledZoom=MotionPolicy.Scale(NavMode.Zoom,0,-20,120,1,2,.5f);
+Check(Math.Abs(MotionPolicy.ZoomAmount(NavMode.Zoom,scaledZoom.Y,scaledZoom.Wheel)-.17f)<.00001,"Zoom sensitivity scales both ball and wheel zoom");
+Check(MotionPolicy.Circle(NavMode.PanZoom,true,true),"Ctrl+Shift or a held pan button still permits ball-circle zoom");
+Check(!MotionPolicy.Circle(NavMode.Orbit,true,true),"Held orbit circles remain deliberate rotation");
+Check(MotionPolicy.Circle(NavMode.Orbit,true,false)&&!MotionPolicy.Circle(NavMode.PanZoom,false,true),"Free-ball circle zoom respects its saved enable switch");
+Check(MotionPolicy.WhilePaused(NavMode.Orbit,true,false)==NavMode.Idle,"A click can still restore normal pointing");
+Check(MotionPolicy.WhilePaused(NavMode.Orbit,true,true)==NavMode.Orbit&&MotionPolicy.WhilePaused(NavMode.Snap,true,true)==NavMode.Snap,"Held commands work after returning to the pointer");
+
 Console.WriteLine(count+" regression checks passed.");
