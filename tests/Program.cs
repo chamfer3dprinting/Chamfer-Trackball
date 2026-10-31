@@ -80,7 +80,7 @@ try{
  var reset=store.Reset();
  Check(ConfigStore.I(reset,"activeProgram")==0&&ModeResolver.Resolve(reset,new HashSet<int>{16})==NavMode.Idle,"Reset selects normal mouse without navigation");
  Check(!ConfigStore.B(reset,"trackballSwapButtons")&&!ConfigStore.B(reset,"trackballSwapWheels"),"Reset disables device corrections as well as bindings");Check(ConfigStore.S(reset,"leftWheel")=="normal"&&ConfigStore.S(reset,"rightWheel")=="normal","Reset restores both wheels");
- Check(reset["programs"]!.AsArray().All(p=>p!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")),"Reset restores every mouse button");
+ Check(reset["programs"]![0]!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")&&reset["programs"]![1]!["buttons"]!.AsObject().Where(b=>b.Key!="back").All(b=>ConfigStore.S(b.Value,"action")=="normal")&&ConfigStore.S(reset["programs"]![1]!["buttons"]!["back"],"action")=="panToggle","Reset restores normal mouse clicks and the 3D Back toggle");
  var bad=store.Snapshot();bad["orbitKeys"]="ctrl";bool rejected=false;try{store.Save(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"Saving Ctrl-only navigation is rejected");
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
  Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==23,"Legacy config migrates without Ctrl-only orbit");
