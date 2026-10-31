@@ -100,6 +100,8 @@ public sealed class ConfigStore {
         foreach(var node in ps){
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
             foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
+            if(p["feel"] is not JsonObject)p["feel"]=d["programs"]![0]!["feel"]!.DeepClone();
+            foreach(var entry in d["programs"]![0]!["feel"]!.AsObject())if(!p["feel"]!.AsObject().ContainsKey(entry.Key))p["feel"]![entry.Key]=entry.Value?.DeepClone();
         }
         c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=25;
     }

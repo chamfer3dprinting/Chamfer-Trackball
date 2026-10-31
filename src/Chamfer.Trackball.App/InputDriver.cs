@@ -169,6 +169,8 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                 if(!RouteKey(win,true)||!Keys.Contains(91)||!RouteKey(win,false)||!keyReplays.IsEmpty)
                     throw new InvalidOperationException("Windows navigation opened Start or lost right-Windows normalization.");
             }
+            RouteKey(91,true);RouteKey(18,true);RouteKey(18,false);RouteKey(91,false);
+            if(!keyReplays.IsEmpty)throw new InvalidOperationException("Unused Windows+Alt navigation opened a system menu.");
             RouteKey(91,true);RouteKey(68,true);RouteKey(91,false);RouteKey(68,false);
             if(!keyReplays.ToArray().SequenceEqual(new[]{(91,true),(68,true),(91,false),(68,false)}))
                 throw new InvalidOperationException("Windows+D did not retain its ordered system shortcut.");
@@ -239,7 +241,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                 ReplayKey(k,down);if(!down)delayedKeys.Remove(k);return true;
             }
             bool trigger=k is not (16 or 17 or 160 or 161 or 162 or 163)&&HookHealthy&&IsNavigationChord(Keys);
-            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);if(k is 91 or 92)usedDeferred.Add(k);NotifyKeys();return true;}
+            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);if(k is 91 or 92||Keys.Contains(91))usedDeferred.Add(k);NotifyKeys();return true;}
             if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)&&deferred.Count>0){
                 foreach(var old in deferred.ToArray()){
                     ReplayKey(old,true);delayedKeys.Add(old);deferred.Remove(old);usedDeferred.Remove(old);

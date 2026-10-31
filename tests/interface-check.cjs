@@ -136,5 +136,5 @@ keyboardContext.updateKeyboard({keys:[],appState:'cad',mode:'Idle'});assert.ok(k
 assert.ok(html.includes('id="liveKeyboard"'));
 assert.ok(controller.includes('["keys"]=KeysState()')&&controller.includes('PointerGain'));
 assert.ok(controller.includes('pointer.Move(x,y,PointerGain)')&&controller.includes('pointer.Tick('));
-assert.ok(inputDriver.includes('if(k is 91 or 92)usedDeferred.Add(k)'));
+assert.ok(inputDriver.includes('if(k is 91 or 92||Keys.Contains(91))usedDeferred.Add(k)'));
 console.log('Physical keyboard display lights held Windows/Alt and clears on release; speed reaches real pointer delivery.');
