@@ -79,3 +79,16 @@ assert.ok(!hookCallbacks.includes('KeysChanged?.Invoke('),'global hooks must que
 assert.ok(!hookCallbacks.includes('FailOpen('),'global hooks must queue recovery work');
 assert.ok(hookPump.includes('Application.Run()')&&hookPump.includes('thread.Start()'),'global hooks need their own running message pump');
 console.log('Global input hooks hand off keyboard injection, controller work and recovery outside their callbacks.');
+
+const identificationStart=html.indexOf('document.addEventListener("click",async e=>{',html.indexOf('/* ---------- controls page'));
+const identificationEnd=html.indexOf('async function devicePoll',identificationStart);
+assert.ok(identificationStart>0&&identificationEnd>identificationStart);
+(async()=>{
+ let handler;const calls=[];
+ const context={document:{addEventListener:(name,fn)=>{handler=fn}},call:async name=>calls.push(name),toast:()=>{}};
+ vm.runInNewContext(html.slice(identificationStart,identificationEnd),context);
+ await handler({target:{id:'homeIdentifyTrackball'}});await handler({target:{id:'homeCancelIdentify'}});
+ assert.deepEqual(calls,['ctIdentify','ctCancelIdentify']);
+ assert.ok(html.includes('id="homeDeviceSetup"')&&html.includes('s.deviceReady'));
+ console.log('Home identification and cancellation reach the input driver and setup readiness is visible.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

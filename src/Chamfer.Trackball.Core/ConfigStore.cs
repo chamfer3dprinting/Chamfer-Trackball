@@ -46,6 +46,8 @@ public sealed class ConfigStore {
     public void Save(JsonObject incoming) {
         lock(gate){
             var next=(JsonObject)incoming.DeepClone();Normalize(next);
+            // Device identity comes from Raw Input, not a possibly stale settings page.
+            next["selectedDevice"]=config["selectedDevice"]?.DeepClone()??JsonValue.Create("");
             var i=Math.Clamp(I(next,"activeProgram",0),0,next["programs"]!.AsArray().Count-1);
             next["activeProgram"]=i;
             var p=next["programs"]![i]!.AsObject();
@@ -54,6 +56,13 @@ public sealed class ConfigStore {
             foreach(var key in new[]{"orbitSens","panSens","zoomSens","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
             next["feel"]=p["feel"]!.DeepClone();
             Validate(next);Write(next);config=next;Revision++;
+        }
+    }
+    public void IdentifyDevice(string device){
+        if(string.IsNullOrWhiteSpace(device)||device.Length>4095)throw new ArgumentException("Invalid trackball identity.",nameof(device));
+        lock(gate){
+            var next=(JsonObject)config.DeepClone();next["selectedDevice"]=device;
+            Write(next);config=next;Revision++;
         }
     }
     public void Select(int index){lock(gate){var n=(JsonObject)config.DeepClone();LoadProgram(n,index);Write(n);config=n;Revision++;}}

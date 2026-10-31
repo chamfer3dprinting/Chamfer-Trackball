@@ -56,9 +56,13 @@ var draftTracker=new ComboTracker();draftTracker.Change(1,true,unassigned);Check
 string dirPath=Path.Combine(Path.GetTempPath(),"chamfer-tests-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(dirPath);
 try{
  var path=Path.Combine(dirPath,"settings.json");var store=new ConfigStore(path);var s=store.Snapshot();
+ store.IdentifyDevice("trackball-device-a");
  s["combos"]=new JsonArray(new JsonObject{["buttons"]=new JsonArray(),["bind"]=new JsonObject{["action"]="keys",["keys"]="Ctrl+S"}});
  store.Save(s);var reopened=new ConfigStore(path).Snapshot();
  Check(reopened["combos"]!.AsArray().Count==1&&reopened["combos"]![0]!["buttons"]!.AsArray().Count==0,"Incomplete combination persists through restart");
+ Check(ConfigStore.S(reopened,"selectedDevice")=="trackball-device-a","A stale settings save cannot erase the newly identified trackball");
+ store.IdentifyDevice("trackball-device-b");store.Save(reopened);
+ Check(ConfigStore.S(store.Snapshot(),"selectedDevice")=="trackball-device-b","An older page cannot restore a previous trackball identity");
  s=reopened;s["combos"]=list.DeepClone();store.Save(s);
  Check(new ConfigStore(path).Snapshot()["combos"]!.AsArray().Count==2,"Complete combinations persist");
  store.Select(0);Check(ConfigStore.S(store.Snapshot(),"orbitKeys")=="none","Normal mouse has no navigation");
@@ -73,11 +77,15 @@ try{
  Check(!ConfigStore.B(store.Snapshot(),"circleZoom"),"Normal program does not inherit circle zoom");
  store.Select(1);var custom=new ConfigStore(path).Snapshot();
  Check(ConfigStore.B(custom,"circleZoom")&&ConfigStore.I(custom,"circleSize")==210,"Circle settings survive program switches and restart");
+ Check(ConfigStore.S(custom,"selectedDevice")=="trackball-device-b","Trackball identity survives program switches and restart");
  Check(ModeResolver.Resolve(custom,new HashSet<int>{18,81})==NavMode.Orbit,"Custom orbit chord is used");
  Check(ModeResolver.Resolve(custom,new HashSet<int>{17,32})==NavMode.PanZoom,"Custom pan chord is used");
  Check(ModeResolver.Resolve(custom,new HashSet<int>{16,90})==NavMode.Zoom,"Custom zoom chord is used");
  custom["trackballSwapButtons"]=true;custom["trackballSwapWheels"]=true;store.Save(custom);
  var reset=store.Reset();
+ Check(ConfigStore.S(reset,"selectedDevice")=="trackball-device-b","Restoring normal controls keeps the identified trackball");
+ bool invalidIdentity=false;try{store.IdentifyDevice("");}catch(ArgumentException){invalidIdentity=true;}
+ Check(invalidIdentity&&ConfigStore.S(store.Snapshot(),"selectedDevice")=="trackball-device-b","Invalid identification cannot replace the saved trackball");
  Check(ConfigStore.I(reset,"activeProgram")==0&&ModeResolver.Resolve(reset,new HashSet<int>{16})==NavMode.Idle,"Reset selects normal mouse without navigation");
  Check(!ConfigStore.B(reset,"trackballSwapButtons")&&!ConfigStore.B(reset,"trackballSwapWheels"),"Reset disables device corrections as well as bindings");Check(ConfigStore.S(reset,"leftWheel")=="normal"&&ConfigStore.S(reset,"rightWheel")=="normal","Reset restores both wheels");
  Check(reset["programs"]![0]!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")&&reset["programs"]![1]!["buttons"]!.AsObject().Where(b=>b.Key!="back").All(b=>ConfigStore.S(b.Value,"action")=="normal")&&ConfigStore.S(reset["programs"]![1]!["buttons"]!["back"],"action")=="panToggle","Reset restores normal mouse clicks and the 3D Back toggle");

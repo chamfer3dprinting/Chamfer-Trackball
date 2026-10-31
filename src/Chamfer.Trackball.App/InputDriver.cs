@@ -37,6 +37,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public string DeviceStatus {get;private set;}="Identify your trackball to enable device-only controls.";
     public string LastDevice {get;private set;}="";
     public bool Ready=>connected&&!failed&&SelectedDevice().Length>0;
+    public bool Identifying=>learning;
     bool Routing=>(Ready&&(Enabled()||SwapButtons()||SwapWheels()))||Volatile.Read(ref heldRouting)>0;
     bool HookHealthy{
         get{
@@ -47,7 +48,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     void NotifyKeys(){if(Interlocked.Exchange(ref keysPending,1)==0)Win32.PostMessage(Handle,DispatchKeys,0,0);}
     void ReplayKey(int key,bool down){keyReplays.Enqueue((key,down));NotifyKeys();}
     void HookFailed(string message){failed=true;Interlocked.Exchange(ref hookError,message);Win32.PostMessage(Handle,DispatchFailure,0,0);}
-    public void Identify(){learning=true;learnUntil=Environment.TickCount64+15000;DeviceStatus="Roll only the trackball now…";failed=false;recoverOnInput=false;}
+    public void Identify(){learning=true;learnUntil=Environment.TickCount64+60000;DeviceStatus="Roll only the trackball now…";failed=false;recoverOnInput=false;}
     public void CancelIdentify(){learning=false;DeviceStatus=Ready?"Trackball connected":"Trackball not identified";}
     void Watchdog(object? sender,EventArgs e){
         var now=Environment.TickCount64;Volatile.Write(ref uiPulse,now);

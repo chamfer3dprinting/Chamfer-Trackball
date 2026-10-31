@@ -271,6 +271,11 @@ details .ver{margin-top:10px;font-weight:600}
         <button class="btn primary" id="welcomeOk">Got it</button>
       </div>
       <h1>Hold, roll, model.</h1><p id="integrationState" class="note">Normal mouse</p>
+      <div id="homeDeviceSetup" class="note" hidden>
+        <b id="homeDeviceMessage">Identify your trackball to turn on its 3D controls.</b>
+        <p class="mu" style="margin:6px 0 10px">Click Identify trackball, then roll only the M512 ball. The app remembers it when you change settings or restart.</p>
+        <div class="row"><button class="btn primary" id="homeIdentifyTrackball">Identify trackball</button><button class="btn sm" id="homeCancelIdentify" hidden>Cancel</button></div>
+      </div>
       <p class="sub">In 3D apps, choose the <b>3D modelling</b> program below for ball-only orbit, pan and circle zoom. <b>Normal mouse</b> keeps standard pointer, click and scroll behavior.</p>
       <div class="grid g3" style="margin-bottom:16px">
         <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="6"/><path d="M5 6h4M15 6h4"/></svg></div><div style="min-width:0"><small>Trackball</small><b id="stDevice">Looking…</b></div></div>
@@ -622,8 +627,8 @@ function flashSaved(){$$(".saved").forEach(s=>{s.textContent="✓ Saved";s.style
 
 /* ---------- controls page ---------- */
 document.addEventListener("click",async e=>{
- if(e.target.id==="identifyTrackball"){await call("ctIdentify");toast("Roll only the trackball now");}
- if(e.target.id==="cancelIdentify")await call("ctCancelIdentify");
+ if(e.target.id==="identifyTrackball"||e.target.id==="homeIdentifyTrackball"){await call("ctIdentify");toast("Roll only the M512 ball now — listening for 60 seconds");}
+ if(e.target.id==="cancelIdentify"||e.target.id==="homeCancelIdentify")await call("ctCancelIdentify");
 });
 async function devicePoll(){try{const d=await call("ctDeviceState");$("#deviceIdentity").textContent=d.status}catch{}setTimeout(devicePoll,700)}
 setTimeout(devicePoll,1000);
@@ -957,9 +962,12 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   const dirTxt=s.ballDir?" "+s.ballDir:"";
   liveText("#stMode",(s.lock3d?"3D mode · ":"")+(MODEN[s.mode]||s.mode)+(live?dirTxt:""));liveClass("#stMode",live?"ok":"");
   if(page==="controls"&&focused)updateBall(s,live);
-  liveText("#stDevice",s.device||"No mouse found");liveClass("#stDevice",s.device?"":"wn");
-  const appTxt=s.app?(s.appState==="cad"?s.app+" — 3D on":s.appState==="off"?s.app+" — 3D off":s.app+" — normal mouse"):"—";
-  liveText("#stApp",appTxt);liveText("#integrationState",s.integration||"Normal mouse");liveClass("#stApp",s.appState==="cad"?"ok":"");liveText("#footApp",s.appState==="cad"?s.app:(s.enabled?"Waiting for a CAD app":"Normal mouse everywhere"));
+  liveText("#stDevice",s.device||"No mouse found");liveClass("#stDevice",s.deviceReady?"":"wn");
+  $("#homeDeviceSetup").hidden=!!s.deviceReady;
+  $("#homeIdentifyTrackball").disabled=!!s.identifying;$("#homeCancelIdentify").hidden=!s.identifying;
+  liveText("#homeDeviceMessage",s.identifying?"Roll only the M512 ball now — listening…":"Identify your trackball to turn on its 3D controls.");
+  const appTxt=s.app?(s.appState==="cad"?s.app+" — 3D on":s.appState==="setup"?s.app+" — identify trackball":s.appState==="off"?s.app+" — 3D off":s.app+" — normal mouse"):"—";
+  liveText("#stApp",appTxt);liveText("#integrationState",s.integration||"Normal mouse");liveClass("#stApp",s.appState==="cad"?"ok":"");liveText("#footApp",s.appState==="cad"?s.app:s.appState==="setup"?"Identify trackball for 3D controls":(s.enabled?"Waiting for a CAD app":"Normal mouse everywhere"));
   if(s.lastBtn&&s.lastBtnAge<1500){const key=s.lastBtn+":"+s.lastBtnSeq;if(key!==lastBtnSeen){lastBtnSeen=key;liveText("#lastPressed",BTN[s.lastBtn]||s.lastBtn);if(page==="controls"&&focused){flashRow(s.lastBtn);selectRow(s.lastBtn,false)}}}
   if(s.lastAction)liveText("#lastDid",s.lastAction);
   setTimeout(poll,document.hidden?1000:!focused?250:(page==="home"||page==="controls"?ACTIVE_STATUS_POLL_MS:250))}
