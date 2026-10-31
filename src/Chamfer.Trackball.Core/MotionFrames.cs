@@ -42,6 +42,7 @@ public static class MotionPolicy{
  public static float Gain(double slider)=>MathF.Pow(2,((float)Math.Clamp(slider,0,100)-50)/20);
  public static bool Circle(NavMode mode,bool enabled,bool held)=>enabled&&(mode==NavMode.PanZoom||mode==NavMode.Orbit&&!held);
  public static NavMode WhilePaused(NavMode desired,bool paused,bool held)=>paused&&!held?NavMode.Idle:desired;
+ public static bool ResumeAfterClick(bool stoppedByClick,NavMode desired,bool heldNavigation,bool ballMoved)=>stoppedByClick&&ballMoved&&!heldNavigation&&desired!=NavMode.Idle;
  public static (float X,float Y,float Wheel) Scale(NavMode mode,float x,float y,float wheel,float orbit,float pan,float zoom){
   float movement=mode==NavMode.Zoom?zoom:mode is NavMode.Orbit or NavMode.Roll or NavMode.Snap?orbit:pan;
   float scroll=mode is NavMode.Orbit or NavMode.Navigate?orbit:zoom;
