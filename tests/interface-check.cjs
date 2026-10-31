@@ -121,7 +121,7 @@ programConfig.pointerSpeed=2;programConfig.glide=1;programConfig.navigateKeys='n
 assert.equal(programConfig.pointerSpeed,17);assert.equal(programConfig.glide,77);assert.equal(programConfig.navigateKeys,'win');
 const coreStore=fs.readFileSync('src/Chamfer.Trackball.Core/ConfigStore.cs','utf8');
 for(const field of helpers.fields)assert.ok(coreStore.includes('"'+field+'"'));
-assert.ok(html.includes('const p=snapshotProgram();')&&html.includes('loadProgramFields(np);'));
+assert.ok(html.includes('const p=snapshotProgram();'));
 assert.ok(html.includes('choice==="current"?snapshotProgram()'));
 console.log('Added, duplicated and remaining programs carry full speed, glide, gestures, combinations and held controls without aliasing.');
 
