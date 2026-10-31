@@ -1,5 +1,8 @@
 # Chamfer Trackball Admin update
 
+- Add named saved presets: Save current as preset, Apply, Rename and Delete. Presets include full program controls, pointer/3D speeds and glide, survive restart and control resets, and require explicit replacement of an existing name.
+- Keep a renamed program’s default template, and repair every program target in controls and saved presets when deleting a program.
+
 - Start keyboard state cleanly and highlight only physical key edges observed after launch. An inherited Backtick/OS key state cannot disable the held navigation shortcuts. If a key was already held before opening the app, release and press it again.
 
 - Make the saved pointer speed / effective DPI slider affect actual selected-trackball movement, with immediate delivery and preserved fractional counts.

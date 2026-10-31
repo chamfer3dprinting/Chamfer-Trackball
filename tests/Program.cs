@@ -342,4 +342,62 @@ Check(stable,"Face-boundary noise does not flicker between adjacent views");
 var snappedOff=CameraMath.AlignFace(offCenter with{WorldUp=Vector3.UnitY},Vector3.UnitX,1);
 Check(Vector2.Distance(ProjectPivot(offCenter),ProjectPivot(snappedOff))<.0001,"Upright face turns preserve an off-center cursor pivot");
 
+
+var presetPath=Path.Combine(Path.GetTempPath(),"chamfer-presets-"+Guid.NewGuid().ToString("N")+".json");
+try{
+ var library=new ConfigStore(presetPath);library.IdentifyDevice("preset-trackball");library.Select(1);
+ var setup=library.Snapshot();var staleLibrary=(JsonObject)setup.DeepClone();
+ setup["pointerSpeed"]=7;setup["orbitSens"]=62;setup["panSens"]=71;setup["zoomSens"]=39;setup["glide"]=64;setup["smooth"]=false;
+ setup["circleSize"]=90;setup["leftWheel"]="keys";setup["leftWheelUpKeys"]="Ctrl+S";
+ setup["combos"]=new JsonArray(new JsonObject{["buttons"]=new JsonArray(1,2),["bind"]=new JsonObject{["action"]="keys",["keys"]="Alt+Q"}});
+ setup["programs"]![1]!["gestures"]!["up"]=new JsonObject{["type"]="keys",["keys"]="F"};
+ library.Save(setup);var savedPreset=library.SavePreset(" Fine CAD ");
+ Check(savedPreset["presets"]!.AsArray().Count==1&&ConfigStore.S(savedPreset["presets"]![0],"name")=="Fine CAD","A named preset saves with a trimmed name");
+ var presetSettings=savedPreset["presets"]![0]!["settings"]!;
+ Check(ConfigStore.I(presetSettings,"pointerSpeed")==7&&ConfigStore.I(presetSettings["feel"],"glide")==64&&!ConfigStore.B(presetSettings["feel"],"smooth"),"Presets save pointer speed, glide and motion feel");
+ Check(ConfigStore.S(presetSettings,"navigateKeys")=="win"&&ConfigStore.S(presetSettings,"leftWheelUpKeys")=="Ctrl+S"&&ConfigStore.S(presetSettings["gestures"]!["up"],"keys")=="F","Presets save navigation keys, wheels and gestures");
+ Check(!presetSettings.AsObject().ContainsKey("selectedDevice")&&!presetSettings.AsObject().ContainsKey("profiles")&&!presetSettings.AsObject().ContainsKey("theme"),"A program preset excludes device identity and unrelated app settings");
+ library.Save(staleLibrary);Check(library.Snapshot()["presets"]!.AsArray().Count==1,"An older settings page cannot erase a newly saved preset");
+ var reopenedLibrary=new ConfigStore(presetPath);reopenedLibrary.Select(0);
+ var beforeApply=reopenedLibrary.Snapshot();var otherBefore=beforeApply["programs"]![1]!.ToJsonString();
+ var applied=reopenedLibrary.ApplyPreset(0);
+ Check(ConfigStore.S(applied["programs"]![0],"name")=="Normal mouse"&&applied["programs"]![1]!.ToJsonString()==otherBefore,"Applying a preset preserves program names and the other program's settings");
+ Check(ConfigStore.I(applied,"pointerSpeed")==7&&ConfigStore.I(applied,"orbitSens")==62&&ConfigStore.I(applied,"panSens")==71&&ConfigStore.I(applied,"zoomSens")==39&&ConfigStore.I(applied,"glide")==64,"Applied presets reach every actual speed and glide field");
+ Check(ConfigStore.S(applied,"selectedDevice")=="preset-trackball"&&applied["combos"]![0]!["buttons"]!.ToJsonString()=="[1,2]","Applying a preset keeps the identified trackball and restores combinations");
+ var edited=reopenedLibrary.Snapshot();edited["pointerSpeed"]=18;reopenedLibrary.Save(edited);
+ Check(ConfigStore.I(reopenedLibrary.Snapshot()["presets"]![0]!["settings"],"pointerSpeed")==7,"Editing a program does not change the saved preset");
+ bool duplicateRejected=false;try{reopenedLibrary.SavePreset("fine cad");}catch(InvalidDataException){duplicateRejected=true;}
+ Check(duplicateRejected&&reopenedLibrary.Snapshot()["presets"]!.AsArray().Count==1,"An existing preset needs explicit replacement");
+ reopenedLibrary.SavePreset("fine cad",true);
+ Check(ConfigStore.I(reopenedLibrary.Snapshot()["presets"]![0]!["settings"],"pointerSpeed")==18,"Explicit replacement updates the existing preset");
+ reopenedLibrary.RenamePreset(0,"Detail view");
+ Check(ConfigStore.S(new ConfigStore(presetPath).Snapshot()["presets"]![0],"name")=="Detail view","Renamed presets survive restart");
+ bool invalidName=false;try{reopenedLibrary.SavePreset(" ");}catch(InvalidDataException){invalidName=true;}
+ Check(invalidName,"Blank preset names cannot overwrite the library");
+ var resetLibrary=reopenedLibrary.Reset();
+ Check(resetLibrary["presets"]!.AsArray().Count==1&&ConfigStore.S(resetLibrary["presets"]![0],"name")=="Detail view","Resetting controls preserves personal presets");
+ reopenedLibrary.Select(1);var referenced=reopenedLibrary.Snapshot();
+ var third=(JsonObject)referenced["programs"]![1]!.DeepClone();third["name"]="Third";third["pointerSpeed"]=17;referenced["programs"]!.AsArray().Add(third);
+ referenced["buttons"]!["back"]=new JsonObject{["action"]="program",["program"]=2};
+ referenced["modeButtons"]=new JsonObject{["middle"]=new JsonObject{["action"]="program",["program"]=1}};
+ referenced["combos"]=new JsonArray(new JsonObject{["buttons"]=new JsonArray(1,2),["bind"]=new JsonObject{["action"]="program",["program"]=2}});
+ referenced["programs"]![1]!["gestures"]!["up"]=new JsonObject{["type"]="program",["program"]=1};
+ referenced["wheelPrograms"]=new JsonArray(0,1,2,2);reopenedLibrary.Save(referenced);reopenedLibrary.SavePreset("Program targets");
+ var remaining=reopenedLibrary.DeleteProgram(1);
+ Check(ConfigStore.S(remaining["programs"]![1],"name")=="Third"&&ConfigStore.I(remaining,"pointerSpeed")==17,"Deleting a program loads all settings from the remaining program");
+ var targets=remaining["presets"]![1]!["settings"]!;
+ Check(ConfigStore.I(targets["buttons"]!["back"],"program")==1&&ConfigStore.I(targets["modeButtons"]!["middle"],"program")==0&&ConfigStore.I(targets["combos"]![0]!["bind"],"program")==1&&ConfigStore.I(targets["gestures"]!["up"],"program")==0&&targets["wheelPrograms"]!.ToJsonString()=="[0,0,1,1]","Program deletion repairs every saved preset's button, mode, combination, gesture and wheel target");
+ reopenedLibrary.ApplyPreset(1);
+ Check(ConfigStore.S(reopenedLibrary.Snapshot()["programs"]![1],"name")=="Third"&&ConfigStore.I(reopenedLibrary.Snapshot()["buttons"]!["back"],"program")==1,"A preset still applies correctly after one of its target programs was deleted");
+ var beforeDelete=reopenedLibrary.Snapshot();reopenedLibrary.DeletePreset(0);
+ Check(reopenedLibrary.Snapshot()["presets"]!.AsArray().Count==1&&reopenedLibrary.Snapshot()["programs"]!.ToJsonString()==beforeDelete["programs"]!.ToJsonString(),"Deleting a saved preset keeps the applied program settings");
+ bool invalidIndex=false;try{reopenedLibrary.ApplyPreset(99);}catch(InvalidDataException){invalidIndex=true;}
+ Check(invalidIndex,"An invalid preset index cannot change the program");
+ var tooMany=ConfigStore.Defaults();for(int index=0;index<65;index++)tooMany["presets"]!.AsArray().Add(new JsonObject{["name"]="Preset "+index,["settings"]=tooMany["programs"]![0]!.DeepClone()});
+ bool overflow=false;try{ConfigStore.Validate(tooMany);}catch(InvalidDataException){overflow=true;}
+ Check(overflow,"Preset libraries have a bounded size");
+}finally{
+ foreach(var suffix in new[]{"",".previous",".writing"})if(File.Exists(presetPath+suffix))File.Delete(presetPath+suffix);
+}
+
 Console.WriteLine(count+" regression checks passed.");

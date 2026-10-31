@@ -26,7 +26,7 @@ The draggable, always-on-top guide shows the same four-button arrangement, curre
 - Hold **Ctrl+Shift** and roll: pan; use the wheel simultaneously for zoom.
 - Hold **Ctrl** and roll up/down: zoom.
 - Hold **Alt** and roll: snap to Top, Bottom, Left, Right, Front or Back. Diagonal edge and corner views are excluded.
-- Hold **backtick** and roll: navigate; add **Alt** for height.
+- Hold **Windows** and roll: navigate; add **Alt** for height. Release does not open Start in this 3D context.
 - The 3D modelling program starts with ordinary pointer movement. Hold a navigation key to move the camera; release it to point again. Ctrl+C, Ctrl+V and other typing shortcuts stay normal. Held orbit, pan and zoom bindings are editable and saved; complete and incomplete button combinations survive restart.
 - **Ball navigation** is an optional quick setup: roll to orbit; tap Back to switch only between orbit and pan; draw small clockwise/anticlockwise circles to zoom in/out. Straight rolling returns to orbit or pan. The Circle size and Zoom sensitivity settings tune the gesture. Held keys/buttons override circle recognition.
 
@@ -56,6 +56,13 @@ Windows release does not open Start when reserved by the active program in a 3D 
 Pointer speed/effective DPI now changes the identified trackball's delivered pointer counts. Hardware DPI selection only calibrates the estimate. Pointer speed, Orbit/Pan/Zoom speed, soft stop and glide are saved per program and retained by Add, Duplicate, switching and restart. Pointer gain does not multiply camera speed. Soft stop applies to pointing and navigation; clicks and mode changes stop the tail. A live keyboard on Home and in the guide highlights currently held shortcut keys without recording typed text.
 
 Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep their coordinate convention. The standard M512 sensor still supplies only X/Y ball movement; use a wheel for the additional roll.
+
+
+### Saved presets
+
+In Buttons & keys, choose **Save current as preset**, give the setup a name, and save. The Speed & direction page has the same Save control. Choose a saved preset and click **Apply** to use it in the active program. Rename or delete a preset from the same card; saving an existing name asks before replacing it.
+
+Presets include buttons, held keys, wheels, combinations, gestures, pointer speed, Orbit/Pan/Zoom speed and motion feel. They survive app restarts and control resets. Applying one preserves the program name, other programs and selected trackball. Hardware DPI calibration and general app settings stay outside a program preset.
 
 ## Build and verification
 

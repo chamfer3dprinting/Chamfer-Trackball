@@ -145,10 +145,22 @@ console.log('Keyboard starts with observed physical edges, so an inherited Backt
 
 assert.ok(html.includes('.slider:has(input[data-k="pointerSpeed"]){grid-template-columns:90px 1fr 165px}'),'effective DPI value needs readable space at the normal app width');
 
-const programReindex=new Function(html.slice(html.indexOf('function reindexProgram('),html.indexOf('function progOpts('))+';return reindexProgram;')();
-const referenced={buttons:{back:{action:'program',program:2}},modeButtons:{middle:{action:'program',program:1}},combos:[{bind:{action:'program',program:2}}],gestures:{up:{type:'program',program:1}},wheelPrograms:[0,1,2,2]};
-programReindex(referenced,x=>x>1?x-1:x===1?0:x);
-assert.equal(referenced.buttons.back.program,1);assert.equal(referenced.modeButtons.middle.program,0);
-assert.equal(referenced.combos[0].bind.program,1);assert.equal(referenced.gestures.up.program,0);assert.deepEqual(referenced.wheelPrograms,[0,0,1,1]);
+
+assert.ok(html.includes('call("ctProgramDelete",cfg.activeProgram)'),'program deletion must update stored programs and preset references together');
 assert.ok(html.includes('p.defaultKind=p.defaultKind||p.name;p.name=n'));
-console.log('Renaming retains the program default; deleting reindexes button, mode, combination, gesture and wheel targets together.');
+for(const id of ['savedPresetsCard','presetSelect','presetApply','presetRename','presetDelete'])assert.ok(html.includes('id="'+id+'"'));
+const presetStart=html.indexOf('async function handlePreset('),presetEnd=html.indexOf('function progOpts(',presetStart);
+assert.ok(presetStart>0&&presetEnd>presetStart);
+(async()=>{
+ const calls=[];let ask='Fine CAD';const cfg={activeProgram:0,programs:[{name:'3D modelling'}],presets:[]};
+ const context={cfg,$:()=>({value:'0'}),askText:async()=>ask,modal:async()=>true,doSave:async()=>calls.push(['save']),call:async(name,...args)=>{calls.push([name,...args]);return context.cfg},renderAll:()=>{},toast:()=>{}};
+ vm.runInNewContext(html.slice(presetStart,presetEnd),context);
+ const button=id=>({id,hasAttribute:name=>name==='data-savepreset'&&id==='save'});
+ await context.handlePreset(button('save'));assert.deepEqual(calls,[['save'],['ctPresetSave','Fine CAD',false]]);
+ context.cfg.presets=[{name:'Fine CAD'}];calls.length=0;await context.handlePreset(button('save'));assert.deepEqual(calls,[['save'],['ctPresetSave','Fine CAD',true]]);
+ ask='Detail view';calls.length=0;await context.handlePreset(button('presetRename'));assert.deepEqual(calls,[['save'],['ctPresetRename',0,'Detail view']]);
+ calls.length=0;await context.handlePreset(button('presetApply'));assert.deepEqual(calls,[['save'],['ctPresetApply',0]]);
+ calls.length=0;await context.handlePreset(button('presetDelete'));assert.deepEqual(calls,[['save'],['ctPresetDelete',0]]);
+ ask=null;calls.length=0;await context.handlePreset(button('save'));assert.equal(calls.length,0);
+ console.log('Save, explicit overwrite, apply, rename and delete use the preset bridge after saving current program edits; cancellation changes nothing.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
