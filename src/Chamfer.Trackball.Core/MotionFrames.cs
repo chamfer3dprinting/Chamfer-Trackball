@@ -40,7 +40,14 @@ public sealed class FractionalInput{
  public void Reset()=>x=y=wheel=0;
 }
 public static class MotionPolicy{
- public static float Gain(double slider)=>MathF.Pow(2,((float)Math.Clamp(slider,0,100)-50)/20);
+ // 0 stops this motion; 1..50 spans 1%..100%; 50..100 spans 100%..400%.
+ public static float Gain(double slider){
+  float value=(float)Math.Clamp(slider,0,100);
+  if(value<=0)return 0;
+  return value<=50?MathF.Pow(100,(value-50)/49):MathF.Pow(4,(value-50)/50);
+ }
+ // Face switching keeps its previous stroke length while smooth 3D motion gets a wider range.
+ public static float SnapGain(double slider)=>MathF.Pow(2,((float)Math.Clamp(slider,1,100)-50)/20);
  public static bool Circle(NavMode mode,bool enabled,bool held)=>enabled&&(mode==NavMode.PanZoom||mode==NavMode.Orbit&&!held);
  public static NavMode WhilePaused(NavMode desired,bool paused,bool held)=>paused&&!held?NavMode.Idle:desired;
  public static bool ResumeAfterClick(bool stoppedByClick,NavMode desired,bool heldNavigation,bool ballMoved)=>stoppedByClick&&ballMoved&&!heldNavigation&&desired!=NavMode.Idle;

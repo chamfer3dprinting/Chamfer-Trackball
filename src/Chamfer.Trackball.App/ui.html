@@ -454,9 +454,11 @@ details .ver{margin-top:10px;font-weight:600}
       </div>
       <div class="card" style="margin-bottom:16px">
         <h2>3D speed</h2>
-        <div class="slider"><b>Orbit</b><input type="range" min="1" max="100" data-k="orbitSens"><span class="val" data-v="orbitSens"></span></div>
-        <div class="slider"><b>Pan</b><input type="range" min="1" max="100" data-k="panSens"><span class="val" data-v="panSens"></span></div>
-        <div class="slider"><b>Zoom</b><input type="range" min="1" max="100" data-k="zoomSens"><span class="val" data-v="zoomSens"></span></div>
+        <p class="mu">50 is the default (100%). The low end goes down to 1%; 0 stops that motion. These speeds affect 3D navigation, independently of pointer DPI and face switching.</p>
+        <p class="mu" id="activeSpeeds" style="font-size:12px"></p>
+        <div class="slider"><b>Orbit</b><input type="range" min="0" max="100" data-k="orbitSens"><span class="val" data-v="orbitSens"></span></div>
+        <div class="slider"><b>Pan</b><input type="range" min="0" max="100" data-k="panSens"><span class="val" data-v="panSens"></span></div>
+        <div class="slider"><b>Zoom</b><input type="range" min="0" max="100" data-k="zoomSens"><span class="val" data-v="zoomSens"></span></div>
       </div>
       <div class="card" style="margin-bottom:16px">
         <h2>Precision</h2>
@@ -685,7 +687,7 @@ function renderBinds(){
     const warn=bs.length<2?'<div class="desc wn">Pick at least two buttons.</div>':"";
     out.push(`<div class="bind" data-row="combo-${ci}"><div class="nm"><b>${bs.length?bs.map(n=>"btn"+n).join(" + "):"New combination"}</b><small>Combination ${ci+1}</small></div><div class="opts"><div class="line">${boxes}</div><div class="line"><select data-cact="${ci}">${opts(CACT,bd.action)}</select><button class="btn sm" data-cdel="${ci}">Remove</button></div>${warn}${extra}</div></div>`)});
   $("#binds").innerHTML=out.join("");
-  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll to snap to Top, Bottom, Left, Right, Front or Back. Keep rolling to reach the opposite face. The wheel turns the face in 90° steps. Requires a native integration."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Windows release will not open Start in this program’s 3D view. Requires a native integration."]].map(([k,n,d])=>
+  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll straight up, down, left or right to change the cube face. Curl the ball path into a small clockwise or counterclockwise loop to turn that face 90° in the same direction, like the cube’s rotate arrow. Roll straight again to change faces. The wheel also turns the face. Requires a native integration; the gesture uses X/Y movement, not a separately sensed physical twist."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Windows release will not open Start in this program’s 3D view. Requires a native integration."]].map(([k,n,d])=>
     `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):`<span class="mu">${k==="zoomKeys"&&cfg.panKeys&&cfg.panKeys!=="none"?"Included in Pan + zoom":"Off"}</span>` }<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key, except Windows, which stays reserved for navigation.</div></div></div>`).join("");
   $$("[data-k]").forEach(i=>{const k=i.dataset.k;if(i.type==="checkbox")i.checked=!!cfg[k];else i.value=cfg[k]});
   $$("[data-v]").forEach(v=>v.textContent=valLabel(v.dataset.v,cfg[v.dataset.v]));
@@ -695,7 +697,9 @@ const WIN_MULT=[0,1/32,1/16,1/8,1/4,3/8,1/2,5/8,3/4,7/8,1,1.25,1.5,1.75,2,2.25,2
 function dpiOf(v){return Math.max(1,Math.round((cfg.trackballDpi||1600)*WIN_MULT[v||10]))}
 $("#dpiDefault").onclick=()=>{cfg.pointerSpeed=10;renderBinds();save(true)};
 document.addEventListener("change",e=>{if(e.target.id==="hwDpi"){cfg.trackballDpi=+e.target.value;renderBinds();save()}},true);
-function speedLabel(v){return(Math.pow(2,(v-50)/20)).toFixed(2)+"×"}
+function speedGain(v){v=Math.max(0,Math.min(100,Number(v)));return v<=0?0:v<=50?Math.pow(100,(v-50)/49):Math.pow(4,(v-50)/50)}
+function gainLabel(g){return(g*100).toFixed(g>0&&g<.1?1:0)+"%"}
+function speedLabel(v){return gainLabel(speedGain(v))}
 function valLabel(k,v){if(k==="glide"){const t=.05+v/100*1.45;return t.toFixed(2)+" s · "+(t<.3?"short":t<.8?"medium":"long")}if(k==="pointerSpeed")return dpiOf(v)+" DPI · "+WIN_MULT[v||10].toFixed(2)+"×"+(v===10?" · default":"");if(k==="clickSlop")return v+" px · "+(v<6?"sensitive":v<=12?"normal":v<=25?"forgiving":"very forgiving");return speedLabel(v)}
 document.addEventListener("change",e=>{const t=e.target;
   if(t.dataset.act){const b=t.dataset.act,a=t.value;const cur=cfg.buttons[b];cur.action=a;
@@ -996,6 +1000,7 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
   const focused=!document.hidden&&document.hasFocus();
   if(page==="home"&&!document.hidden)updateKeyboard(s);
+  if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1));
   if(changed&&page==="home"&&focused)drawPad();
   const live=s.mode!=="Idle";liveText("#padMode",live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
   const dirTxt=s.ballDir?" "+s.ballDir:"";
