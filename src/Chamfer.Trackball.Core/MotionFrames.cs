@@ -15,6 +15,23 @@ public sealed class MotionFrames{
  public void ClearDial()=>dial=0;
  public void Reset(){ClearPrimary();ClearDial();}
 }
+public sealed class MotionGlide{
+ float velocityX,velocityY;long lastTime;
+ public bool Active=>velocityX*velocityX+velocityY*velocityY>=.0025f;
+ public (float X,float Y) Step(float x,float y,long now,float seconds,bool enabled){
+  if(!enabled){Reset();return (x,y);}
+  if(!float.IsFinite(x)||!float.IsFinite(y)||!float.IsFinite(seconds)){Reset();return (0,0);}
+  float dt=lastTime==0?.016f:Math.Clamp((now-lastTime)/1000f,.001f,.05f);lastTime=now;
+  if(x!=0||y!=0){velocityX=x/dt;velocityY=y/dt;return (x,y);}
+  if(!Active)return (0,0);
+  float tau=Math.Clamp(seconds,.05f,1.5f),decay=MathF.Exp(-dt/tau),travel=tau*(1-decay);
+  float outX=velocityX*travel,outY=velocityY*travel;
+  velocityX*=decay;velocityY*=decay;
+  if(!Active)velocityX=velocityY=0;
+  return (outX,outY);
+ }
+ public void Reset(){velocityX=velocityY=0;lastTime=0;}
+}
 public sealed class FractionalInput{
  float x,y,wheel;
  static int Take(ref float remainder,float value){remainder+=value;int whole=(int)MathF.Round(remainder);remainder-=whole;return whole;}

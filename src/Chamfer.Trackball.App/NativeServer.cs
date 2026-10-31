@@ -43,7 +43,17 @@ internal sealed class NativeServer:IDisposable {
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
     static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
     public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";}}
-    static void Queue(Client c,JsonObject msg){while(c.Out.Count>64)c.Out.TryDequeue(out _);c.Out.Enqueue(msg);}
+    static void Queue(Client c,JsonObject msg){
+        lock(c.Gate){
+            if(ConfigStore.S(msg,"t")=="camera"){
+                var keep=new List<JsonObject>();var session=ConfigStore.S(msg,"session");
+                while(c.Out.TryDequeue(out var queued))if(ConfigStore.S(queued,"t")!="camera"||ConfigStore.S(queued,"session")!=session)keep.Add(queued);
+                foreach(var queued in keep)c.Out.Enqueue(queued);
+            }
+            while(c.Out.Count>=64&&c.Out.TryDequeue(out _)){ }
+            c.Out.Enqueue(msg);
+        }
+    }
     void Receive(Client c,JsonObject m){
         c.Seen=DateTime.UtcNow;
         if(ConfigStore.S(m,"t")=="focus"){c.Focus=ConfigStore.B(m,"on");return;}
@@ -85,7 +95,7 @@ internal sealed class NativeServer:IDisposable {
                 if(!int.TryParse(query.GetValueOrDefault("pid"),out int pid)||pid<=0){await Reply(stream,400,new{error="Process ID required"},stop.Token);return;}
                 var c=clients.Values.FirstOrDefault(c=>c.App==app&&c.Pid==pid&&c.Socket==null)??new Client{App=app,Pid=pid};
                 clients[c.Id]=c;c.Seen=DateTime.UtcNow;
-                var messages=new List<JsonObject>();while(c.Out.TryDequeue(out var message))messages.Add(message);
+                var messages=new List<JsonObject>();lock(c.Gate)while(c.Out.TryDequeue(out var message))messages.Add(message);
                 await Reply(stream,200,new{id=c.Id,commands=messages},stop.Token);return;
             }
             if(request[0]=="POST"&&uri.AbsolutePath=="/native/scene"){
@@ -107,7 +117,8 @@ internal sealed class NativeServer:IDisposable {
         var sender=Task.Run(async()=>{
             while(!quit.IsCancellationRequested&&socket.State==WebSocketState.Open){
                 c.Seen=DateTime.UtcNow;
-                if(c.Out.TryDequeue(out var item)){var bytes=Encoding.UTF8.GetBytes(item.ToJsonString());await socket.SendAsync(bytes,WebSocketMessageType.Text,true,quit.Token);}
+                JsonObject? item=null;lock(c.Gate){if(c.Out.TryDequeue(out var next))item=next;}
+                if(item!=null){var bytes=Encoding.UTF8.GetBytes(item.ToJsonString());await socket.SendAsync(bytes,WebSocketMessageType.Text,true,quit.Token);}
                 else await Task.Delay(8,quit.Token);
             }
         },quit.Token);

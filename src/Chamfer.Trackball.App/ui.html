@@ -271,7 +271,7 @@ details .ver{margin-top:10px;font-weight:600}
         <button class="btn primary" id="welcomeOk">Got it</button>
       </div>
       <h1>Hold, roll, model.</h1><p id="integrationState" class="note">Normal mouse</p>
-      <p class="sub">Your trackball works like a 3D mouse in CAD apps, and like a normal mouse everywhere else.</p>
+      <p class="sub">In 3D apps, choose the <b>3D modelling</b> program below for ball-only orbit, pan and circle zoom. <b>Normal mouse</b> keeps standard pointer, click and scroll behavior.</p>
       <div class="grid g3" style="margin-bottom:16px">
         <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="6"/><path d="M5 6h4M15 6h4"/></svg></div><div style="min-width:0"><small>Trackball</small><b id="stDevice">Looking…</b></div></div>
         <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg></div><div style="min-width:0"><small>App in front</small><b id="stApp">—</b></div></div>
@@ -331,7 +331,7 @@ details .ver{margin-top:10px;font-weight:600}
         <h2>Quick setups</h2>
         <div class="presets">
           <button class="preset" data-preset="controller"><b>Your held-key setup</b><small>Shift + ball rotates. Ctrl+Shift + ball pans, with the wheel for simultaneous zoom. Alt + ball snaps and backtick navigates with a native integration. Release the keys for a normal mouse.</small></button><button class="preset" data-preset="ballonly"><b>Normal mouse</b><small>Original mouse clicks, pointing and scrolling. Navigation keys, custom combinations and wheel remapping are off.</small></button>
-          <button class="preset" data-preset="ballnav"><b>Ball navigation</b><small>In 3D apps, roll to orbit. Tap Back to switch between orbit and pan. Draw small circles to zoom: clockwise in, anticlockwise out. Held keys below still work.</small></button><button class="preset" data-preset="both"><b>Buttons + held keys</b><small>Hold Back + ball to orbit or Middle + ball to pan. Shift and Ctrl+Shift work too. Normal left and right clicks.</small></button>
+          <button class="preset" data-preset="ballnav"><b>Ball navigation</b><small>Select this for 3D apps: roll straight to orbit, tap the M512 Back button to switch to pan, then tap again for orbit. Draw an almost-full small circle over the 3D view to zoom: clockwise in, anticlockwise out. Keep circling to continue zooming.</small></button><button class="preset" data-preset="both"><b>Buttons + held keys</b><small>Hold Back + ball to orbit or Middle + ball to pan. Shift and Ctrl+Shift work too. Normal left and right clicks.</small></button>
           
           
           
@@ -381,9 +381,9 @@ details .ver{margin-top:10px;font-weight:600}
       </div>
       <div class="card" style="margin-top:16px">
         <h2>Circle zoom</h2>
-        <div class="opt"><div class="t">Draw circles to zoom<small>During ball-only orbit or pan, draw a small circle: clockwise zooms in, anticlockwise zooms out. Recognition needs most of a circle; keep circling for continuous zoom. Roll straight to return. Circle zoom also works while holding your Pan + zoom keys or pan button. Held orbit keeps rotating.</small></div><label class="sw"><input type="checkbox" data-k="circleZoom"><span></span></label></div>
+        <div class="opt"><div class="t">Draw circles to zoom<small>Select the 3D modelling program and place the pointer over the 3D viewport. Roll straight to orbit or pan. Draw an almost-full small circle to start zooming: clockwise zooms in and anticlockwise zooms out. Keep circling for continuous zoom; roll straight to return to navigation. This is enabled by default in the 3D modelling program.</small></div><label class="sw"><input type="checkbox" data-k="circleZoom"><span></span></label></div>
         <div class="opt"><div class="t">Circle size<small>Increase this if your circles are larger; decrease it if broad curved orbits trigger zoom. Zoom speed uses Zoom sensitivity in Speed &amp; direction.</small></div><input type="range" min="60" max="400" step="10" data-k="circleSize"></div>
-        <p class="mu" style="font-size:12.5px">This recognizes the shape of a roll. Physical ball twist is not measured by the M512's standard mouse reports. Use the Ball navigation setup above to enable orbit, pan and circle zoom together.</p>
+        <p class="mu" style="font-size:12.5px">This recognizes the shape of a roll, not physical ball twist. The Back button toggles orbit and pan; circle zoom works in both modes. Normal mouse stays unchanged in its separate program.</p>
       </div>
       <div class="card" style="margin-top:16px" id="gestCard">
         <div class="row" style="margin-bottom:8px;gap:10px"><h2 style="margin:0">Ball gestures</h2><span class="spacer"></span><span class="mu" style="font-size:13px">Gestures for</span><select id="gestScope" style="min-width:220px"></select></div>
@@ -429,7 +429,7 @@ details .ver{margin-top:10px;font-weight:600}
       </div>
       <div class="card" style="margin-bottom:16px">
         <h2>Motion feel</h2>
-        <div class="opt"><div class="t">Smooth, like a SpaceMouse<small>The ball sets a speed and the view flies: it eases in as you roll and glides to a stop after you let go, instead of jumping exactly with the ball like a mouse. Turn off for direct, mouse-like control.</small></div><label class="sw"><input type="checkbox" data-k="smooth"><span></span></label></div>
+        <div class="opt"><div class="t">Soft stop after release<small>The view follows the ball directly while you roll, then eases to a stop after you let go. Glide sets how long it continues. Turn this off to stop immediately. This setting only affects 3D navigation.</small></div><label class="sw"><input type="checkbox" data-k="smooth"><span></span></label></div>
         <div class="slider" style="margin-top:8px"><b>Glide</b><input type="range" min="1" max="100" data-k="glide"><span class="val" data-v="glide"></span></div>
         <p class="mu" style="margin:6px 0 0;font-size:12px">How long the view keeps moving after the ball stops. Short feels precise; long feels like flying.</p>
       </div>

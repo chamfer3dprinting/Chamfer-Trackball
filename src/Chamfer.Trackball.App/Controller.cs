@@ -13,7 +13,7 @@ internal sealed class Controller:IDisposable{
     readonly Queue<JsonObject> logs=new();long seq;long revision=-1;
     readonly HashSet<int> sentMods=[];readonly HashSet<string> sentButtons=[];
     NavMode mode=NavMode.Idle,latched=NavMode.Idle;string gestureButton="";
-    readonly CircleZoom circle=new();
+    readonly CircleZoom circle=new();readonly MotionGlide glide=new();
     double gx,gy;readonly MotionFrames pending=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
     bool stoppedByClick,emulating,nativeFocusAllowed=true;int foregroundPid; nint foregroundWindow;
     Rectangle pad;bool padVisible;Point padOrigin;
@@ -90,7 +90,7 @@ public string AppName{get;private set;}="";
         if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y);}
     }
     void End(){
-        server.End(native);native=null;pending.Reset();circle.Reset();
+        server.End(native);native=null;pending.Reset();circle.Reset();glide.Reset();
         ReleaseEmulation();mode=NavMode.Idle;
     }
     void ReleaseEmulation(){
@@ -106,14 +106,16 @@ public string AppName{get;private set;}="";
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
         if(MotionPolicy.Circle(mode,ConfigStore.B(cfg,"circleZoom"),!freeBall)){
             var dial=circle.Add(x,y,Environment.TickCount64,(float)ConfigStore.D(cfg,"circleSize",160));
-            if(dial.Consumed){pending.Dial(dial.Wheel);return;}
+            if(dial.Consumed){glide.Reset();pending.Dial(dial.Wheel);return;}
         }else circle.Reset();
         pending.Move(x,y);
     }
     void Flush(){
         var frame=pending.Peek();
-        if(frame.HasPrimary){
-            if(!SendMotion(mode,frame.X,frame.Y,frame.Wheel))return;
+        float seconds=(float)(.05+Math.Clamp(ConfigStore.D(cfg,"glide",5),1,100)/100*1.45);
+        var smooth=glide.Step(frame.X,frame.Y,Environment.TickCount64,seconds,ConfigStore.B(cfg,"smooth",true));
+        if(frame.HasPrimary||smooth.X!=0||smooth.Y!=0){
+            if(!SendMotion(mode,smooth.X,smooth.Y,frame.Wheel))return;
             pending.ClearPrimary();
         }
         if(frame.HasDial){

@@ -83,7 +83,7 @@ try{
  Check(reset["programs"]!.AsArray().All(p=>p!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")),"Reset restores every mouse button");
  var bad=store.Snapshot();bad["orbitKeys"]="ctrl";bool rejected=false;try{store.Save(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"Saving Ctrl-only navigation is rejected");
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==22,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==23,"Legacy config migrates without Ctrl-only orbit");
 }finally{Directory.Delete(dirPath,true);}
 
 var dm=new DeviceMapping();var leftDown=new MouseEdge(0x201);var rightDown=new MouseEdge(0x204);

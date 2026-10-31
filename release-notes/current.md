@@ -1,3 +1,6 @@
+- Make ball-only orbit, Back-button orbit/pan switching and circle zoom ready by default in the 3D modelling program. Migrate existing settings once while preserving the separate Normal mouse program and custom controls.
+- Implement the existing soft-stop setting for 3D motion and discard stale camera poses when a native client falls behind, keeping the newest view responsive.
+- Clarify that circle zoom starts with an almost-full circle over the 3D viewport: clockwise zooms in, anticlockwise zooms out; straight rolling resumes orbit or pan.
 - Cap active settings UI polling at 20 Hz instead of sending status requests every display frame; preserve the independent 16 ms trackball input loop.
 - Batch sensor movement into display-rate camera updates instead of sending one camera message for every input packet. Preserve fine movement and wheel zoom at low sensitivity.
 - Ctrl+Shift Pan + zoom now allows enabled ball-circle zoom while held. Shift orbit continues to rotate; the separate Zoom key remains optional and customizable.

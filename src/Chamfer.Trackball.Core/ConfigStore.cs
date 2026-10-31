@@ -8,6 +8,7 @@ public sealed class ConfigStore {
     private readonly string path;
     private JsonObject config;
     public long Revision {get;private set;}
+    private static JsonObject? nodeProgram(JsonObject c,string name)=>c["programs"]!.AsArray().Select(n=>n?.AsObject()).FirstOrDefault(p=>p!=null&&S(p,"name").Contains(name,StringComparison.OrdinalIgnoreCase));
     public static JsonObject Defaults() {
         using var stream=typeof(ConfigStore).Assembly.GetManifestResourceStream("Chamfer.Trackball.Core.defaults.json")!;
         return JsonNode.Parse(stream)!.AsObject();
@@ -28,6 +29,16 @@ public sealed class ConfigStore {
                 }
             }
             LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=22;
+        }
+        if(oldVersion<23){
+            var navigation=nodeProgram(config,"3D");
+            if(navigation!=null){
+                navigation["ball"]="orbit";navigation["circleZoom"]=true;
+                var buttons=navigation["buttons"] as JsonObject??new JsonObject();
+                buttons["back"]=new JsonObject{["action"]="panToggle",["tap"]="click"};
+                navigation["buttons"]=buttons;
+            }
+            LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=23;
         }
         Validate(config);
     }
@@ -68,7 +79,7 @@ public sealed class ConfigStore {
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
             foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=22;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=23;
     }
     public static void Validate(JsonObject c){
         foreach(var node in c["programs"]!.AsArray()){

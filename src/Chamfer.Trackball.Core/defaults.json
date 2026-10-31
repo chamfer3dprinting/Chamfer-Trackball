@@ -677,7 +677,7 @@
           "tap": "click"
         },
         "back": {
-          "action": "normal",
+          "action": "panToggle",
           "tap": "click"
         },
         "right": {
@@ -702,7 +702,7 @@
       "zoomKeys": "none",
       "gestures": {},
       "pointerSpeed": 10,
-      "ball": "pointer",
+      "ball": "orbit",
       "feel": {
         "orbitSens": 50,
         "panSens": 50,
@@ -720,7 +720,7 @@
       "combos": [],
       "snapKeys": "alt",
       "navigateKeys": "backtick",
-      "circleZoom": false,
+      "circleZoom": true,
       "circleSize": 160
     }
   ],

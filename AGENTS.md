@@ -43,3 +43,10 @@ Validation is included in the existing GitHub Actions build workflow. A physical
 GitHub Actions run 41186358288 passed the core regressions, interface/syntax checks, Admin and Public executable builds, and actual WebView interface/bridge smoke checks. The Admin-only v1.5.13 executable is available at the Admin prerelease. Its release contains only ChamferTrackball-Admin.exe. The public Trackball candidate remains an unpublished draft; no public release was activated.
 
 The updated UI caps active status refresh at 20 Hz and leaves the 16 ms device-input loop intact. The automated interface check confirms that the UI no longer polls on every animation frame. A physical maximized-window performance test remains for the owner. Next: update Admin to v1.5.13 and confirm the maximized window remains responsive.
+
+
+# 2026-10-31 — Enable and smooth ball-only 3D navigation
+
+Enable orbit, the M512 Back-button orbit/pan toggle, and circle zoom in the dedicated 3D modelling program by default. Upgrade existing v22 settings once without changing the separate Normal mouse program, other programs, or user key bindings. Implement the saved short soft-stop motion feel and coalesce obsolete absolute camera poses per native session so a delayed client applies the newest view instead of replaying stale frames. Make the Home and Circle zoom instructions describe the setup and gesture directly.
+
+CI validation is triggered by the source update. Admin prerelease only; no public stable release is activated. The owner still needs to confirm physical M512 zoom feel and responsiveness in Chamfer Studio after installing the new Admin build. Standard M512 reports do not provide independent physical twist.
