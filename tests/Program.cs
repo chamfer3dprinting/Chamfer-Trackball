@@ -209,4 +209,15 @@ Check(MotionPolicy.Circle(NavMode.Orbit,true,false)&&!MotionPolicy.Circle(NavMod
 Check(MotionPolicy.WhilePaused(NavMode.Orbit,true,false)==NavMode.Idle,"A click can still restore normal pointing");
 Check(MotionPolicy.WhilePaused(NavMode.Orbit,true,true)==NavMode.Orbit&&MotionPolicy.WhilePaused(NavMode.Snap,true,true)==NavMode.Snap,"Held commands work after returning to the pointer");
 
+
+var panAnchor=CameraMath.Move(offCenter,NavMode.PanZoom,70,-25,120);
+Check(Vector2.Distance(ProjectPivot(offCenter),ProjectPivot(panAnchor))<.0001,"Simultaneous pan/zoom keeps the moving cursor pivot stable");
+Vector2 OrthoPivot(CameraPose pose){var b=Vector3.Normalize(pose.Eye-pose.Target);var r=Vector3.Normalize(Vector3.Cross(pose.Up,b));var u=Vector3.Normalize(Vector3.Cross(b,r));var offset=pose.Pivot-pose.Target;return new(Vector3.Dot(offset,r)/pose.OrthoHeight,Vector3.Dot(offset,u)/pose.OrthoHeight);}
+var offOrtho=offCenter with{Orthographic=true};
+var orthoZoom=CameraMath.Move(offOrtho,NavMode.Zoom,0,-30,120);
+Check(Vector2.Distance(OrthoPivot(offOrtho),OrthoPivot(orthoZoom))<.0001,"Orthographic zoom keeps an off-center cursor pivot in place");
+Check(Math.Abs(Vector3.Distance(offOrtho.Eye,offOrtho.Target)-Vector3.Distance(orthoZoom.Eye,orthoZoom.Target))<.0001,"Orthographic zoom preserves camera depth");
+var closeUp=c;for(int i=0;i<1000;i++)closeUp=CameraMath.Move(closeUp,NavMode.Zoom,0,-40,120);
+Check(closeUp.Valid&&Vector3.Distance(closeUp.Eye,closeUp.Target)>=.00009f,"Repeated close-up zoom cannot collapse the camera or disable navigation");
+
 Console.WriteLine(count+" regression checks passed.");

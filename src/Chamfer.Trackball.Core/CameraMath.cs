@@ -47,13 +47,22 @@ public static class CameraMath {
         }
         if(mode==NavMode.PanZoom){
             var move=(-right*dx+up*dy)*pixel;
-            c=c with{Eye=c.Eye+move,Target=c.Target+move};return Zoom(c,wheel*.0015f);
+            c=c with{Eye=c.Eye+move,Target=c.Target+move,Pivot=c.Pivot+move};return Zoom(c,wheel*.0015f);
         }
         return mode==NavMode.Zoom?Zoom(c,-dy*.008f+wheel*.0015f):c;
     }
     static CameraPose Zoom(CameraPose c,float amount){
         var factor=MathF.Exp(Math.Clamp(-amount,-2,2));
-        if(c.Orthographic)return c with{OrthoHeight=Math.Clamp(c.OrthoHeight*factor,1e-6f,1e12f)};
+        if(c.Orthographic){
+            float height=Math.Clamp(c.OrthoHeight*factor,1e-6f,1e12f);factor=height/c.OrthoHeight;
+            var back=Unit(c.Eye-c.Target);var offset=c.Target-c.Pivot;
+            var move=(offset-back*Vector3.Dot(offset,back))*(factor-1);
+            return c with{Eye=c.Eye+move,Target=c.Target+move,OrthoHeight=height};
+        }
+        // Keep view-space separation representable after prolonged close-up zoom.
+        float magnitude=MathF.Max(c.Eye.Length(),MathF.Max(c.Target.Length(),c.Pivot.Length()));
+        float distance=Vector3.Distance(c.Eye,c.Target),minimum=MathF.Max(1e-4f,magnitude*1e-6f);
+        factor=Math.Clamp(factor,minimum/distance,MathF.Max(minimum/distance,1e12f/distance));
         return c with{Eye=c.Pivot+(c.Eye-c.Pivot)*factor,Target=c.Pivot+(c.Target-c.Pivot)*factor};
     }
 }

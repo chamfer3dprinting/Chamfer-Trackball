@@ -130,7 +130,8 @@ public string AppName{get;private set;}="";
         var scaled=MotionPolicy.Scale(output,x,y,w,MotionPolicy.Gain(ConfigStore.D(cfg,"orbitSens",50)),MotionPolicy.Gain(ConfigStore.D(cfg,"panSens",50)),MotionPolicy.Gain(ConfigStore.D(cfg,"zoomSens",50)));
         x=scaled.X;y=scaled.Y;w=scaled.Wheel;
         bool demo=ConfigStore.S(profile,"id")=="demo";
-        if(native!=null&&!server.Move(native,output,x,y,w,input.Keys.Contains(18),1))return false;
+        if(native!=null)try{if(!server.Move(native,output,x,y,w,input.Keys.Contains(18),1))return false;}
+        catch(ArgumentException ex){Log("Camera movement stopped: "+ex.Message,"err");End();stoppedByClick=true;Integration="Release the keys and use the normal view controls before trying again.";return false;}
         if(native==null&&!demo){
             try{
                 PrepareEmulation(output);
