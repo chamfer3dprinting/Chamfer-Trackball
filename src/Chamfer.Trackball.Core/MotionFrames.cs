@@ -11,6 +11,7 @@ public sealed class MotionFrames{
  public void Move(float dx,float dy){x=Add(x,dx);y=Add(y,dy);}
  public void Wheel(float delta)=>wheel=Add(wheel,delta);
  public void Dial(float delta)=>dial=Add(dial,delta);
+ public void ClearMove()=>x=y=0;
  public void ClearPrimary(){x=y=wheel=0;}
  public void ClearDial()=>dial=0;
  public void Reset(){ClearPrimary();ClearDial();}

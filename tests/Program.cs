@@ -168,6 +168,23 @@ var broad=Trace(new CircleZoom(),a=>new(300*MathF.Cos(a),300*MathF.Sin(a)),MathF
 Check(broad.Captured==0,"Large circular orbits stay outside the configured gesture size");
 var small=Trace(new CircleZoom(),a=>new(12*MathF.Cos(a),12*MathF.Sin(a)),MathF.PI*6,540);
 Check(small.Wheel>300,"Small dial circles are recognized");
+var firstLoop=Trace(new CircleZoom(),a=>new(8*MathF.Cos(a),8*MathF.Sin(a)),MathF.Tau,240);
+Check(firstLoop.Wheel>250,"One small circle produces visible zoom when first recognized");
+var slowLoop=new CircleZoom();var previousLoop=new Vector2(11,0);float slowWheel=0;
+for(int i=1;i<=360;i++){
+ var angle=MathF.Tau*i/360;var at=new Vector2((11+2*MathF.Sin(3*angle))*MathF.Cos(angle),8*MathF.Sin(angle));var delta=at-previousLoop;previousLoop=at;
+ var result=slowLoop.Add(delta.X,delta.Y,1000+i*5+(i>180?450:0));slowWheel+=result.Wheel;
+}
+Check(slowLoop.Active&&slowWheel>250,"Imperfect small circles survive a brief pause and zoom on the first loop");
+var framedCircle=new CircleZoom();Vector2 frameMove=Vector2.Zero,lastPosition=new(18,0);float framedWheel=0;int recognitionCalls=0;
+for(int ms=1;ms<=3200;ms++){
+ var angle=ms*MathF.Tau/1600;var at=new Vector2(MathF.Round(18*MathF.Cos(angle)),MathF.Round(14*MathF.Sin(angle)));
+ frameMove+=at-lastPosition;lastPosition=at;
+ if(ms%16==0){var result=framedCircle.Add(frameMove.X,frameMove.Y,1000+ms);framedWheel+=result.Wheel;recognitionCalls++;frameMove=Vector2.Zero;}
+}
+Check(recognitionCalls==200&&framedWheel>500,"Quantized 1000 Hz sensor input still recognizes circle zoom at 16 ms frames");
+var longRoll=new CircleZoom();for(int i=0;i<30000;i++)longRoll.Add(30,0,1000+i*5);
+Check(!longRoll.Active,"A long continuous straight roll stays bounded and never activates zoom");
 var figureEight=Trace(new CircleZoom(),a=>new(35*MathF.Sin(a),20*MathF.Sin(2*a)),MathF.PI*6,800);
 Check(figureEight.Captured==0,"Alternating figure-eight curvature does not activate dial zoom");
 clockwise.Add(6,0,3705);clockwise.Add(6,0,3710);clockwise.Add(6,0,3715);clockwise.Add(6,0,3720);clockwise.Add(6,0,3725);
@@ -194,6 +211,8 @@ for(int i=1;i<=1000;i++){sensorFrames.Move(1,-2);if(i%125==0)sensorFrames.Wheel(
 Check(deliveredFrames<=64&&totalX==1000&&totalY==-2000&&totalWheel==960&&totalDial==50,"1000 Hz input becomes display-rate frames without lost motion, wheel or dial zoom");
 Check(!sensorFrames.Peek().HasPrimary&&!sensorFrames.Peek().HasDial,"Idle frames do not resend old movement");
 sensorFrames.Move(20,10);sensorFrames.Dial(7);sensorFrames.ClearPrimary();Check(!sensorFrames.Peek().HasPrimary&&sensorFrames.Peek().Dial==7,"A delayed zoom keeps its own pending sample");sensorFrames.Reset();
+sensorFrames.Move(12,-6);sensorFrames.Wheel(120);sensorFrames.Dial(9);sensorFrames.ClearMove();
+var preservedWheel=sensorFrames.Peek();Check(preservedWheel.X==0&&preservedWheel.Y==0&&preservedWheel.Wheel==120&&preservedWheel.Dial==9,"Circle detection consumes ball movement while preserving real wheel input");sensorFrames.Reset();
 var fractions=new FractionalInput();int fractionalX=0,fractionalY=0,fractionalWheel=0;
 for(int i=0;i<100;i++){var whole=fractions.Add(.1f,-.2f,.3f);fractionalX+=whole.X;fractionalY+=whole.Y;fractionalWheel+=whole.Wheel;}
 Check(fractionalX==10&&fractionalY==-20&&fractionalWheel==30,"Fine emulated motion and zoom survive fractional sensitivity");

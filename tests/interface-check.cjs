@@ -70,3 +70,12 @@ const customStart=html.indexOf('$("#releasePublic").onclick='),customEnd=html.in
  field.value='1.2';calls.length=0;await button.onclick();assert.equal(calls.length,0);
  console.log('Chosen release version reaches the Admin bridge and invalid versions are rejected.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+const inputDriver=fs.readFileSync('src/Chamfer.Trackball.App/InputDriver.cs','utf8');
+const hookPump=fs.readFileSync('src/Chamfer.Trackball.App/HookPump.cs','utf8');
+const hookCallbacks=inputDriver.slice(inputDriver.indexOf('    nint OnKey('),inputDriver.indexOf('    protected override void WndProc'));
+assert.ok(!hookCallbacks.includes('Win32.Key('),'global hooks must queue keyboard injection');
+assert.ok(!hookCallbacks.includes('KeysChanged?.Invoke('),'global hooks must queue controller callbacks');
+assert.ok(!hookCallbacks.includes('FailOpen('),'global hooks must queue recovery work');
+assert.ok(hookPump.includes('Application.Run()')&&hookPump.includes('thread.Start()'),'global hooks need their own running message pump');
+console.log('Global input hooks hand off keyboard injection, controller work and recovery outside their callbacks.');

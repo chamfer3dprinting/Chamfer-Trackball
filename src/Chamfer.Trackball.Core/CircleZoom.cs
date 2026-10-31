@@ -4,6 +4,8 @@ namespace Chamfer.Trackball.Core;
 // Recognizes a deliberate closed roll path. This derives a gesture from X/Y;
 // it does not measure a third physical rotation axis.
 public sealed class CircleZoom {
+    const float SharpTurnLimit=1.45f;
+    const int MaxSamples=192;
     readonly List<Vector2> points=[];
     readonly List<float> turns=[];
     Vector2 position,sampled,previous,straightAnchor;float straightTravel;
@@ -12,33 +14,46 @@ public sealed class CircleZoom {
     public void Reset(){points.Clear();turns.Clear();position=sampled=previous=Vector2.Zero;lastTime=0;straightTravel=0;straightAnchor=Vector2.Zero;hasHeading=Active=false;}
     public (bool Consumed,float Wheel) Add(float dx,float dy,long now,float maxDiameter=160){
         if(!float.IsFinite(dx)||!float.IsFinite(dy)||!float.IsFinite(maxDiameter)){Reset();return (false,0);}
-        if(lastTime!=0&&(now<lastTime||now-lastTime>300))Reset();
+        var delta=new Vector2(dx,dy);
+        if(delta.LengthSquared()==0){
+            if(lastTime!=0&&(now<lastTime||now-lastTime>700))Reset();
+            return (Active,0);
+        }
+        if(lastTime!=0&&(now<lastTime||now-lastTime>700))Reset();
         lastTime=now;
-        var delta=new Vector2(dx,dy);if(delta.LengthSquared()==0)return (Active,0);
-        if(delta.Length()>Math.Clamp(maxDiameter,60,400)){Reset();return (false,0);}
+        float diameter=Math.Clamp(maxDiameter,60,400);
+        if(delta.Length()>diameter){Reset();return (false,0);}
         if(Active){
             var heading=Vector2.Normalize(delta);
             if(straightTravel==0||Vector2.Dot(heading,straightAnchor)<.995f){straightAnchor=heading;straightTravel=delta.Length();}
             else straightTravel+=delta.Length();
-            if(straightTravel>=Math.Max(18,maxDiameter*.18f)){Reset();return (false,0);}
+            if(straightTravel>=Math.Max(18,diameter*.18f)){Reset();return (false,0);}
         }
         position+=delta;
-        float wheel=0;bool consumed=Active;
-        const float step=6;
+        if(position.LengthSquared()>8192f*8192f){
+            // Keep floating-point precision bounded during a long continuous roll.
+            var origin=sampled;position-=origin;sampled=Vector2.Zero;
+            for(int i=0;i<points.Count;i++)points[i]-=origin;
+        }
+        float wheel=0;bool consumed=Active;int remaining=128;
+        float step=Math.Clamp(diameter/60f,3,8);
         while(Vector2.Distance(position,sampled)>=step){
+            if(remaining--==0){Reset();return (false,0);}
             var direction=Vector2.Normalize(position-sampled);sampled+=direction*step;
             float turn=hasHeading?MathF.Atan2(previous.X*direction.Y-previous.Y*direction.X,Vector2.Dot(previous,direction)):0;
             previous=direction;hasHeading=true;
-            points.Add(sampled);turns.Add(turn);if(points.Count>96){points.RemoveAt(0);turns.RemoveAt(0);}
+            points.Add(sampled);turns.Add(turn);if(points.Count>MaxSamples){points.RemoveAt(0);turns.RemoveAt(0);}
             if(Active){
                 // A sharp kink, reversal or sustained straight roll returns control
                 // immediately; no queued orbit motion is replayed after zoom.
-                if(MathF.Abs(turn)>1.05f){Reset();return (false,0);}
-                if(HasStraightTail(Math.Max(30,maxDiameter*.3f))){Reset();return (false,0);}
+                if(MathF.Abs(turn)>SharpTurnLimit){Reset();return (false,0);}
+                if(HasStraightTail(Math.Max(30,diameter*.3f))){Reset();return (false,0);}
                 wheel+=turn*(480/(2*MathF.PI));consumed=true;
-            }else if(IsCircle(Math.Clamp(maxDiameter,60,400))){
+            }else if(IsCircle(diameter,out var accumulatedTurn)){
                 Active=true;straightTravel=0;consumed=true;
-                wheel+=turn*(480/(2*MathF.PI));
+                // Apply the winding collected before recognition so a first circle
+                // produces a visible zoom instead of only a tiny final-step change.
+                wheel+=accumulatedTurn*(480/(2*MathF.PI));
             }
         }
         return (consumed,wheel);
@@ -51,10 +66,10 @@ public sealed class CircleZoom {
         for(int i=start+1;i<end;i++){var v=points[i]-points[start];if(MathF.Abs(axis.X*v.Y-axis.Y*v.X)/distance>2)return false;}
         return true;
     }
-    bool IsCircle(float maxDiameter){
-        // Cache each segment's turning angle once in Add(). Check every suffix
-        // with prefix sums instead of recalculating atan2 in a nested scan.
-        int count=points.Count;if(count<12)return false;
+    bool IsCircle(float maxDiameter,out float accumulatedTurn){
+        accumulatedTurn=0;
+        // Check short, imperfect loop suffixes using precomputed turns and prefix sums.
+        int count=points.Count;if(count<10)return false;
         int end=count-1;
         Span<float> lengthPrefix=stackalloc float[count];
         Span<float> turnPrefix=stackalloc float[count];
@@ -67,21 +82,23 @@ public sealed class CircleZoom {
             lengthPrefix[i]=lengthPrefix[i-1]+Vector2.Distance(points[i],points[i-1]);
             turnPrefix[i]=turnPrefix[i-1]+a;
             absoluteTurnPrefix[i]=absoluteTurnPrefix[i-1]+MathF.Abs(a);
-            sharpTurnPrefix[i]=sharpTurnPrefix[i-1]+(MathF.Abs(a)>1.05f?1:0);
+            sharpTurnPrefix[i]=sharpTurnPrefix[i-1]+(MathF.Abs(a)>SharpTurnLimit?1:0);
         }
         Vector2 lo=points[end],hi=points[end];
         for(int start=end;start>=0;start--){
             lo=Vector2.Min(lo,points[start]);hi=Vector2.Max(hi,points[start]);
-            if(start>count-12)continue;
+            if(start>count-10)continue;
             float length=lengthPrefix[end]-lengthPrefix[start];
             float turn=turnPrefix[end]-turnPrefix[start+1];
             float absoluteTurn=absoluteTurnPrefix[end]-absoluteTurnPrefix[start+1];
             bool sharp=sharpTurnPrefix[end]!=sharpTurnPrefix[start+1];
             var extent=hi-lo;float widest=Math.Max(extent.X,extent.Y),narrowest=Math.Min(extent.X,extent.Y);
             var first=points[start];
-            if(!sharp&&length>=60&&MathF.Abs(turn)>=5.0f&&MathF.Abs(turn)/Math.Max(absoluteTurn,.001f)>=.90f
-                &&widest<=maxDiameter&&narrowest>=12&&narrowest/widest>=.5f
-                &&Vector2.Distance(first,points[end])/length<=.23f)return true;
+            if(!sharp&&length>=40&&MathF.Abs(turn)>=4.9f&&MathF.Abs(turn)/Math.Max(absoluteTurn,.001f)>=.78f
+                &&widest<=maxDiameter&&narrowest>=8&&narrowest/widest>=.35f
+                &&Vector2.Distance(first,points[end])/length<=.38f){
+                accumulatedTurn=turn;return true;
+            }
         }
         return false;
     }
