@@ -18,7 +18,7 @@ public sealed class CircleZoom(bool allowTurnArc=false) {
             if(Active)return true;
             int first=Math.Max(1,turns.Count-8);float signed=0,absolute=0;
             for(int i=first;i<turns.Count;i++){signed+=turns[i];absolute+=MathF.Abs(turns[i]);}
-            return MathF.Abs(signed)>(allowTurnArc?.15f:.45f)&&MathF.Abs(signed)>absolute*.8f;
+            return MathF.Abs(signed)>(allowTurnArc?.06f:.45f)&&MathF.Abs(signed)>absolute*.8f;
         }
     }
     public void Reset(){points.Clear();turns.Clear();position=sampled=previous=Vector2.Zero;lastTime=0;straightTravel=0;straightAnchor=Vector2.Zero;hasHeading=Active=false;}
