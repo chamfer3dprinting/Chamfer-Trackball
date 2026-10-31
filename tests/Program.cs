@@ -458,4 +458,12 @@ Check(noFalseTwist,"Ordinary directional snapping never becomes a face turn");
 var offTurn=CircleFace(offCenter with{WorldUp=Vector3.UnitY},1,out _);
 Check(offTurn.Valid&&Math.Abs(Vector3.Distance(offTurn.Eye,offTurn.Pivot)-Vector3.Distance(offCenter.Eye,offCenter.Pivot))<.0001,"Ball face turns keep the cursor-pivot radius");
 
+
+foreach(int rawStroke in new[]{80,300,1000,4000}){
+ var rawSnap=new FaceSnap();rawSnap.Reset(studioView);var legacySnap=new FaceSnap();legacySnap.Reset(studioView);
+ var actualStroke=rawSnap.Step(studioView,rawStroke,0,0,.2f,1000);
+ var oldStroke=legacySnap.Step(studioView,rawStroke*.2f,0,0,1,1000);
+ Check(Vector3.Distance(actualStroke.Eye,oldStroke.Eye)<.0001&&Vector3.Distance(actualStroke.Up,oldStroke.Up)<.0001,"Raw snap gestures retain the original directional response at "+rawStroke+" counts");
+}
+
 Console.WriteLine(count+" regression checks passed.");

@@ -105,7 +105,7 @@ public sealed class FaceSnap{
    }
   }else{
    if(turning){virtualPose=lastAligned??virtualPose;turning=false;turnRemainder=0;}
-   virtualPose=CameraMath.Move(virtualPose,NavMode.Orbit,x*4,y*4,0,false,gain);
+   virtualPose=CameraMath.Move(virtualPose,NavMode.Orbit,x*4*gain,y*4*gain);
    var direction=Vector3.Normalize(virtualPose.Eye-virtualPose.Target);var next=CameraMath.NearestFace(direction);
    if(Vector3.Dot(next,direction)>Vector3.Dot(face,direction)+.08f){face=next;quarterTurns=0;}
   }
