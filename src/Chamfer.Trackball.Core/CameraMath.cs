@@ -73,14 +73,46 @@ public static class CameraMath {
 }
 
 public sealed class FaceSnap{
- CameraPose? virtualPose;Vector3 face;float wheelRemainder;int quarterTurns;
- public void Reset(CameraPose? pose=null){virtualPose=pose;face=pose==null?Vector3.Zero:CameraMath.NearestFace(Vector3.Normalize(pose.Eye-pose.Target));quarterTurns=0;wheelRemainder=0;}
- public CameraPose Step(CameraPose start,float x,float y,float wheel=0,float gain=1){
-  virtualPose??=start;
-  virtualPose=CameraMath.Move(virtualPose,NavMode.Orbit,x*4,y*4,0,false,gain);
-  var direction=Vector3.Normalize(virtualPose.Eye-virtualPose.Target);var next=CameraMath.NearestFace(direction);
-  if(face==Vector3.Zero||Vector3.Dot(next,direction)>Vector3.Dot(face,direction)+.08f){face=next;quarterTurns=0;}
-  wheelRemainder+=wheel;int turns=(int)(wheelRemainder/120);wheelRemainder-=turns*120;quarterTurns=(quarterTurns+turns)%4;
-  return CameraMath.AlignFace(virtualPose,face,quarterTurns);
+ CameraPose? virtualPose,lastAligned;Vector3 face;float wheelRemainder,turnRemainder;int quarterTurns;
+ readonly CircleZoom ballTurn=new(true);bool turning;
+ public bool Turning=>ballTurn.Curving;
+ public int Orientation=>quarterTurns;
+ public void Reset(CameraPose? pose=null){
+  virtualPose=lastAligned=pose;face=pose==null?Vector3.Zero:CameraMath.NearestFace(Vector3.Normalize(pose.Eye-pose.Target));
+  quarterTurns=0;wheelRemainder=turnRemainder=0;turning=false;ballTurn.Reset();
+  if(pose!=null&&Vector3.Dot(Vector3.Normalize(pose.Eye-pose.Target),face)>.999f){
+   var canonical=CameraMath.AlignFace(pose,face).Up;
+   var seen=Vector3.Normalize(pose.Up-face*Vector3.Dot(pose.Up,face));
+   float angle=MathF.Atan2(Vector3.Dot(face,Vector3.Cross(canonical,seen)),Vector3.Dot(canonical,seen));
+   quarterTurns=(int)MathF.Round(-angle/(MathF.PI/2));
+  }
+ }
+ public CameraPose Step(CameraPose start,float x,float y,float wheel=0,float gain=1,long now=0){
+  virtualPose??=start;if(face==Vector3.Zero)face=CameraMath.NearestFace(Vector3.Normalize(start.Eye-start.Target));
+  bool wasActive=ballTurn.Active;
+  var dial=ballTurn.Add(x,y,now==0?Environment.TickCount64:now,80);
+  bool candidate=ballTurn.Curving;
+  if(candidate){
+   // Freeze the current face while the ball curls, rather than navigating
+   // through other faces before a deliberate dial gesture is recognized.
+   if(!turning){virtualPose=lastAligned??CameraMath.AlignFace(virtualPose,face,quarterTurns);turning=true;}
+   if(dial.Consumed){
+    if(!wasActive){quarterTurns-=Math.Sign(dial.Wheel);turnRemainder=0;}
+    else{
+     turnRemainder+=dial.Wheel;int turns=(int)(turnRemainder/480);
+     quarterTurns-=turns;turnRemainder-=turns*480;
+    }
+   }
+  }else{
+   if(turning){virtualPose=lastAligned??virtualPose;turning=false;turnRemainder=0;}
+   virtualPose=CameraMath.Move(virtualPose,NavMode.Orbit,x*4*gain,y*4*gain);
+   var direction=Vector3.Normalize(virtualPose.Eye-virtualPose.Target);var next=CameraMath.NearestFace(direction);
+   if(Vector3.Dot(next,direction)>Vector3.Dot(face,direction)+.08f){face=next;quarterTurns=0;}
+  }
+  wheelRemainder+=wheel;int wheelTurns=(int)(wheelRemainder/120);wheelRemainder-=wheelTurns*120;
+  quarterTurns=(quarterTurns+wheelTurns)%4;
+  lastAligned=CameraMath.AlignFace(virtualPose,face,quarterTurns);
+  if(wheelTurns!=0)virtualPose=lastAligned;
+  return lastAligned;
  }
 }

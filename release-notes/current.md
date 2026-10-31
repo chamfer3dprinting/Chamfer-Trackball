@@ -1,5 +1,11 @@
 # Chamfer Trackball Admin update
 
+- Make slow 3D movement substantially slower: 1% at the low end, 100% at the center, up to 400%, and 0 to stop the selected motion. The previous minimum was about 18%. Show active pointer/orbit/pan/zoom settings.
+- In Alt Snap, roll straight to change cube faces. Curl into a small clockwise/counterclockwise loop to turn the selected face by 90° in the same direction, like the view cube arrows. Straight movement resumes face changes. Wheel turning remains available.
+- Keep turn recognition independent of Orbit sensitivity and retain face orientation across release/rehold.
+- Verify Normal mouse pointer DPI and glide independently, including program switching. Preserve saved presets, key bindings and native button/wheel defaults.
+
+
 - Add named saved presets: Save current as preset, Apply, Rename and Delete. Presets include full program controls, pointer/3D speeds and glide, survive restart and control resets, and require explicit replacement of an existing name.
 - Keep a renamed program’s default template, and repair every program target in controls and saved presets when deleting a program.
 

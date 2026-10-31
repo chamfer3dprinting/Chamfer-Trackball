@@ -268,7 +268,7 @@ var fractions=new FractionalInput();int fractionalX=0,fractionalY=0,fractionalWh
 for(int i=0;i<100;i++){var whole=fractions.Add(.1f,-.2f,.3f);fractionalX+=whole.X;fractionalY+=whole.Y;fractionalWheel+=whole.Wheel;}
 Check(fractionalX==10&&fractionalY==-20&&fractionalWheel==30,"Fine emulated motion and zoom survive fractional sensitivity");
 fractions.Reset();Check(fractions.Add(0,0,0)==(0,0,0),"Ending navigation clears fractional output");
-Check(Math.Abs(MotionPolicy.Gain(50)-1)<.0001&&Math.Abs(MotionPolicy.Gain(30)-.5f)<.0001&&Math.Abs(MotionPolicy.Gain(70)-2)<.0001,"Sensitivity matches the speed shown in the interface");
+Check(MotionPolicy.Gain(0)==0&&Math.Abs(MotionPolicy.Gain(1)-.01f)<.00001&&MotionPolicy.Gain(50)==1&&MotionPolicy.Gain(100)==4,"3D speed covers stop, one percent, default and four times default");
 var scaledPan=MotionPolicy.Scale(NavMode.PanZoom,20,-10,120,1,2,.25f);
 Check(scaledPan==(40,-20,30),"Pan speed and simultaneous zoom speed are independent");
 var scaledZoom=MotionPolicy.Scale(NavMode.Zoom,0,-20,120,1,2,.5f);
@@ -399,5 +399,76 @@ try{
 }finally{
  foreach(var suffix in new[]{"",".previous",".writing"})if(File.Exists(presetPath+suffix))File.Delete(presetPath+suffix);
 }
+
+
+bool monotonicSpeed=true;for(int value=1;value<=100;value++)monotonicSpeed&=MotionPolicy.Gain(value)>MotionPolicy.Gain(value-1);
+Check(monotonicSpeed,"Every 3D speed slider step changes the applied gain");
+Check(MotionPolicy.SnapGain(4)>.19f&&MotionPolicy.SnapGain(4)<.21f,"The wider Orbit range preserves the existing face-switching stroke length");
+foreach(var modeTest in new[]{NavMode.Orbit,NavMode.PanZoom,NavMode.Zoom,NavMode.Navigate,NavMode.Roll}){
+ CameraPose AtSpeed(int slider){
+  float gain=MotionPolicy.Gain(slider);var scaled=MotionPolicy.Scale(modeTest,20,-10,0,gain,gain,gain);
+  return CameraMath.Move(studioView,modeTest,scaled.X,scaled.Y,scaled.Wheel);
+ }
+ var stopped=AtSpeed(0);Check(Vector3.Distance(stopped.Eye,studioView.Eye)<.00001&&Vector3.Distance(stopped.Target,studioView.Target)<.00001&&Vector3.Distance(stopped.Up,studioView.Up)<.00001,"Zero speed stops actual "+modeTest+" camera movement");
+ var slow=AtSpeed(1);var normal=AtSpeed(50);
+ float Distance(CameraPose view)=>Vector3.Distance(view.Eye,studioView.Eye)+Vector3.Distance(view.Target,studioView.Target)+Vector3.Distance(view.Up,studioView.Up);
+ Check(Distance(slow)<Distance(normal)*.012f&&Distance(slow)>0,"One-percent "+modeTest+" speed produces much smaller real camera movement");
+}
+foreach(int step in new[]{2,10,19}){
+ var normalPointer=new PointerMotion();int delivered=0;
+ for(int sample=0;sample<160;sample++)delivered+=normalPointer.Move(2,0,PointerPolicy.Gain(step)).X;
+ Check(delivered==(int)MathF.Round(320*PointerPolicy.Gain(step)),"Normal mouse DPI "+step+" changes delivered pointer distance");
+}
+CameraPose CircleFace(CameraPose initial,float direction,out bool sawTurn,int loops=1,float gain=.2f){
+ var input=new FaceSnap();input.Reset(initial);var view=initial;var previous=new Vector2(18,0);sawTurn=false;
+ for(int sample=1;sample<=loops*160;sample++){
+  float a=direction*MathF.Tau*sample/160;var position=new Vector2(18*MathF.Cos(a),18*MathF.Sin(a));var delta=position-previous;previous=position;
+  view=input.Step(initial,delta.X,delta.Y,0,gain,1000+sample*16);sawTurn|=input.Orientation!=0;
+ }
+ return view;
+}
+foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ}){
+ var initial=CameraMath.AlignFace(studioView,axis);
+ var clockwiseFace=CircleFace(initial,1,out var turnedRight);
+ var counterFace=CircleFace(initial,-1,out var turnedLeft);
+ var backFace=Vector3.Normalize(clockwiseFace.Eye-clockwiseFace.Target);
+ var rightAfter=Vector3.Normalize(Vector3.Cross(clockwiseFace.Up,backFace));
+ var leftAfter=Vector3.Normalize(Vector3.Cross(counterFace.Up,backFace));
+ Check(turnedRight&&Vector3.Dot(backFace,axis)>.999f&&Vector3.Dot(initial.Up,rightAfter)>.99f,"Clockwise ball gesture turns the "+axis+" face clockwise without changing faces");
+ Check(turnedLeft&&Vector3.Dot(Vector3.Normalize(counterFace.Eye-counterFace.Target),axis)>.999f&&Vector3.Dot(initial.Up,leftAfter)<-.99f,"Counterclockwise ball gesture turns the "+axis+" face counterclockwise");
+}
+foreach(float gainTest in new[]{.18f,1f,5.66f}){
+ var speedIndependent=CircleFace(studioView,1,out var hasGesture,1,gainTest);
+ Check(hasGesture&&Vector3.Dot(Vector3.Normalize(speedIndependent.Eye-speedIndependent.Target),Vector3.UnitZ)>.999f,"Snap turn recognition uses raw movement at gain "+gainTest);
+}
+var turnedFace=CircleFace(studioRight,1,out _);var reheld=new FaceSnap();reheld.Reset(turnedFace);
+var retainedTurn=reheld.Step(turnedFace,0,0,0,.2f,8000);
+Check(Vector3.Distance(retainedTurn.Up,turnedFace.Up)<.0001,"Releasing and reholding Alt preserves a deliberately turned face");
+var afterTurn=new FaceSnap();afterTurn.Reset(studioView);var priorPoint=new Vector2(18,0);var recoveredView=studioView;
+for(int sample=1;sample<=160;sample++){float a=MathF.Tau*sample/160;var point=new Vector2(18*MathF.Cos(a),18*MathF.Sin(a));var delta=point-priorPoint;priorPoint=point;recoveredView=afterTurn.Step(studioView,delta.X,delta.Y,0,.2f,1000+sample*16);}
+bool changedAfterTwist=false;
+for(int sample=1;sample<=100;sample++){recoveredView=afterTurn.Step(studioView,5,0,0,.2f,4000+sample*16);changedAfterTwist|=Vector3.Dot(Vector3.Normalize(recoveredView.Eye-recoveredView.Target),Vector3.UnitZ)<.99f;}
+Check(changedAfterTwist&&!afterTurn.Turning,"Rolling straight after a turn gesture changes cube faces again");
+var arcInput=new FaceSnap();arcInput.Reset(studioView);var arcPrevious=new Vector2(18,0);var arcView=studioView;
+for(int sample=1;sample<=95;sample++){float a=MathF.Tau*sample/160;var point=new Vector2(18*MathF.Cos(a),18*MathF.Sin(a));var delta=point-arcPrevious;arcPrevious=point;arcView=arcInput.Step(studioView,delta.X,delta.Y,0,.2f,1000+sample*16);}
+Check(arcInput.Orientation!=0&&IsFace(arcView),"A small curved turn gesture responds before a full circle is completed");
+var noTwist=new FaceSnap();noTwist.Reset(studioView);bool noFalseTwist=true;
+for(int sample=0;sample<100;sample++){noTwist.Step(studioView,5,0,0,.2f,1000+sample*16);noFalseTwist&=!noTwist.Turning&&noTwist.Orientation==0;}
+Check(noFalseTwist,"Ordinary directional snapping never becomes a face turn");
+var offTurn=CircleFace(offCenter with{WorldUp=Vector3.UnitY},1,out _);
+Check(offTurn.Valid&&Math.Abs(Vector3.Distance(offTurn.Eye,offTurn.Pivot)-Vector3.Distance(offCenter.Eye,offCenter.Pivot))<.0001,"Ball face turns keep the cursor-pivot radius");
+
+
+foreach(int rawStroke in new[]{80,300,1000,4000}){
+ var rawSnap=new FaceSnap();rawSnap.Reset(studioView);var legacySnap=new FaceSnap();legacySnap.Reset(studioView);
+ var actualStroke=rawSnap.Step(studioView,rawStroke,0,0,.2f,1000);
+ var oldStroke=legacySnap.Step(studioView,rawStroke*.2f,0,0,1,1000);
+ Check(Vector3.Distance(actualStroke.Eye,oldStroke.Eye)<.0001&&Vector3.Distance(actualStroke.Up,oldStroke.Up)<.0001,"Raw snap gestures retain the original directional response at "+rawStroke+" counts");
+}
+
+
+var reverseSnap=new FaceSnap();reverseSnap.Reset(studioView);bool straightReversal=true;
+for(int sample=0;sample<120;sample++){reverseSnap.Step(studioView,sample<40?5:sample<80?-5:0,sample>=80?5:0,0,.2f,1000+sample*16);straightReversal&=!reverseSnap.Turning&&reverseSnap.Orientation==0;}
+Check(straightReversal,"Reversing or cornering a straight face-switch stroke does not reserve a turn gesture");
 
 Console.WriteLine(count+" regression checks passed.");

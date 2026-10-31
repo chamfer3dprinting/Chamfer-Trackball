@@ -104,7 +104,7 @@ assert.ok(shortcutRecorderStart>0&&shortcutRecorderEnd>shortcutRecorderStart);
  assert.equal(context.cfg.zoomKeys,'ctrl');assert.equal(saves.length,1);
  context.recordShortcut('hold:orbitKeys');context.recording.combo='Ctrl';accept(true);await Promise.resolve();await Promise.resolve();
  assert.equal(context.cfg.orbitKeys,'shift');assert.equal(saves.length,1);assert.ok(messages.some(text=>text.includes('Zoom')));
- assert.ok(html.includes('Top, Bottom, Left, Right, Front or Back')&&!html.includes('align to a face, edge or corner'));
+ assert.ok(html.includes('straight up, down, left or right to change the cube face')&&html.includes('clockwise or counterclockwise loop')&&!html.includes('align to a face, edge or corner'));
  console.log('Ctrl can be recorded for Zoom, Shift Orbit is preserved, and snapping describes only the six faces.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
@@ -164,3 +164,13 @@ assert.ok(presetStart>0&&presetEnd>presetStart);
  ask=null;calls.length=0;await context.handlePreset(button('save'));assert.equal(calls.length,0);
  console.log('Save, explicit overwrite, apply, rename and delete use the preset bridge after saving current program edits; cancellation changes nothing.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+const speedStart=html.indexOf('function speedGain('),speedEnd=html.indexOf('function valLabel(',speedStart);
+const speedContext={};vm.runInNewContext(html.slice(speedStart,speedEnd),speedContext);
+assert.equal(speedContext.speedLabel(0),'0%');assert.equal(speedContext.speedLabel(1),'1.0%');assert.equal(speedContext.speedLabel(50),'100%');assert.equal(speedContext.speedLabel(100),'400%');
+assert.ok(Math.abs(speedContext.speedGain(4)-.0132571137)<.000001);
+for(const key of ['orbitSens','panSens','zoomSens'])assert.ok(html.includes('min="0" max="100" data-k="'+key+'"'));
+assert.ok(controller.includes('MotionPolicy.Scale(output,x,y,w,OrbitGain,PanGain,ZoomGain)'));
+assert.ok(controller.includes('MotionPolicy.SnapGain(')&&controller.includes('server.Move(native,output,x,y,w,input.Keys.Contains(18),nativeGain)'));
+assert.ok(html.includes('id="activeSpeeds"'));
+console.log('3D slider labels span 0 to 400 percent and use the same widened curve as actual motion; snap gestures keep raw movement.');

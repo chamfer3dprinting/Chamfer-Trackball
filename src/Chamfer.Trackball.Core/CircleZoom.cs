@@ -3,7 +3,7 @@ namespace Chamfer.Trackball.Core;
 
 // Recognizes a deliberate closed roll path. This derives a gesture from X/Y;
 // it does not measure a third physical rotation axis.
-public sealed class CircleZoom {
+public sealed class CircleZoom(bool allowTurnArc=false) {
     const float SharpTurnLimit=1.45f;
     const int MaxSamples=192;
     readonly List<Vector2> points=[];
@@ -11,6 +11,16 @@ public sealed class CircleZoom {
     Vector2 position,sampled,previous,straightAnchor;float straightTravel;
     long lastTime;bool hasHeading;
     public bool Active {get;private set;}
+    // A consistent bend in the resampled path can reserve a snap-turn candidate
+    // before a full loop is recognized. Ordinary zoom recognition is unchanged.
+    public bool Curving {
+        get{
+            if(Active)return true;
+            int first=Math.Max(1,turns.Count-8);float signed=0,absolute=0;
+            for(int i=first;i<turns.Count;i++){if(MathF.Abs(turns[i])>SharpTurnLimit)return false;signed+=turns[i];absolute+=MathF.Abs(turns[i]);}
+            return MathF.Abs(signed)>(allowTurnArc?.06f:.45f)&&MathF.Abs(signed)>absolute*.8f;
+        }
+    }
     public void Reset(){points.Clear();turns.Clear();position=sampled=previous=Vector2.Zero;lastTime=0;straightTravel=0;straightAnchor=Vector2.Zero;hasHeading=Active=false;}
     public (bool Consumed,float Wheel) Add(float dx,float dy,long now,float maxDiameter=160){
         if(!float.IsFinite(dx)||!float.IsFinite(dy)||!float.IsFinite(maxDiameter)){Reset();return (false,0);}
@@ -94,9 +104,9 @@ public sealed class CircleZoom {
             bool sharp=sharpTurnPrefix[end]!=sharpTurnPrefix[start+1];
             var extent=hi-lo;float widest=Math.Max(extent.X,extent.Y),narrowest=Math.Min(extent.X,extent.Y);
             var first=points[start];
-            if(!sharp&&length>=40&&MathF.Abs(turn)>=4.9f&&MathF.Abs(turn)/Math.Max(absoluteTurn,.001f)>=.78f
+            if(!sharp&&length>=(allowTurnArc?32:40)&&MathF.Abs(turn)>=(allowTurnArc?2.3f:4.9f)&&MathF.Abs(turn)/Math.Max(absoluteTurn,.001f)>=.78f
                 &&widest<=maxDiameter&&narrowest>=8&&narrowest/widest>=.35f
-                &&Vector2.Distance(first,points[end])/length<=.38f){
+                &&Vector2.Distance(first,points[end])/length<=(allowTurnArc?.82f:.38f)){
                 accumulatedTurn=turn;return true;
             }
         }
