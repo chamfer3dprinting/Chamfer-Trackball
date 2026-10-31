@@ -104,7 +104,14 @@ public string AppName{get;private set;}="";
         emulating=false;emulationMode=NavMode.Idle;fractions.Reset();
     }
     void Motion(int x,int y,string device){
-        rawX+=x;rawY+=y;if(mode==NavMode.Idle)return;
+        rawX+=x;rawY+=y;
+        if(mode==NavMode.Idle&&IsCad&&input.Ready){
+            var desired=Resolve();
+            if(MotionPolicy.ResumeAfterClick(stoppedByClick,desired,HeldNavigation,x!=0||y!=0)){
+                stoppedByClick=false;Change(desired);
+            }
+        }
+        if(mode==NavMode.Idle)return;
         if(mode==NavMode.Gestures){gx+=x;gy+=y;return;}
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
         if(MotionPolicy.Circle(mode,ConfigStore.B(cfg,"circleZoom"),!freeBall)){
