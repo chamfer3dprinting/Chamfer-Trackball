@@ -40,6 +40,14 @@ public sealed class ConfigStore {
             }
             LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=23;
         }
+        if(oldVersion<24){
+            var navigation=nodeProgram(config,"3D");
+            if(navigation!=null){
+                navigation["ball"]="pointer";
+                if(S(navigation,"zoomKeys","none") is "" or "none")navigation["zoomKeys"]="ctrl";
+            }
+            LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=24;
+        }
         Validate(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
@@ -88,7 +96,7 @@ public sealed class ConfigStore {
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
             foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=23;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=24;
     }
     public static void Validate(JsonObject c){
         foreach(var node in c["programs"]!.AsArray()){
@@ -96,7 +104,7 @@ public sealed class ConfigStore {
             foreach(var key in new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys"}){
                 var chord=S(p,key,"none");if(chord=="none"||chord=="")continue;
                 var binding=KeyChord.Parse(chord);
-                if(binding.IsCtrlAlone)throw new InvalidDataException("Ctrl alone stays a normal keyboard key. Choose another navigation binding.");
+                if(binding.IsCtrlAlone&&key!="zoomKeys")throw new InvalidDataException("Ctrl by itself is available for Zoom. Choose another key for this navigation command.");
                 if(!used.Add(binding.Canonical))throw new InvalidDataException("Two navigation modes cannot use the same held keys. Pan and zoom share the Pan + zoom mode.");
             }
             if(p["combos"] is JsonArray combos && combos.Count>64)throw new InvalidDataException("A program supports up to 64 combinations.");

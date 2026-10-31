@@ -4,8 +4,11 @@ using Chamfer.Trackball.Core;
 int count=0;void Check(bool pass,string name){count++;if(!pass)throw new Exception("FAILED: "+name);Console.WriteLine("PASS "+name);}
 var defaults=ConfigStore.Defaults();
 Check(ConfigStore.I(defaults,"activeProgram")==0&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Idle,"Factory startup is an ordinary mouse");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Normal mouse keeps Ctrl as an ordinary modifier");
 ConfigStore.LoadProgram(defaults,1);
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Ctrl alone passes through");
+Check(ConfigStore.S(defaults,"ball")=="pointer"&&ModeResolver.Resolve(defaults,new HashSet<int>())==NavMode.Idle,"The 3D program points normally until a navigation key is held");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Zoom,"Ctrl and roll selects Zoom in the 3D program");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&ModeResolver.Resolve(defaults,new HashSet<int>{17,86})==NavMode.Idle,"Ctrl+C and Ctrl+V remain ordinary keyboard shortcuts");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom,"Ctrl+Shift wins over Shift");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap,"Alt snaps");
@@ -31,8 +34,24 @@ var near=CameraMath.Move(c with{Eye=new(0,0,10),Target=Vector3.Zero,Pivot=Vector
 var far=CameraMath.Move(c with{Eye=new(0,0,100),Target=Vector3.Zero,Pivot=Vector3.Zero,Up=Vector3.UnitY},NavMode.PanZoom,10,0);
 Check(Math.Abs(far.Target.X/near.Target.X-10)<.001,"Pan scales with real scene depth");
 var snap=CameraMath.Move(c,NavMode.Snap,120,30);
-var dir=Vector3.Normalize(snap.Eye-snap.Pivot);var components=new[]{Math.Abs(dir.X),Math.Abs(dir.Y),Math.Abs(dir.Z)}.Where(x=>x>.001).ToArray();
-Check(components.Max()-components.Min()<.001,"Snap aligns to face/edge/corner direction");
+var dir=Vector3.Normalize(snap.Eye-snap.Target);var components=new[]{Math.Abs(dir.X),Math.Abs(dir.Y),Math.Abs(dir.Z)}.Where(x=>x>.001).ToArray();
+Check(components.Length==1&&Math.Abs(components[0]-1)<.001,"Snap aligns to one cube face without an edge or corner");
+bool IsFace(CameraPose view){
+ var direction=Vector3.Normalize(view.Eye-view.Target);var values=new[]{Math.Abs(direction.X),Math.Abs(direction.Y),Math.Abs(direction.Z)};
+ return view.Valid&&values.Count(value=>value>.001)==1&&values.Max()>.999f;
+}
+foreach(var (name,axis) in new[]{("Right",Vector3.UnitX),("Left",-Vector3.UnitX),("Back",Vector3.UnitY),("Front",-Vector3.UnitY),("Top",Vector3.UnitZ),("Bottom",-Vector3.UnitZ)}){
+ var face=c with{Eye=c.Target+axis*10,Up=Math.Abs(axis.Z)>.9?Vector3.UnitY:Vector3.UnitZ};
+ var aligned=CameraMath.Move(face,NavMode.Snap,0,0);
+ Check(IsFace(aligned)&&Vector3.Dot(Vector3.Normalize(aligned.Eye-aligned.Target),axis)>.999f,"Snap can reach the "+name+" face");
+}
+bool faceOnly=true;
+for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)for(int z=-1;z<=1;z++){
+ if(x==0&&y==0&&z==0)continue;var axis=Vector3.Normalize(new Vector3(x,y,z));
+ var initial=c with{Eye=c.Target+axis*10,Up=Math.Abs(axis.Z)>.9?Vector3.UnitY:Vector3.UnitZ};
+ foreach(var orthographic in new[]{false,true})faceOnly&=IsFace(CameraMath.Move(initial with{Orthographic=orthographic},NavMode.Snap,0,0));
+}
+Check(faceOnly,"Diagonal starting views snap only to faces in perspective and orthographic cameras");
 Vector2 ProjectPivot(CameraPose camera){
  var b=Vector3.Normalize(camera.Eye-camera.Target);var r=Vector3.Normalize(Vector3.Cross(camera.Up,b));var u=Vector3.Normalize(Vector3.Cross(b,r));var v=camera.Pivot-camera.Eye;
  return new(Vector3.Dot(v,r)/-Vector3.Dot(v,b),Vector3.Dot(v,u)/-Vector3.Dot(v,b));
@@ -91,7 +110,16 @@ try{
  Check(reset["programs"]![0]!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")&&reset["programs"]![1]!["buttons"]!.AsObject().Where(b=>b.Key!="back").All(b=>ConfigStore.S(b.Value,"action")=="normal")&&ConfigStore.S(reset["programs"]![1]!["buttons"]!["back"],"action")=="panToggle","Reset restores normal mouse clicks and the 3D Back toggle");
  var bad=store.Snapshot();bad["orbitKeys"]="ctrl";bool rejected=false;try{store.Save(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"Saving Ctrl-only navigation is rejected");
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==23,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==24,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
+ foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
+  var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
+  old["programs"]![1]!["ball"]="orbit";old["programs"]![1]!["zoomKeys"]=zoomBinding;
+  old["programs"]![1]!["orbitKeys"]="Alt+Q";old["programs"]![1]!["panKeys"]="Ctrl+Space";
+  File.WriteAllText(path,old.ToJsonString());var upgraded=new ConfigStore(path).Snapshot();
+  Check(ConfigStore.S(upgraded,"ball")=="pointer"&&ConfigStore.S(upgraded,"selectedDevice")=="retained-trackball","Held-navigation migration keeps the trackball and restores pointing for "+zoomBinding);
+  Check(ConfigStore.S(upgraded,"zoomKeys")==(zoomBinding=="none"?"ctrl":zoomBinding)&&ConfigStore.S(upgraded,"orbitKeys")=="Alt+Q"&&ConfigStore.S(upgraded,"panKeys")=="Ctrl+Space","Migration preserves custom held keys for "+zoomBinding);
+ }
 }finally{Directory.Delete(dirPath,true);}
 
 var dm=new DeviceMapping();var leftDown=new MouseEdge(0x201);var rightDown=new MouseEdge(0x204);

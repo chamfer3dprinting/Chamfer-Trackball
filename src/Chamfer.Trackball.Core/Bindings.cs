@@ -37,7 +37,7 @@ public static class ModeResolver {
                     var withoutAlt=new HashSet<int>(keys);withoutAlt.Remove(18);
                     if(chord.Matches(withoutAlt))return mode;
                 }
-                if(!chord.IsCtrlAlone&&chord.Matches(keys))return mode;
+                if((!chord.IsCtrlAlone||mode==NavMode.Zoom)&&chord.Matches(keys))return mode;
             }catch(FormatException){ }
         }
         return NavMode.Idle;

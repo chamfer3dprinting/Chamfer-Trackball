@@ -92,3 +92,18 @@ assert.ok(identificationStart>0&&identificationEnd>identificationStart);
  assert.ok(html.includes('id="homeDeviceSetup"')&&html.includes('s.deviceReady'));
  console.log('Home identification and cancellation reach the input driver and setup readiness is visible.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+const shortcutRecorderStart=html.indexOf('function recordShortcut(target){');
+const shortcutRecorderEnd=html.indexOf('const MOD_CODES=',shortcutRecorderStart);
+assert.ok(shortcutRecorderStart>0&&shortcutRecorderEnd>shortcutRecorderStart);
+(async()=>{
+ let accept;const messages=[],saves=[];
+ const context={recording:null,cfg:{orbitKeys:'shift',panKeys:'ctrl+shift',zoomKeys:'none',snapKeys:'alt',navigateKeys:'backtick'},modal:()=>new Promise(resolve=>accept=resolve),toast:text=>messages.push(text),renderBinds:()=>{},renderCheat:()=>{},save:()=>saves.push(true),holdLabel:value=>value};
+ vm.runInNewContext(html.slice(shortcutRecorderStart,shortcutRecorderEnd),context);
+ context.recordShortcut('hold:zoomKeys');context.recording.combo='Ctrl';accept(true);await Promise.resolve();await Promise.resolve();
+ assert.equal(context.cfg.zoomKeys,'ctrl');assert.equal(saves.length,1);
+ context.recordShortcut('hold:orbitKeys');context.recording.combo='Ctrl';accept(true);await Promise.resolve();await Promise.resolve();
+ assert.equal(context.cfg.orbitKeys,'shift');assert.equal(saves.length,1);assert.ok(messages.some(text=>text.includes('Zoom')));
+ assert.ok(html.includes('Top, Bottom, Left, Right, Front or Back')&&!html.includes('align to a face, edge or corner'));
+ console.log('Ctrl can be recorded for Zoom, Shift Orbit is preserved, and snapping describes only the six faces.');
+})().catch(e=>{console.error(e);process.exitCode=1;});
