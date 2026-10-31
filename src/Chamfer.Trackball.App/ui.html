@@ -811,7 +811,7 @@ function renderKeyboard(){
 }
 function updateKeyboard(s){
  const keys=new Set(s.keys||[]);
- $("#liveKeyboard [data-vk]").forEach(el=>{const down=keys.has(+el.dataset.vk);if(el.classList.contains("down")!==down)el.classList.toggle("down",down)});
+ $$("#liveKeyboard [data-vk]").forEach(el=>{const down=keys.has(+el.dataset.vk);if(el.classList.contains("down")!==down)el.classList.toggle("down",down)});
  liveText("#keyboardMode",s.appState==="cad"?"3D controls: "+(MODEN[s.mode]||s.mode):"Normal keyboard — 3D shortcuts activate in a supported 3D view.");
 }
 
