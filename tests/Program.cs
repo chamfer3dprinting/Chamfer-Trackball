@@ -539,13 +539,13 @@ bool invalidTwist=false;try{KnobTwist.CameraDelta(float.NaN,0,"x",false,1);}catc
 Check(invalidTwist,"Invalid Twist samples cannot poison camera orientation");
 foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ}){
  var initial=CameraMath.AlignFace(studioView,axis);
- var clockwise=CameraMath.Move(initial,NavMode.Roll,KnobTwist.CameraDelta(100,0,"x",false,1),0);
- var anticlockwise=CameraMath.Move(initial,NavMode.Roll,KnobTwist.CameraDelta(-100,0,"x",false,1),0);
- var rightAfter=Vector3.Normalize(Vector3.Cross(clockwise.Up,axis));var leftAfter=Vector3.Normalize(Vector3.Cross(anticlockwise.Up,axis));
- Check(Vector3.Dot(Vector3.Normalize(clockwise.Eye-clockwise.Target),axis)>.999f&&Vector3.Dot(initial.Up,rightAfter)>.09f,"Clockwise knob motion turns orientation without changing the "+axis+" face");
- Check(Vector3.Dot(Vector3.Normalize(anticlockwise.Eye-anticlockwise.Target),axis)>.999f&&Vector3.Dot(initial.Up,leftAfter)<-.09f,"Anticlockwise knob motion turns orientation without changing the "+axis+" face");
- var returned=CameraMath.Move(clockwise,NavMode.Roll,KnobTwist.CameraDelta(-100,0,"x",false,1),0);
- Check(Vector3.Distance(returned.Up,initial.Up)<.0001&&Math.Abs(Vector3.Distance(clockwise.Eye,clockwise.Pivot)-Vector3.Distance(initial.Eye,initial.Pivot))<.0001,"Opposite knob turns cancel and preserve the cursor pivot on "+axis);
+ var knobClockwise=CameraMath.Move(initial,NavMode.Roll,KnobTwist.CameraDelta(100,0,"x",false,1),0);
+ var knobAnticlockwise=CameraMath.Move(initial,NavMode.Roll,KnobTwist.CameraDelta(-100,0,"x",false,1),0);
+ var rightAfter=Vector3.Normalize(Vector3.Cross(knobClockwise.Up,axis));var leftAfter=Vector3.Normalize(Vector3.Cross(knobAnticlockwise.Up,axis));
+ Check(Vector3.Dot(Vector3.Normalize(knobClockwise.Eye-knobClockwise.Target),axis)>.999f&&Vector3.Dot(initial.Up,rightAfter)>.09f,"Clockwise knob motion turns orientation without changing the "+axis+" face");
+ Check(Vector3.Dot(Vector3.Normalize(knobAnticlockwise.Eye-knobAnticlockwise.Target),axis)>.999f&&Vector3.Dot(initial.Up,leftAfter)<-.09f,"Anticlockwise knob motion turns orientation without changing the "+axis+" face");
+ var returned=CameraMath.Move(knobClockwise,NavMode.Roll,KnobTwist.CameraDelta(-100,0,"x",false,1),0);
+ Check(Vector3.Distance(returned.Up,initial.Up)<.0001&&Math.Abs(Vector3.Distance(knobClockwise.Eye,knobClockwise.Pivot)-Vector3.Distance(initial.Eye,initial.Pivot))<.0001,"Opposite knob turns cancel and preserve the cursor pivot on "+axis);
 }
 var directionalStillWorks=new FaceSnap();directionalStillWorks.Reset(studioView);var directionsSeen=new HashSet<string>();
 foreach(var direction in new[]{new Vector2(5,0),new Vector2(-5,0),new Vector2(0,5),new Vector2(0,-5)}){
