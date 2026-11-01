@@ -7,7 +7,7 @@ on the owner's PC. Deliver only the executable as the user-facing download.
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
 mouse button swapping to implement app bindings. The owner's latest requested controls
 are Shift orbit, Ctrl+Shift pan, Ctrl plus ball for zoom, Alt plus ball for six-face
-snapping, Alt+Shift for the new customizable held Twist, and Windows navigation with Alt for height. Reserve the Windows tap in the 3D
+snapping with the explicitly approved experimental Alt-only knob estimator, an optional separate Twist hold, and Windows navigation with Alt for height. Reserve the Windows tap in the 3D
 context so releasing it never opens Start; keep system shortcuts and non-3D Windows input normal. Ctrl alone is permitted for
 Zoom in 3D apps; other Ctrl keyboard shortcuts must remain normal. The 3D program
 points normally until a held navigation command is used.
@@ -186,3 +186,16 @@ Source 5b962afe938faf56167316fe1f352de406d7cf55 produced Admin prerelease v1.5.2
 Through the actual Speed & direction UI, Twist was changed from 50 to 49, the backend gain display changed from 100% to 91%, then the value was restored to 50. The saved file now contains schema 26, twistKeys alt+shift, twistSens 50, twistAxis x and invertTwist false. Removing only the added Twist fields yields an identical hash of all existing program settings before/after installation. Saved presets and selected-device hashes also match exactly; native click/wheel corrections remain false. The owner's current pointer/orbit/pan/zoom settings are 5/10/10/11 and remain unchanged. No source/development folder was created on the PC.
 
 The receiver's measured knob motion and ordinary left/right strokes overlap on X; the explicit Twist hold supplies the intended interpretation. X is the measured useful axis; the initial clockwise direction convention remains an owner-calibratable default through Reverse twist. Do not present this as independent three-axis sensing. Public stable remains public-v1.0.1 and no stable public promotion occurred. The owner has been asked to physically test Alt+Shift knob turning and the preserved Alt directional snaps. Those physical held-control results are pending; automated camera/input coverage is not a live hand-feel test.
+
+
+# 2026-10-31 — Snap knob orientation in 90° steps and estimate it under Alt
+
+The owner confirms v1.5.25 Twist responds but asks for discrete 90-degree orientation, reports buggy Alt directional snapping and explicitly rejects any Alt-tap mode switch or Shift requirement. After explaining that the M512 X/Y signal cannot independently identify all six camera degrees of freedom, the owner chooses “Try Alt-only estimation.” No Alt-tap keyboard behavior is added.
+
+Replace the old curved-roll reservation inside directional FaceSnap with stable dominant-axis strokes, one adjacent face per step and a 140 ms repeat limit. Retain the stroke's world rotation axis across upright faces; an initial focused test caught Top/side bouncing when that axis was recomputed after every canonical snap. Preserve continuous Top-to-Bottom travel, wheel quarter turns and cursor pivots. Quantize the optional explicit Twist hold into 90-degree increments and report progress. A snapped Twist session initially aligns the nearest cube face.
+
+Add a bounded, experimental X/Y geometry estimator for native Alt Snap sessions. Consistent, nearly horizontal strokes may become estimated knob turns; uncertain or cross-axis strokes use directional faces. The brief observation window is resolved by existing 16 ms controller frames, including idle frames while a decision is pending. A candidate that becomes uncertain before a turn replays its bounded pending movement as directional faces. No sensor-axis or six-DOF claim is made. The owner approved the possibility of confusing horizontal rolls with twists.
+
+Separate clockwise, anticlockwise and normal-rolling samples were captured read-only from the selected M512, with no keyboard capture, input blocking or device writes. The listener has stopped. Private traces stay in memory, not source. The actual C# replay recognized the clockwise sample and clearer anticlockwise passes while all five selected normal comparison strokes remained faces; shorter/uncertain knob strokes conservatively fell back or did not reach a 90-degree threshold. This is a small calibration check, not a general accuracy guarantee.
+
+Schema 27 enables the approved estimate in the existing Alt-based 3D program and removes only the preceding factory Alt+Shift default; custom separate Twist chords remain. Normal mouse has estimation off. The checkbox, program copies, presets and reset paths include the option. Focused in-memory C# checks pass 75 cases for adjacent faces, repeat limits, pole continuity, exact quarter turns, estimator fallback and accepted input ambiguity. Full Windows workflows and installation are pending. Physical Alt-only feel still needs owner confirmation after installation.

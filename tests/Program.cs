@@ -125,7 +125,7 @@ try{
  Check(ConfigStore.I(repaired,"orbitSens")==82&&ConfigStore.I(repaired,"panSens")==50&&ConfigStore.I(repaired,"pointerSpeed")==10,"An incomplete added program gets its own full motion defaults instead of leaking the previous program");
  store.Select(0);
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==26,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==27,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
@@ -325,7 +325,7 @@ var studioTop=CameraMath.AlignFace(studioView,Vector3.UnitY);var studioBottom=Ca
 Check(studioTop.Valid&&studioBottom.Valid&&Vector3.Dot(studioTop.Up,-Vector3.UnitZ)>.999f&&Vector3.Dot(studioBottom.Up,Vector3.UnitZ)>.999f,"Studio Top and Bottom have upright opposite-face orientations");
 var stepSnap=new FaceSnap();stepSnap.Reset(studioTop);var seenFaces=new HashSet<string>();var reachedBottom=false;
 for(int sample=0;sample<40;sample++){
- var face=stepSnap.Step(studioTop,0,5);var direction=Vector3.Normalize(face.Eye-face.Target);seenFaces.Add(CameraMath.NearestFace(direction).ToString());
+ var face=stepSnap.Step(studioTop,0,5,0,1,1000+sample*16);var direction=Vector3.Normalize(face.Eye-face.Target);seenFaces.Add(CameraMath.NearestFace(direction).ToString());
  reachedBottom|=Vector3.Dot(direction,-Vector3.UnitY)>.999f;
  Check(IsFace(face),"Continuous face snap remains aligned at sample "+sample);
 }
@@ -419,114 +419,11 @@ foreach(int step in new[]{2,10,19}){
  for(int sample=0;sample<160;sample++)delivered+=normalPointer.Move(2,0,PointerPolicy.Gain(step)).X;
  Check(delivered==(int)MathF.Round(320*PointerPolicy.Gain(step)),"Normal mouse DPI "+step+" changes delivered pointer distance");
 }
-CameraPose CircleFace(CameraPose initial,float direction,out bool sawTurn,int loops=1,float gain=.2f){
- var input=new FaceSnap();input.Reset(initial);var view=initial;var previous=new Vector2(18,0);sawTurn=false;
- for(int sample=1;sample<=loops*160;sample++){
-  float a=direction*MathF.Tau*sample/160;var position=new Vector2(18*MathF.Cos(a),18*MathF.Sin(a));var delta=position-previous;previous=position;
-  view=input.Step(initial,delta.X,delta.Y,0,gain,1000+sample*16);sawTurn|=input.Orientation!=0;
- }
- return view;
-}
-foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ}){
- var initial=CameraMath.AlignFace(studioView,axis);
- var clockwiseFace=CircleFace(initial,1,out var turnedRight);
- var counterFace=CircleFace(initial,-1,out var turnedLeft);
- var backFace=Vector3.Normalize(clockwiseFace.Eye-clockwiseFace.Target);
- var rightAfter=Vector3.Normalize(Vector3.Cross(clockwiseFace.Up,backFace));
- var leftAfter=Vector3.Normalize(Vector3.Cross(counterFace.Up,backFace));
- Check(turnedRight&&Vector3.Dot(backFace,axis)>.999f&&Vector3.Dot(initial.Up,rightAfter)>.99f,"Clockwise ball gesture turns the "+axis+" face clockwise without changing faces");
- Check(turnedLeft&&Vector3.Dot(Vector3.Normalize(counterFace.Eye-counterFace.Target),axis)>.999f&&Vector3.Dot(initial.Up,leftAfter)<-.99f,"Counterclockwise ball gesture turns the "+axis+" face counterclockwise");
-}
-foreach(float gainTest in new[]{.18f,1f,5.66f}){
- var speedIndependent=CircleFace(studioView,1,out var hasGesture,1,gainTest);
- Check(hasGesture&&Vector3.Dot(Vector3.Normalize(speedIndependent.Eye-speedIndependent.Target),Vector3.UnitZ)>.999f,"Snap turn recognition uses raw movement at gain "+gainTest);
-}
-var turnedFace=CircleFace(studioRight,1,out _);var reheld=new FaceSnap();reheld.Reset(turnedFace);
-var retainedTurn=reheld.Step(turnedFace,0,0,0,.2f,8000);
-Check(Vector3.Distance(retainedTurn.Up,turnedFace.Up)<.0001,"Releasing and reholding Alt preserves a deliberately turned face");
-var afterTurn=new FaceSnap();afterTurn.Reset(studioView);var priorPoint=new Vector2(18,0);var recoveredView=studioView;
-for(int sample=1;sample<=160;sample++){float a=MathF.Tau*sample/160;var point=new Vector2(18*MathF.Cos(a),18*MathF.Sin(a));var delta=point-priorPoint;priorPoint=point;recoveredView=afterTurn.Step(studioView,delta.X,delta.Y,0,.2f,1000+sample*16);}
-bool changedAfterTwist=false;
-for(int sample=1;sample<=100;sample++){recoveredView=afterTurn.Step(studioView,5,0,0,.2f,4000+sample*16);changedAfterTwist|=Vector3.Dot(Vector3.Normalize(recoveredView.Eye-recoveredView.Target),Vector3.UnitZ)<.99f;}
-Check(changedAfterTwist&&!afterTurn.Turning,"Rolling straight after a turn gesture changes cube faces again");
-var arcInput=new FaceSnap();arcInput.Reset(studioView);var arcPrevious=new Vector2(18,0);var arcView=studioView;
-for(int sample=1;sample<=95;sample++){float a=MathF.Tau*sample/160;var point=new Vector2(18*MathF.Cos(a),18*MathF.Sin(a));var delta=point-arcPrevious;arcPrevious=point;arcView=arcInput.Step(studioView,delta.X,delta.Y,0,.2f,1000+sample*16);}
-Check(arcInput.Orientation!=0&&IsFace(arcView),"A small curved turn gesture responds before a full circle is completed");
-var noTwist=new FaceSnap();noTwist.Reset(studioView);bool noFalseTwist=true;
-for(int sample=0;sample<100;sample++){noTwist.Step(studioView,5,0,0,.2f,1000+sample*16);noFalseTwist&=!noTwist.Turning&&noTwist.Orientation==0;}
-Check(noFalseTwist,"Ordinary directional snapping never becomes a face turn");
-var offTurn=CircleFace(offCenter with{WorldUp=Vector3.UnitY},1,out _);
-Check(offTurn.Valid&&Math.Abs(Vector3.Distance(offTurn.Eye,offTurn.Pivot)-Vector3.Distance(offCenter.Eye,offCenter.Pivot))<.0001,"Ball face turns keep the cursor-pivot radius");
-
-
-foreach(int rawStroke in new[]{80,300,1000,4000}){
- var rawSnap=new FaceSnap();rawSnap.Reset(studioView);var legacySnap=new FaceSnap();legacySnap.Reset(studioView);
- var actualStroke=rawSnap.Step(studioView,rawStroke,0,0,.2f,1000);
- var oldStroke=legacySnap.Step(studioView,rawStroke*.2f,0,0,1,1000);
- Check(Vector3.Distance(actualStroke.Eye,oldStroke.Eye)<.0001&&Vector3.Distance(actualStroke.Up,oldStroke.Up)<.0001,"Raw snap gestures retain the original directional response at "+rawStroke+" counts");
-}
-
-
-var reverseSnap=new FaceSnap();reverseSnap.Reset(studioView);bool straightReversal=true;
-for(int sample=0;sample<120;sample++){reverseSnap.Step(studioView,sample<40?5:sample<80?-5:0,sample>=80?5:0,0,.2f,1000+sample*16);straightReversal&=!reverseSnap.Turning&&reverseSnap.Orientation==0;}
-Check(straightReversal,"Reversing or cornering a straight face-switch stroke does not reserve a turn gesture");
-
-
-(CameraPose View,FaceSnap Input) QuantizedFaceTurn(CameraPose initial,int radius,int duration,int sign,float gain,int loops=1,float ellipse=1){
- var input=new FaceSnap();input.Reset(initial);var view=initial;
- int oldX=radius,oldY=0,frameX=0,frameY=0;
- for(int ms=1;ms<=duration*loops;ms++){
-  double angle=sign*Math.Tau*ms/duration;
-  int x=(int)Math.Round(radius*Math.Cos(angle)),y=(int)Math.Round(radius*ellipse*Math.Sin(angle));
-  frameX+=x-oldX;frameY+=y-oldY;oldX=x;oldY=y;
-  if(ms%16==0||ms==duration*loops){view=input.Step(initial,frameX,frameY,0,gain,1000+ms);frameX=frameY=0;}
- }
- return (view,input);
-}
-foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ})
-foreach(int radius in new[]{8,18,24,60,180,600,1800}){
- var initial=CameraMath.AlignFace(studioView,axis);bool validTurns=true;
- foreach(int duration in new[]{400,1600})
- foreach(int sign in new[]{1,-1})
- foreach(float gain in new[]{.2f,5.66f}){
-  var (view,input)=QuantizedFaceTurn(initial,radius,duration,sign,gain);
-  var direction=Vector3.Normalize(view.Eye-view.Target);var right=Vector3.Normalize(Vector3.Cross(view.Up,direction));
-  validTurns&=view.Valid&&input.TurnCount==1&&input.LastTurnDirection==sign&&Vector3.Dot(direction,axis)>.999f&&sign*Vector3.Dot(initial.Up,right)>.99f;
- }
- Check(validTurns,"Quantized small/large turns preserve face and direction at radius "+radius+" on "+axis);
-}
-foreach(int radius in new[]{18,60,180,600,1800})
-foreach(int sign in new[]{1,-1}){
- var (view,input)=QuantizedFaceTurn(studioRight,radius,900,sign,.2f,4);
- Check(input.TurnCount==4&&Vector3.Distance(view.Up,studioRight.Up)<.0001,"Overlapping size bands produce exactly four quarter turns at radius "+radius+" direction "+sign);
- for(int sample=1;sample<=20;sample++)view=input.Step(studioRight,5,0,0,.2f,4600+sample*16);
- Check(!input.Turning,"A straight stroke exits a large/small turn without waiting for another circle at radius "+radius+" direction "+sign);
-}
-foreach(int radius in new[]{18,180,600}){
- var (view,input)=QuantizedFaceTurn(studioRight,radius,1100,1,.2f,1,.65f);
- Check(input.TurnCount==1&&Vector3.Dot(Vector3.Normalize(view.Eye-view.Target),Vector3.UnitX)>.999f,"Uneven elliptical roll turns the current face at radius "+radius);
- input.Reset(view);input.Step(view,0,0,0,.2f,8000);
- Check(input.Samples==0&&input.TurnCount==0&&input.LastTurnDirection==0,"Reholding starts turn feedback without stale samples at radius "+radius);
-}
-var stillFace=new FaceSnap();stillFace.Reset(studioRight);var stillView=studioRight;
-for(int frame=0;frame<100;frame++)stillView=stillFace.Step(studioRight,0,0,0,.2f,1000+frame*16);
-Check(stillFace.TurnCount==0&&stillFace.Samples==0&&Vector3.Distance(stillView.Up,studioRight.Up)<.0001,"No X/Y input cannot invent a physical twist or orientation change");
-var wheelFeedback=new FaceSnap();wheelFeedback.Reset(studioRight);wheelFeedback.Step(studioRight,0,0,120,.2f,1000);
-Check(wheelFeedback.TurnCount==1&&wheelFeedback.LastTurnDirection==-1&&wheelFeedback.LastTurnAt==1000,"The existing wheel turn has accurate counterclockwise feedback");
-
-foreach(int stroke in new[]{5,20,100,400}){
- var cornerInput=new FaceSnap();cornerInput.Reset(studioRight);bool noCornerTurn=true;
- for(int sample=0;sample<120;sample++){
-  cornerInput.Step(studioRight,sample<40?stroke:sample<80?-stroke:0,sample>=80?stroke:0,0,.2f,1000+sample*16);
-  noCornerTurn&=!cornerInput.Turning&&cornerInput.TurnCount==0;
- }
- Check(noCornerTurn,"Raw sharp corners and reversals remain face-switch strokes at "+stroke+" counts");
-}
-
-
 var twistDefaults=ConfigStore.Defaults();
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Normal mouse keeps Alt+Shift as ordinary keyboard input");
 ConfigStore.LoadProgram(twistDefaults,1);
+Check(ConfigStore.B(twistDefaults,"altTwistEstimate")&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Factory 3D uses Alt estimation without requiring Shift");
+twistDefaults["twistKeys"]="alt+shift";
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Roll,"Alt+Shift selects the new held Twist mode");
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{18})==NavMode.Snap&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16})==NavMode.Orbit,"Alt face switching and Shift orbit stay separate from Twist");
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,17})==NavMode.PanZoom&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{17})==NavMode.Zoom,"Existing pan and zoom chords are preserved");
@@ -562,7 +459,7 @@ try{
  foreach(var node in old["programs"]!.AsArray()){node!.AsObject().Remove("twistKeys");node["feel"]!.AsObject().Remove("twistSens");node["feel"]!.AsObject().Remove("twistAxis");node["feel"]!.AsObject().Remove("invertTwist");}
  old["programs"]![1]!["feel"]!["orbitSens"]=4;old["programs"]![0]!["pointerSpeed"]=3;File.WriteAllText(twistPath,old.ToJsonString());
  var store=new ConfigStore(twistPath);var migrated=store.Snapshot();
- Check(ConfigStore.I(migrated,"configVersion")==26&&ConfigStore.S(migrated,"twistKeys")=="alt+shift","The existing 3D program gains its approved Twist hold on migration");
+ Check(ConfigStore.I(migrated,"configVersion")==27&&ConfigStore.S(migrated,"twistKeys")=="none"&&ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program gains approved Alt-only estimation without a Shift requirement");
  Check(ConfigStore.S(migrated,"selectedDevice")=="twist-device"&&ConfigStore.I(migrated,"orbitSens")==4&&ConfigStore.I(migrated["programs"]![0],"pointerSpeed")==3,"Twist migration preserves trackball identity and existing speed settings");
  Check(ConfigStore.S(migrated["programs"]![0],"twistKeys")=="none","Twist migration leaves Normal mouse shortcuts off");
  migrated["twistKeys"]="alt+t";migrated["twistSens"]=23;migrated["twistAxis"]="y";migrated["invertTwist"]=true;store.Save(migrated);store.SavePreset("Knob");
@@ -581,5 +478,87 @@ try{
  var badAxis=ConfigStore.Defaults();badAxis["programs"]![1]!["feel"]!["twistAxis"]="z";bool badAxisRejected=false;try{ConfigStore.Validate(badAxis);}catch(InvalidDataException){badAxisRejected=true;}
  Check(badAxisRejected,"An unsupported Twist axis is rejected before saving");
 }finally{foreach(var suffix in new[]{"",".previous",".writing"})if(File.Exists(twistPath+suffix))File.Delete(twistPath+suffix);}
+
+
+var steps=new KnobSteps();
+Check(steps.Add(-KnobSteps.QuarterDelta*.4f)==0&&steps.Progress>.39f&&steps.Progress<.41f,"A partial knob turn waits at the current 90-degree orientation and shows progress");
+Check(steps.Add(-KnobSteps.QuarterDelta*.61f)==-1&&steps.Progress<.02f,"Crossing the knob threshold produces exactly one clockwise quarter step");
+steps.Reset();Check(steps.Add(KnobSteps.QuarterDelta*1.01f)==1,"Opposite knob motion produces an anticlockwise quarter step");
+steps.Reset();steps.Add(KnobSteps.QuarterDelta*.4f);Check(steps.Add(-KnobSteps.QuarterDelta*.4f)==0&&steps.Progress<.001f,"Reversing an unfinished knob motion cancels its remainder");
+steps.Add(40);steps.Reset();Check(steps.Progress==0&&steps.Add(0)==0,"Releasing Twist discards partial progress and cannot coast into another step");
+foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ}){
+ var initial=CameraMath.AlignFace(studioView,axis);var view=initial;var quarterSteps=new KnobSteps();
+ for(int turn=0;turn<4;turn++){
+  int amount=quarterSteps.Add(-KnobSteps.QuarterDelta*1.01f);
+  view=CameraMath.Move(view,NavMode.Roll,(amount%4)*KnobSteps.QuarterDelta,0);
+  var expected=CameraMath.AlignFace(initial,axis,-(turn+1));
+  Check(Vector3.Distance(view.Up,expected.Up)<.0001&&Vector3.Dot(Vector3.Normalize(view.Eye-view.Target),axis)>.999f,"Twist lands on a precise quarter orientation on "+axis+" at step "+turn);
+ }
+ Check(Vector3.Distance(view.Up,initial.Up)<.0001,"Four knob snaps return to the original orientation on "+axis);
+ foreach(var direction in new[]{new Vector2(1000,5),new Vector2(-1000,-5),new Vector2(5,1000),new Vector2(-5,-1000)}){
+  var input=new FaceSnap();input.Reset(initial);var next=input.Step(initial,direction.X,direction.Y,0,.2f,1000);
+  Check(Math.Abs(Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),axis))<.001&&input.Orientation==0&&!input.Turning,"A noisy Alt direction selects one adjacent face on "+axis+" for "+direction);
+ }
+}
+var limited=new FaceSnap();limited.Reset(studioView);var snapPreviousFace=studioView;int changes=0;bool adjacent=true;
+for(int frame=0;frame<100;frame++){
+ var next=limited.Step(studioView,16000,200,0,5.66f,1000+frame*16);
+ var a=Vector3.Normalize(snapPreviousFace.Eye-snapPreviousFace.Target);var b=Vector3.Normalize(next.Eye-next.Target);float dot=Vector3.Dot(a,b);
+ if(dot<.99f){changes++;adjacent&=Math.Abs(dot)<.001f;}
+ snapPreviousFace=next;
+}
+Check(adjacent&&changes>2&&changes<=12,"Fast Alt reports move through neighbors at a bounded repeat rate without skipping opposite faces");
+var paused=new FaceSnap();paused.Reset(studioView);paused.Step(studioView,100,0,0,.2f,1000);
+var afterPause=paused.Step(studioView,0,100,0,.2f,1600);
+Check(Vector3.Dot(Vector3.Normalize(afterPause.Eye-afterPause.Target),Vector3.UnitZ)>.999f,"A pause discards a partial directional stroke instead of mixing it into the next direction");
+var noCurve=new FaceSnap();noCurve.Reset(studioView);bool neverCurves=true;
+for(int frame=0;frame<180;frame++){float angle=frame*.08f;noCurve.Step(studioView,80*MathF.Cos(angle),80*MathF.Sin(angle),0,.2f,1000+frame*16);neverCurves&=!noCurve.Turning&&noCurve.TurnCount==0&&noCurve.Orientation==0;}
+Check(neverCurves,"Alt never reserves the former circular orientation gesture");
+var around=new FaceSnap();around.Reset(studioTop);bool bottom=false;
+for(int frame=0;frame<80;frame++){var next=around.Step(studioTop,0,50,0,.2f,1000+frame*16);bottom|=Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),-Vector3.UnitY)>.999f;}
+Check(bottom,"Continued directional Alt rolls can still go from Top through a neighbor to Bottom");
+
+
+foreach(int sign in new[]{1,-1}){
+ var estimate=new EstimatedFaceSnap();estimate.Reset(studioView);var view=studioView;
+ for(int frame=0;frame<40;frame++)view=estimate.Step(studioView,sign*60,0,0,.2f,1,"x",false,1000+frame*16);
+ Check(estimate.EstimatedTwist&&estimate.QuarterTurns==1&&estimate.LastDirection==sign,"Experimental Alt-only motion estimates a consistent knob turn in direction "+sign);
+ Check(Vector3.Dot(Vector3.Normalize(view.Eye-view.Target),Vector3.UnitZ)>.999f&&Math.Abs(Vector3.Dot(view.Up,studioView.Up))<.001,"Estimated knob turns land at 90 degrees without changing the selected face");
+}
+foreach(var stroke in new[]{new Vector2(60,12),new Vector2(-60,-12),new Vector2(3,60),new Vector2(-3,-60)}){
+ var estimate=new EstimatedFaceSnap();estimate.Reset(studioView);var view=studioView;
+ for(int frame=0;frame<30;frame++)view=estimate.Step(studioView,stroke.X,stroke.Y,0,.2f,1,"x",false,1000+frame*16);
+ Check(!estimate.EstimatedTwist&&estimate.QuarterTurns==0,"Uncertain or cross-axis Alt motion stays directional for "+stroke);
+}
+var fallbackEstimate=new EstimatedFaceSnap();fallbackEstimate.Reset(studioView);var fallbackView=studioView;
+for(int frame=0;frame<8;frame++)fallbackView=fallbackEstimate.Step(studioView,70,0,0,.2f,1,"x",false,1000+frame*16);
+for(int frame=8;frame<14;frame++)fallbackView=fallbackEstimate.Step(studioView,70,30,0,.2f,1,"x",false,1000+frame*16);
+Check(!fallbackEstimate.EstimatedTwist&&fallbackEstimate.QuarterTurns==0,"An initially knob-like normal roll falls back to faces before issuing a false 90-degree turn");
+var quietEstimate=new EstimatedFaceSnap();quietEstimate.Reset(studioView);quietEstimate.Step(studioView,5,0,0,.2f,1,"x",false,1000);
+quietEstimate.Step(studioView,0,0,0,.2f,1,"x",false,1200);
+Check(!quietEstimate.Pending&&!quietEstimate.EstimatedTwist,"A short unfinished motion resolves without staying frozen in a pending estimate");
+var estimateReset=new EstimatedFaceSnap();estimateReset.Reset(studioView);
+for(int frame=0;frame<12;frame++)estimateReset.Step(studioView,80,0,0,.2f,1,"x",false,1000+frame*16);
+estimateReset.Reset(studioView);
+Check(!estimateReset.Pending&&!estimateReset.EstimatedTwist&&estimateReset.QuarterTurns==0&&estimateReset.Progress==0,"Releasing Alt resets the estimator and any incomplete turn");
+var acceptedOverlap=new EstimatedFaceSnap();acceptedOverlap.Reset(studioView);
+for(int frame=0;frame<12;frame++)acceptedOverlap.Step(studioView,100,0,0,.2f,1,"x",false,1000+frame*16);
+Check(acceptedOverlap.EstimatedTwist,"A mathematically identical horizontal roll remains an explicit limitation of the experimental estimator");
+var estimateDefaults=ConfigStore.Defaults();
+Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate"),"Normal mouse does not estimate 3D twist");
+ConfigStore.LoadProgram(estimateDefaults,1);
+Check(ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="alt","The 3D default uses Alt for experimental faces and 90-degree knob turns without a switch or Shift");
+
+
+var obliqueEstimate=new EstimatedFaceSnap();var obliqueStart=studioView with{Eye=new Vector3(4,6,10)};
+obliqueEstimate.Reset(obliqueStart);var obliqueTurn=obliqueStart;
+for(int frame=0;frame<40;frame++)obliqueTurn=obliqueEstimate.Step(obliqueStart,60,0,0,.2f,1,"x",false,1000+frame*16);
+Check(obliqueEstimate.QuarterTurns==1&&IsFace(obliqueTurn),"Alt estimated twist first aligns an oblique starting view to a cube face before its 90-degree turn");
+
+
+var estimatedWheelInput=new EstimatedFaceSnap();estimatedWheelInput.Reset(studioView);var estimatedWheelPose=studioView;
+for(int frame=0;frame<12;frame++)estimatedWheelPose=estimatedWheelInput.Step(studioView,100,0,0,.2f,1,"x",false,1000+frame*16);
+estimatedWheelPose=estimatedWheelInput.Step(studioView,0,0,120,.2f,1,"x",false,1300);
+Check(Vector3.Dot(estimatedWheelPose.Up,Vector3.UnitX)>.999f&&Math.Abs(Vector3.Distance(estimatedWheelPose.Eye,estimatedWheelPose.Target)-10)<.0001&&!estimatedWheelInput.LastEstimatedTurn,"Alt plus wheel remains an exact face quarter turn after an estimated knob candidate; it never becomes zoom");
 
 Console.WriteLine(count+" regression checks passed.");

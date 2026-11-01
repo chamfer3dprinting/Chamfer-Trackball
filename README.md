@@ -46,17 +46,17 @@ The Normal mouse program preserves the manufacturer's clicks and wheel axes. The
 | Shift | Orbit |
 | Ctrl + Shift | Pan; the wheel zooms |
 | Ctrl | Zoom in/out by rolling up/down |
-| Alt | Straight rolls change faces; a clockwise/counterclockwise curved roll turns the face by 90° |
+| Alt | Up/down/left/right selects neighboring faces; experimental knob estimation turns orientation in 90° steps |
 | Alt + wheel | Turn the aligned face by 90 degrees |
-| Alt + Shift | Hold and turn the ball like a knob to turn the current view’s orientation |
+| Optional Twist shortcut | Assign a separate hold for deterministic 90° knob steps if desired |
 | Windows | Move through the scene |
 | Windows + Alt | Move vertically through the scene |
 
-Windows release does not open Start when reserved by the active program in a 3D view. Other system shortcuts and Windows input outside that context remain normal. All held controls are editable. Snap, Twist and Navigate require a native integration. Alt plus straight up/down/left/right still switches cube faces; Alt+Shift selects Twist instead. Twist interprets the selected X/Y component of the existing ball movement, because the measured knob and ordinary rolling patterns overlap. It does not claim independent three-axis sensing.
+Windows release does not open Start when reserved by the active program in a 3D view. Other system shortcuts and Windows input outside that context remain normal. All held controls are editable. Snap, Twist and Navigate require a native integration. Alt plus up/down/left/right switches neighboring faces. The 3D default uses the same Alt hold for experimental knob estimation; there is no tap switch or Shift requirement. Twist interprets the selected X/Y component of the existing ball movement, because the measured knob and ordinary rolling patterns overlap. It does not claim independent three-axis sensing.
 
 Pointer speed/effective DPI now changes the identified trackball's delivered pointer counts. Hardware DPI selection only calibrates the estimate. Pointer speed, Orbit/Pan/Zoom/Twist speed, soft stop and glide are saved per program and retained by Add, Duplicate, switching and restart. Pointer gain does not multiply camera speed. Twist has its own speed, Horizontal/Vertical direction and Reverse setting in Speed & direction. The tested M512 uses Horizontal; clockwise is positive raw X. Held Twist stops immediately with the ball and does not coast. Smooth 3D speed has a 1% low end, 100% at the center and a zero stop value. Normal mouse pointer DPI and glide are independent program settings. Soft stop applies to pointing and navigation; clicks and mode changes stop the tail. A live keyboard on Home and in the guide highlights currently held shortcut keys without recording typed text.
 
-Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep their coordinate convention. While snapping, a clockwise/counterclockwise X/Y loop turns the selected face like the cube arrows; roll straight again to change faces. Recognition adapts to the size of the roll. The floating guide and Home show “Curve detected” then “Clockwise 90°” or “Counterclockwise 90°” when a turn is recognized. The standard M512 sensor still supplies only X/Y ball movement. A pure in-place twist with no X/Y report cannot be sensed; the face turn is a gesture inferred from a curved roll path.
+Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep their coordinate convention. While snapping, directional motion advances one neighboring face at a time, with a bounded repeat interval and a consistent stroke axis through Top and Bottom. The experimental Alt-only estimator recognizes highly consistent near-horizontal motion as a possible knob turn, applies 90° orientation steps and shows “Estimated twist” in Home and the guide. Uncertain motion falls back to faces. An ordinary horizontal roll can look identical to a twist; disable the estimation checkbox for directional-only snapping, or assign a separate Twist hold for explicit intent. The standard M512 sensor still supplies only X/Y ball movement. A pure in-place twist with no X/Y report cannot be sensed; the face turn is a gesture inferred from a curved roll path.
 
 
 ### Saved presets

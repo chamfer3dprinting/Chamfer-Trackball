@@ -72,18 +72,18 @@ public static class CameraMath {
     }
 }
 
+
 public sealed class FaceSnap{
- CameraPose? virtualPose,lastAligned;Vector3 face;float wheelRemainder,turnRemainder;int quarterTurns;
- readonly FaceTurnGesture ballTurn=new();readonly Queue<CameraPose> headingHistory=new(4);bool turning;long lastMotion;
+ CameraPose? lastAligned;Vector3 face,strokeAxis;float wheelRemainder,travel;int quarterTurns,axis=-1,heading;long lastMotion,lastFace;
  public long Samples{get;private set;}
  public int TurnCount{get;private set;}
  public int LastTurnDirection{get;private set;}
  public long LastTurnAt{get;private set;}
- public bool Turning=>ballTurn.Curving;
+ public bool Turning=>false;
  public int Orientation=>quarterTurns;
  public void Reset(CameraPose? pose=null){
-  virtualPose=lastAligned=pose;face=pose==null?Vector3.Zero:CameraMath.NearestFace(Vector3.Normalize(pose.Eye-pose.Target));
-  quarterTurns=0;wheelRemainder=turnRemainder=0;turning=false;ballTurn.Reset();headingHistory.Clear();lastMotion=0;Samples=0;TurnCount=LastTurnDirection=0;LastTurnAt=0;
+  lastAligned=pose;face=pose==null?Vector3.Zero:CameraMath.NearestFace(Vector3.Normalize(pose.Eye-pose.Target));
+  quarterTurns=0;wheelRemainder=travel=0;axis=-1;heading=0;strokeAxis=Vector3.Zero;lastMotion=lastFace=0;Samples=0;TurnCount=LastTurnDirection=0;LastTurnAt=0;
   if(pose!=null&&Vector3.Dot(Vector3.Normalize(pose.Eye-pose.Target),face)>.999f){
    var canonical=CameraMath.AlignFace(pose,face).Up;
    var seen=Vector3.Normalize(pose.Up-face*Vector3.Dot(pose.Up,face));
@@ -92,46 +92,38 @@ public sealed class FaceSnap{
   }
  }
  public CameraPose Step(CameraPose start,float x,float y,float wheel=0,float gain=1,long now=0){
-  virtualPose??=start;if(face==Vector3.Zero)face=CameraMath.NearestFace(Vector3.Normalize(start.Eye-start.Target));
+  if(!float.IsFinite(x)||!float.IsFinite(y)||!float.IsFinite(wheel)||!float.IsFinite(gain)||gain<0)throw new ArgumentException("Invalid face movement.");
+  if(face==Vector3.Zero)face=CameraMath.NearestFace(Vector3.Normalize(start.Eye-start.Target));
+  var view=CameraMath.AlignFace(lastAligned??start,face,quarterTurns);
   long time=now==0?Environment.TickCount64:now;
-  if(lastMotion!=0&&(time<lastMotion||time-lastMotion>100))headingHistory.Clear();
-  if(x!=0||y!=0)lastMotion=time;
-  var before=lastAligned??CameraMath.AlignFace(virtualPose,face,quarterTurns);
-  if(x!=0||y!=0)Samples++;
-  bool wasActive=ballTurn.Active;
-  var dial=ballTurn.Add(x,y,time);
-  bool candidate=ballTurn.Curving;
-  if(candidate){
-   // Freeze the current face while the ball curls, rather than navigating
-   // through other faces before a deliberate dial gesture is recognized.
-   if(!turning){
-    // The first vector cannot reveal curvature. Keep the preceding aligned
-    // face so a fast first segment cannot become the turn's new face.
-    virtualPose=headingHistory.TryPeek(out var preceding)?preceding:before;headingHistory.Clear();face=CameraMath.NearestFace(Vector3.Normalize(virtualPose.Eye-virtualPose.Target));
-    var canonical=CameraMath.AlignFace(virtualPose,face).Up;
-    float angle=MathF.Atan2(Vector3.Dot(face,Vector3.Cross(canonical,virtualPose.Up)),Vector3.Dot(canonical,virtualPose.Up));
-    quarterTurns=(int)MathF.Round(-angle/(MathF.PI/2));turning=true;
+  if(x!=0||y!=0){
+   if(lastMotion!=0&&(time<lastMotion||time-lastMotion>250)){axis=-1;heading=0;travel=0;}
+   lastMotion=time;Samples++;
+   // Alt only selects neighboring faces. An axis lock and a small repeat
+   // interval keep imperfect hand motion from curving, flickering or skipping.
+   float ax=MathF.Abs(x),ay=MathF.Abs(y);int nextAxis=axis;
+   if(nextAxis<0)nextAxis=ax>=ay?0:1;
+   else if(nextAxis==0&&ay>ax*1.4f)nextAxis=1;
+   else if(nextAxis==1&&ax>ay*1.4f)nextAxis=0;
+   float delta=nextAxis==0?x:y;int nextHeading=Math.Sign(delta);
+   if(nextAxis!=axis||nextHeading!=heading){
+    travel=0;axis=nextAxis;heading=nextHeading;var back=Vector3.Normalize(view.Eye-view.Target);
+    strokeAxis=axis==0?Vector3.Normalize(view.Up):Vector3.Normalize(Vector3.Cross(view.Up,back));
    }
-   if(dial.Consumed){
-    if(!wasActive){int turn=Math.Sign(dial.Wheel);quarterTurns-=turn;turnRemainder=0;ReportTurn(turn,time);}
-    else{
-     turnRemainder+=dial.Wheel;int turns=(int)(turnRemainder/480);
-     quarterTurns-=turns;turnRemainder-=turns*480;if(turns!=0)ReportTurn(turns,time);
-    }
+   travel=Math.Min(40,travel+MathF.Abs(delta)*gain);
+   if(heading!=0&&travel>=40&&(lastFace==0||time<lastFace||time-lastFace>=140)){
+    // Retain the stroke's world rotation axis across upright cube faces.
+    // Recomputing it at a pole would reverse the continued roll and bounce.
+    var rotation=Quaternion.CreateFromAxisAngle(strokeAxis,-heading*MathF.PI/2);
+    var proposed=view with{Eye=view.Pivot+Vector3.Transform(view.Eye-view.Pivot,rotation),Target=view.Pivot+Vector3.Transform(view.Target-view.Pivot,rotation),Up=Vector3.Normalize(Vector3.Transform(view.Up,rotation))};
+    face=CameraMath.NearestFace(Vector3.Normalize(proposed.Eye-proposed.Target));
+    quarterTurns=0;view=CameraMath.AlignFace(proposed,face);travel=0;lastFace=time;
    }
-  }else{
-   if(turning){virtualPose=lastAligned??virtualPose;turning=false;turnRemainder=0;}
-   virtualPose=CameraMath.Move(virtualPose,NavMode.Orbit,x*4*gain,y*4*gain);
-   var direction=Vector3.Normalize(virtualPose.Eye-virtualPose.Target);var next=CameraMath.NearestFace(direction);
-   if(Vector3.Dot(next,direction)>Vector3.Dot(face,direction)+.08f){face=next;quarterTurns=0;}
   }
-  wheelRemainder+=wheel;int wheelTurns=(int)(wheelRemainder/120);wheelRemainder-=wheelTurns*120;
+  wheelRemainder+=Math.Clamp(wheel,-1200,1200);int wheelTurns=(int)(wheelRemainder/120);wheelRemainder-=wheelTurns*120;
   quarterTurns=(quarterTurns+wheelTurns)%4;
-  lastAligned=CameraMath.AlignFace(virtualPose,face,quarterTurns);
-  if(wheelTurns!=0){virtualPose=lastAligned;headingHistory.Clear();ballTurn.Reset();turning=false;turnRemainder=0;ReportTurn(-wheelTurns,time);}
-  else if((x!=0||y!=0)&&!candidate){headingHistory.Enqueue(before);while(headingHistory.Count>4)headingHistory.Dequeue();}
+  lastAligned=CameraMath.AlignFace(view,face,quarterTurns);
+  if(wheelTurns!=0){travel=0;axis=-1;heading=0;TurnCount+=Math.Abs(wheelTurns);LastTurnDirection=-Math.Sign(wheelTurns);LastTurnAt=time;}
   return lastAligned;
  }
- void ReportTurn(int turns,long now){if(turns==0)return;TurnCount+=Math.Abs(turns);LastTurnDirection=Math.Sign(turns);LastTurnAt=now;}
-
 }
