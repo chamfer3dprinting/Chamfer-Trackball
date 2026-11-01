@@ -1,3 +1,10 @@
+## Calibration startup and reconnect
+
+- Initialize the saved calibration summary and direction controls on startup and program changes.
+- Keep the wizard open while the selected trackball reconnects. Roll the ball once to restore recording and test controls.
+- Preserve completed samples and the learned result across temporary input interruptions; re-record only an interrupted movement.
+- Keep the owner's existing programs, presets, buttons, wheels and speed settings.
+
 ## Record, test and save twist calibration
 
 - Add **Buttons & keys → Twist calibration** for normal rolls, clockwise knob turns and anticlockwise turns.
