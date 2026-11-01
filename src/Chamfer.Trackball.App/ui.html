@@ -830,7 +830,7 @@ function renderKeyboard(){
 function updateKeyboard(s){
  const keys=new Set(s.keys||[]);
  $$("#liveKeyboard [data-vk]").forEach(el=>{const down=keys.has(+el.dataset.vk);if(el.classList.contains("down")!==down)el.classList.toggle("down",down)});
- liveText("#keyboardMode",s.appState==="cad"?"3D controls: "+(MODEN[s.mode]||s.mode):"Normal keyboard — 3D shortcuts activate in a supported 3D view.");
+ liveText("#keyboardMode",s.appState==="cad"?"3D controls: "+(s.snapLabel||MODEN[s.mode]||s.mode):"Normal keyboard — 3D shortcuts activate in a supported 3D view.");
 }
 
 function updateFaceTurn(s){
@@ -1020,9 +1020,9 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   if((page==="home"||page==="controls")&&!document.hidden)updateFaceTurn(s);
   if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1)+" · twist "+gainLabel(s.twistGain??1));
   if(changed&&page==="home"&&focused)drawPad();
-  const live=s.mode!=="Idle";liveText("#padMode",live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
+  const live=s.mode!=="Idle";liveText("#padMode",live?(s.snapLabel||MODEN[s.mode]):"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
   const dirTxt=s.ballDir?" "+s.ballDir:"";
-  liveText("#stMode",(s.lock3d?"3D mode · ":"")+(MODEN[s.mode]||s.mode)+(live?dirTxt:""));liveClass("#stMode",live?"ok":"");
+  liveText("#stMode",(s.lock3d?"3D mode · ":"")+(s.snapLabel||MODEN[s.mode]||s.mode)+(live?dirTxt:""));liveClass("#stMode",live?"ok":"");
   if(page==="controls"&&focused)updateBall(s,live);
   liveText("#stDevice",s.device||"No mouse found");liveClass("#stDevice",s.deviceReady?"":"wn");
   $("#homeDeviceSetup").hidden=!!s.deviceReady;

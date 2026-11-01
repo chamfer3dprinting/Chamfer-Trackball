@@ -215,3 +215,7 @@ console.log('Alt only selects neighboring faces; held Twist reports 90-degree st
 
 assert.ok(html.includes('data-k="altTwistEstimate"')&&html.includes("Uncertain motion selects faces"));
 console.log("Experimental Alt-only estimation is configurable independently from the optional dedicated Twist hold.");
+
+assert.ok(controller.includes('["snapLabel"]=snap==null?"":SnapLabels.For('));
+assert.ok(html.includes('s.snapLabel||MODEN[s.mode]'));
+console.log('Home and the floating guide receive a distinct prominent label for face snapping versus estimated twist.');

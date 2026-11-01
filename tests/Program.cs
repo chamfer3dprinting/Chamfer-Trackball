@@ -561,4 +561,29 @@ for(int frame=0;frame<12;frame++)estimatedWheelPose=estimatedWheelInput.Step(stu
 estimatedWheelPose=estimatedWheelInput.Step(studioView,0,0,120,.2f,1,"x",false,1300);
 Check(Vector3.Dot(estimatedWheelPose.Up,Vector3.UnitX)>.999f&&Math.Abs(Vector3.Distance(estimatedWheelPose.Eye,estimatedWheelPose.Target)-10)<.0001&&!estimatedWheelInput.LastEstimatedTurn,"Alt plus wheel remains an exact face quarter turn after an estimated knob candidate; it never becomes zoom");
 
+
+var heldTransitionInput=new EstimatedFaceSnap();heldTransitionInput.Reset(studioView);var heldTransitionPose=studioView;
+for(int transitionFrame=0;transitionFrame<30;transitionFrame++)heldTransitionPose=heldTransitionInput.Step(studioView,0,60,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(heldTransitionInput.State=="faces","Vertical motion starts as directional faces within a held Alt session");
+var heldTransitionFace=Vector3.Normalize(heldTransitionPose.Eye-heldTransitionPose.Target);
+for(int transitionFrame=30;transitionFrame<100;transitionFrame++)heldTransitionPose=heldTransitionInput.Step(studioView,60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(heldTransitionInput.EstimatedTwist&&heldTransitionInput.QuarterTurns>0&&heldTransitionInput.LastDirection==1,"A later knob motion is reconsidered without pausing or releasing Alt");
+Check(Vector3.Dot(Vector3.Normalize(heldTransitionPose.Eye-heldTransitionPose.Target),heldTransitionFace)>.999f,"Reconsidered knob motion turns the currently selected face instead of changing it");
+var noisyStartInput=new EstimatedFaceSnap();noisyStartInput.Reset(studioView);
+for(int transitionFrame=0;transitionFrame<30;transitionFrame++)noisyStartInput.Step(studioView,60,18,0,.2f,1,"x",false,1000+transitionFrame*16);
+for(int transitionFrame=30;transitionFrame<100;transitionFrame++)noisyStartInput.Step(studioView,-60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(noisyStartInput.EstimatedTwist&&noisyStartInput.QuarterTurns>0&&noisyStartInput.LastDirection==-1,"An early noisy face decision cannot lock out a later anticlockwise knob turn");
+var repeatedTransitionInput=new EstimatedFaceSnap();repeatedTransitionInput.Reset(studioView);
+for(int transitionFrame=0;transitionFrame<35;transitionFrame++)repeatedTransitionInput.Step(studioView,60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+int firstTransitionTurns=repeatedTransitionInput.QuarterTurns;
+for(int transitionFrame=35;transitionFrame<60;transitionFrame++)repeatedTransitionInput.Step(studioView,0,60,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(!repeatedTransitionInput.EstimatedTwist,"A knob turn can return to vertical directional faces during the same Alt hold");
+for(int transitionFrame=60;transitionFrame<110;transitionFrame++)repeatedTransitionInput.Step(studioView,60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(repeatedTransitionInput.EstimatedTwist&&repeatedTransitionInput.QuarterTurns>firstTransitionTurns,"Faces can return to estimated twist repeatedly without an Alt mode switch");
+var jitterTransitionInput=new EstimatedFaceSnap();jitterTransitionInput.Reset(studioView);
+for(int transitionFrame=0;transitionFrame<20;transitionFrame++)jitterTransitionInput.Step(studioView,0,60,0,.2f,1,"x",false,1000+transitionFrame*16);
+for(int transitionFrame=20;transitionFrame<80;transitionFrame++)jitterTransitionInput.Step(studioView,.5f,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(!jitterTransitionInput.Pending&&!jitterTransitionInput.EstimatedTwist,"Sub-count directional noise does not repeatedly reopen twist observation");
+Check(SnapLabels.For("twist")=="Estimated twist 90°"&&SnapLabels.For("faces")=="Snap faces"&&SnapLabels.For("estimating")=="Reading Alt motion","The guide prominently distinguishes estimated twist, face snapping and observation");
+
 Console.WriteLine(count+" regression checks passed.");

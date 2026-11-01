@@ -5,7 +5,7 @@ namespace Chamfer.Trackball.Core;
 // independent twist axis; uncertain strokes are delivered as directional snaps.
 public sealed class EstimatedFaceSnap{
  readonly FaceSnap faces=new();readonly KnobSteps turns=new();readonly List<(float X,float Y,long Time)> pending=new(16);
- CameraPose? pose;long began,lastMotion;float along,cross,alongEnergy,crossEnergy,travel;int stage;bool turnedInBurst; // 0 new, 1 observing, 2 faces, 3 estimated twist
+ CameraPose? pose;long began,lastMotion,faceDecisionAt;float along,cross,alongEnergy,crossEnergy,travel;int stage;bool turnedInBurst; // 0 new, 1 observing, 2 faces, 3 estimated twist
  public bool Pending=>stage==1;
  public bool EstimatedTwist=>stage==3;
  public int QuarterTurns{get;private set;}
@@ -16,7 +16,7 @@ public sealed class EstimatedFaceSnap{
  public float Progress=>turns.Progress;
  public string State=>stage switch{1=>"estimating",3=>"twist",_=>"faces"};
  public void Reset(CameraPose? initial=null){
-  faces.Reset(initial);pose=initial==null?null:faces.Step(initial,0,0);turns.Reset();pending.Clear();stage=0;began=lastMotion=0;
+  faces.Reset(initial);pose=initial==null?null:faces.Step(initial,0,0);turns.Reset();pending.Clear();stage=0;began=lastMotion=faceDecisionAt=0;
   along=cross=alongEnergy=crossEnergy=travel=0;QuarterTurns=0;LastDirection=0;LastTurnAt=0;LastEstimatedTurn=false;Samples=0;
  }
  void Start(long now){
@@ -42,12 +42,12 @@ public sealed class EstimatedFaceSnap{
    lastMotion=now;Samples++;
   }
   float a=axis=="y"?y:x,c=axis=="y"?x:y;
-  if(stage==3&&wheel!=0){stage=2;turns.Reset();pending.Clear();faces.Reset(pose);return Face(start,x,y,wheel,faceGain,now);}
+  if(stage==3&&wheel!=0){stage=2;faceDecisionAt=now;turns.Reset();pending.Clear();faces.Reset(pose);return Face(start,x,y,wheel,faceGain,now);}
   if(stage==3){
    if(motion){along+=a;cross+=c;alongEnergy+=a*a;crossEnergy+=c*c;travel+=MathF.Sqrt(a*a+c*c);}
    bool uncertain=motion&&(MathF.Abs(c)>MathF.Abs(a)*.5f&&MathF.Abs(c)>8||travel>160&&(crossEnergy>alongEnergy*.012f||MathF.Abs(cross)>MathF.Abs(along)*.07f));
    if(uncertain){
-    stage=2;turns.Reset();faces.Reset(pose);
+    stage=2;faceDecisionAt=now;turns.Reset();faces.Reset(pose);
     if(!turnedInBurst)foreach(var item in pending)Face(start,item.X,item.Y,0,faceGain,item.Time);
     pending.Clear();
    }else{
@@ -56,7 +56,13 @@ public sealed class EstimatedFaceSnap{
     return pose;
    }
   }
-  if(stage==2)return Face(start,x,y,wheel,faceGain,now);
+  if(stage==2){
+   // A face decision is local to the recent motion, not the entire Alt hold.
+   // Reconsider a later clean knob candidate without requiring a pause or key release.
+   bool retry=motion&&wheel==0&&now-faceDecisionAt>=160&&MathF.Abs(a)>=4&&MathF.Abs(c)<=Math.Max(2,MathF.Abs(a)*.08f);
+   if(!retry)return Face(start,x,y,wheel,faceGain,now);
+   Start(now);
+  }
   if(motion){
    pending.Add((x,y,now));along+=a;cross+=c;alongEnergy+=a*a;crossEnergy+=c*c;travel+=MathF.Sqrt(a*a+c*c);
   }
@@ -66,7 +72,7 @@ public sealed class EstimatedFaceSnap{
   if(!clearlyDirectional&&!ready)return pose;
   bool knob=!clearlyDirectional&&travel>=60&&MathF.Abs(along)/Math.Max(travel,.001f)>=.97f
       &&MathF.Abs(cross)<=Math.Max(2,MathF.Abs(along)*.045f)&&crossEnergy<=alongEnergy*.0065f;
-  stage=knob?3:2;
+  stage=knob?3:2;if(!knob)faceDecisionAt=now;
   foreach(var item in pending){
    if(knob)Twist(start,item.X,item.Y,twistGain,axis,reverse,item.Time);
    else Face(start,item.X,item.Y,0,faceGain,item.Time);
@@ -75,4 +81,14 @@ public sealed class EstimatedFaceSnap{
   if(wheel!=0)Face(start,0,0,wheel,faceGain,now);
   return pose;
  }
+}
+
+public static class SnapLabels{
+ public static string For(string state)=>state switch{
+  "twist"=>"Estimated twist 90°",
+  "estimating"=>"Reading Alt motion",
+  "waiting"=>"Waiting for 3D view",
+  "unavailable"=>"Snap connection needed",
+  _=>"Snap faces"
+ };
 }

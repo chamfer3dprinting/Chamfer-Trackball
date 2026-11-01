@@ -1,3 +1,11 @@
+## Recognize twist after face movement in the same Alt hold
+
+- Reconsider a later clean knob motion after directional face snapping, without requiring an Alt release, pause or mode switch.
+- Keep exact 90° orientation steps and existing up/down/left/right neighboring-face behavior.
+- Make Home and the guide clearly say “Snap faces”, “Reading Alt motion”, or “Estimated twist 90°”.
+- Preserve saved devices, programs, presets, buttons, wheel mappings and all speed values.
+- Alt-only twist remains an experimental X/Y estimate; similar horizontal rolls can still be confused with knob motion.
+
 ## Alt-only faces and experimental 90° knob snaps
 
 - Hold Alt for directional face changes and estimated knob turns. No Alt-tap switch or Shift requirement is added.
