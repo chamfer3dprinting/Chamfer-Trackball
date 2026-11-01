@@ -331,7 +331,7 @@ public string AppName{get;private set;}="";
     internal void VerifyKnobHandshake(){
         var previousNative=native;var previousCfg=cfg;var previousCalibration=learnedTwist;bool previousKnob=knobHoldActive;float previousAngle=knobAngle;double previousRoll=rollLog;
         try{
-            cfg=(JsonObject)cfg.DeepClone();cfg["twistSens"]=50;cfg["invertTwist"]=false;learnedTwist=null;knobHoldActive=true;knobAngle=0;knobSteps.Reset();
+            cfg=(JsonObject)cfg.DeepClone();cfg["twistSens"]=50;cfg["twistAxis"]="x";cfg["invertTwist"]=false;learnedTwist=null;knobHoldActive=true;knobAngle=0;knobSteps.Reset();
             var client=new NativeServer.Client{Version=2};native=client;
             if(SendMotion(NavMode.Roll,30,0,0)||knobSteps.Progress!=0||knobSteps.Nudged)throw new InvalidOperationException("A small nudge was consumed before the native camera handshake.");
             var pose=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
