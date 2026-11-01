@@ -16,7 +16,8 @@ public static class KnobTwist{
 public sealed class KnobSteps{
  public const float QuarterDelta=MathF.PI/2/.005f;
  // A nudge is a trigger, not a proportional 90-degree physical ball rotation.
- public const float NudgeThreshold=6;
+ public const float NudgeCounts=8;
+ public const float NudgeThreshold=NudgeCounts*.2f;
  public const int NudgePauseMs=220;
  float remainder,nudge;int nudgeDirection;long? lastNudge;bool nudgeMode;
  public bool Nudged=>nudgeMode&&nudgeDirection!=0;

@@ -590,4 +590,5 @@ Check(SnapLabels.For("twist")=="Estimated twist 90°"&&SnapLabels.For("faces")==
 TwistCalibrationChecks.Run(Check);
 InputRecoveryChecks.Run(Check);
 KnobNudgeChecks.Run(Check);
+TinyKnobChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

@@ -1,3 +1,11 @@
+## Tiny knob turns respond without a long stroke
+
+- Trigger one full 90° cube rotation from a much smaller clockwise or anticlockwise knob nudge.
+- Recognize a short burst even when Windows combines it into one movement report. Allow a little sideways wobble at tiny distances.
+- Keep the whole tiny burst when switching from directional faces to a knob turn in the same Alt hold.
+- Recognize saved calibration by direction and shape instead of requiring the speed or amount of its recorded movement.
+- Keep one turn per stroke, reverse/pause reset, directional faces, existing shortcuts, programs, presets and speed settings.
+
 ## Small knob nudges trigger complete 90° cube rotations
 
 - Use a slight clockwise or anticlockwise knob nudge to trigger one full cube quarter turn.
