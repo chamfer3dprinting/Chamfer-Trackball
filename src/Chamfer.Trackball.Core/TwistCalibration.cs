@@ -44,17 +44,21 @@ public sealed class TwistCalibrationModel{
   float value=Project(x,y,wheel);if(!float.IsFinite(value)||!float.IsFinite(gain))throw new ArgumentException("Invalid calibrated motion.");
   return Math.Clamp(-value/QuarterCounts*KnobSteps.QuarterDelta*Math.Clamp(gain,0,4)*(reverse?-1:1),-1000,1000);
  }
- public static float[] Features(IReadOnlyList<TwistSample> samples,float quantum){
+ public static float[] Features(IReadOnlyList<TwistSample> samples,float quantum,bool nudge=false){
   double x=0,y=0,xx=0,yy=0,xy=0,travel=0;int moving=0;
   foreach(var s in samples){if(!float.IsFinite(s.X)||!float.IsFinite(s.Y)||!float.IsFinite(s.Wheel))throw new ArgumentException("Invalid calibration sample.");x+=s.X;y+=s.Y;xx+=s.X*s.X;yy+=s.Y*s.Y;xy+=s.X*s.Y;travel+=Math.Sqrt(s.X*s.X+s.Y*s.Y);if(s.X!=0||s.Y!=0)moving++;}
-  if(travel<8||moving<2)return [];
+  if(travel<KnobSteps.NudgeCounts||moving<(nudge?1:2))return [];
   return [(float)(x/travel),(float)(y/travel),(float)((xx-yy)/Math.Max(xx+yy,.001)),(float)(xy/Math.Max(Math.Sqrt(xx*yy),1)),MathF.Log(1+(float)travel/Math.Max(quantum,8)*128/Math.Max(32,(float)(samples[^1].Time-samples[0].Time+16))),(float)(Math.Sqrt(x*x+y*y)/travel)];
  }
- public (bool Twist,int Direction,float Confidence) Decide(IReadOnlyList<TwistSample> samples){
+ public (bool Twist,int Direction,float Confidence) Decide(IReadOnlyList<TwistSample> samples)=>Decide(samples,false);
+ // Short nudges preserve direction/shape, but their amount and speed differ
+ // from the longer recorded training strokes. Do not reject them for that.
+ public (bool Twist,int Direction,float Confidence) DecideNudge(IReadOnlyList<TwistSample> samples)=>Decide(samples,true);
+ (bool Twist,int Direction,float Confidence) Decide(IReadOnlyList<TwistSample> samples,bool nudge){
   if(Source=="wheel"){float amount=samples.Sum(s=>s.Wheel)*WheelSign;return (amount!=0,Math.Sign(amount),amount==0?0:1);}
-  var f=Features(samples,QuarterCounts);if(f.Length==0)return (false,0,0);
+  var f=Features(samples,QuarterCounts,nudge);if(f.Length==0)return (false,0,0);
   double face=double.PositiveInfinity,twist=double.PositiveInfinity;int direction=0;
-  foreach(var p in Patterns){double distance=0;for(int n=0;n<6;n++){double v=(f[n]-p.Values[n])/Scales[n];distance+=v*v;}
+  foreach(var p in Patterns){double distance=0;for(int n=0;n<6;n++){if(nudge&&n==4)continue;double v=(f[n]-p.Values[n])/Scales[n];distance+=v*v;}
    if(p.Kind=="faces")face=Math.Min(face,distance);else if(distance<twist){twist=distance;direction=p.Kind=="clockwise"?1:-1;}
   }
   float confidence=(float)Math.Clamp((face-twist)/Math.Max(face+twist,.001),0,1);

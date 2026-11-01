@@ -333,12 +333,12 @@ public string AppName{get;private set;}="";
         try{
             cfg=(JsonObject)cfg.DeepClone();cfg["twistSens"]=50;cfg["twistAxis"]="x";cfg["invertTwist"]=false;learnedTwist=null;knobHoldActive=true;knobAngle=0;knobSteps.Reset();
             var client=new NativeServer.Client{Version=2};native=client;
-            if(SendMotion(NavMode.Roll,30,0,0)||knobSteps.Progress!=0||knobSteps.Nudged)throw new InvalidOperationException("A small nudge was consumed before the native camera handshake.");
+            if(SendMotion(NavMode.Roll,8,0,0)||knobSteps.Progress!=0||knobSteps.Nudged)throw new InvalidOperationException("A small nudge was consumed before the native camera handshake.");
             var pose=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
             client.Pose=client.BasePose=pose;
-            if(!SendMotion(NavMode.Roll,30,0,0)||Math.Abs(knobAngle-MathF.PI/2)>.0001f||System.Numerics.Vector3.Distance(client.Pose!.Up,pose.Up)<1)throw new InvalidOperationException("The pending small nudge did not produce one native quarter turn.");
+            if(!SendMotion(NavMode.Roll,8,0,0)||Math.Abs(knobAngle-MathF.PI/2)>.0001f||System.Numerics.Vector3.Distance(client.Pose!.Up,pose.Up)<1)throw new InvalidOperationException("The pending small nudge did not produce one native quarter turn.");
             int queued=client.Out.Count;
-            if(!SendMotion(NavMode.Roll,30,0,0)||client.Out.Count!=queued)throw new InvalidOperationException("Continuing one nudge emitted redundant camera commands.");
+            if(!SendMotion(NavMode.Roll,8,0,0)||client.Out.Count!=queued)throw new InvalidOperationException("Continuing one nudge emitted redundant camera commands.");
         }finally{native=previousNative;cfg=previousCfg;learnedTwist=previousCalibration;knobHoldActive=previousKnob;knobAngle=previousAngle;rollLog=previousRoll;knobSteps.Reset();}
     }
     internal void VerifyCalibrationNavigation(){
