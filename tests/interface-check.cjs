@@ -194,9 +194,9 @@ for(const key of ['twistKeys','twistSens','twistAxis','invertTwist'])assert.ok(h
 const knobFeedback={};const knobContext={cfg:{snapKeys:'alt'},holdLabel:key=>key,liveText:(selector,text)=>knobFeedback[selector]=text};
 vm.runInNewContext(html.slice(faceFeedbackStart,faceFeedbackEnd),knobContext);
 knobContext.updateFaceTurn({knobActive:true,knobDegrees:30});
-assert.equal(knobFeedback['#homeFaceTurn'],'Twist: Clockwise 30° · next step 0%');
+assert.equal(knobFeedback['#homeFaceTurn'],'Twist: Clockwise 30° · trigger 0%');
 knobContext.updateFaceTurn({knobActive:true,knobDegrees:-90});
-assert.equal(knobFeedback['#homeFaceTurn'],'Twist: Anticlockwise 90° · next step 0%');
+assert.equal(knobFeedback['#homeFaceTurn'],'Twist: Anticlockwise 90° · trigger 0%');
 const rotationStart=html.indexOf('function mul('),rotationEnd=html.indexOf('function padReset(',rotationStart);
 const rotationContext={pad:{rot:[1,0,0,0,1,0,0,0,1]},Math};
 vm.runInNewContext(html.slice(rotationStart,rotationEnd),rotationContext);
@@ -206,11 +206,11 @@ assert.ok(controller.includes('KnobTwist.CameraDelta(')&&controller.includes('fl
 assert.ok(controller.includes('!knobHoldActive&&ConfigStore.B(cfg,"smooth",true)'));
 console.log('Customizable held Twist, independent speed/direction, immediate stop, live feedback and the orientation preview are wired.');
 
-assert.ok(controller.includes('twistSteps=knobSteps.Add(delta)'));
-assert.ok(html.includes('neighboring cube face')&&html.includes('90° at a time'));
+assert.ok(controller.includes('twistSteps=knobSteps.AddNudge(delta,Environment.TickCount64)'));
+assert.ok(html.includes('neighboring cube face')&&html.includes('one complete 90° cube rotation'));
 assert.ok(!html.includes('Curl the ball path into a clockwise'));
 knobContext.updateFaceTurn({knobActive:true,knobDegrees:0,knobProgress:46});
-assert.equal(knobFeedback['#homeFaceTurn'],'Twist: turn the ball for a 90° step · next step 46%');
+assert.equal(knobFeedback['#homeFaceTurn'],'Twist: small nudge = 90° · trigger 46%');
 console.log('Alt only selects neighboring faces; held Twist reports 90-degree steps and progress.');
 
 assert.ok(html.includes('data-k="altTwistEstimate"')&&html.includes("Uncertain motion selects faces"));
@@ -284,3 +284,8 @@ assert.ok(signalLabels['#stSignal'].includes('idle'));
 signalContext.updateInputSignal({selectedMoves:24,lastMoveAgeMs:0,ready:false});
 assert.ok(signalLabels['#stSignal'].includes('recovering'));
 console.log('Live sensor feedback distinguishes waiting, other-device input, active movement, idle and recovery without claiming presence is movement.');
+
+assert.ok(html.includes('A small knob nudge triggers one complete 90° cube rotation'));
+assert.ok(html.includes('Pause briefly or reverse direction for another step'));
+assert.ok(controller.includes('learnedTwist?.NudgeDelta('));
+console.log('Short knob nudges trigger full cube quarter turns; the interface explains the pause/reverse reset and calibrated distance is decoupled.');

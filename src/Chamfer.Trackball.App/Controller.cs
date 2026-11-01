@@ -175,6 +175,8 @@ public string AppName{get;private set;}="";
         }
     }
     bool SendMotion(NavMode output,float x,float y,float w){
+        // Keep a first small nudge intact until the host returns its camera.
+        if(native!=null&&native.Version>=2&&native.Pose==null)return false;
         int twistSteps=0;
 
         if(output==NavMode.Orbit){x*=ConfigStore.B(cfg,"invertOrbitX")?-1:1;y*=ConfigStore.B(cfg,"invertOrbitY")?-1:1;}
@@ -185,9 +187,10 @@ public string AppName{get;private set;}="";
         // Snap receives unscaled X/Y so dial recognition is independent of Orbit speed.
         float nativeGain=output==NavMode.Snap?MotionPolicy.SnapGain(ConfigStore.D(cfg,"orbitSens",50)):1;
         if(output==NavMode.Roll&&knobHoldActive){
-            float delta=learnedTwist?.CameraDelta(x,y,w,TwistGain,ConfigStore.B(cfg,"invertTwist"))??KnobTwist.CameraDelta(x,y,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),TwistGain);
-            twistSteps=knobSteps.Add(delta);x=(twistSteps%4)*KnobSteps.QuarterDelta;y=0;w=learnedTwist?.Source=="wheel"?0:scaled.Wheel;
+            float delta=learnedTwist?.NudgeDelta(x,y,w,TwistGain,ConfigStore.B(cfg,"invertTwist"))??KnobTwist.CameraDelta(x,y,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),TwistGain);
+            twistSteps=knobSteps.AddNudge(delta,Environment.TickCount64);x=(twistSteps%4)*KnobSteps.QuarterDelta;y=0;w=learnedTwist?.Source=="wheel"?0:scaled.Wheel;
         }else if(output!=NavMode.Snap){x=scaled.X;y=scaled.Y;w=scaled.Wheel;}
+        if(output==NavMode.Roll&&knobHoldActive&&twistSteps==0&&w==0)return true;
         bool demo=ConfigStore.S(profile,"id")=="demo";
         if(native!=null)try{if(!server.Move(native,output,x,y,w,input.Keys.Contains(18),nativeGain))return false;}
         catch(ArgumentException ex){Log("Camera movement stopped: "+ex.Message,"err");End();stoppedByClick=true;Integration="Release the keys and use the normal view controls before trying again.";return false;}
@@ -324,6 +327,19 @@ public string AppName{get;private set;}="";
         result["inputSignal"]=input.SignalState();
         if(calibration.Active)result["twistCalibration"]=CalibrationState();
         ox=oy=px=py=zoom=zoomLog=rawX=rawY=rollLog=0;fit=false;return result;
+    }
+    internal void VerifyKnobHandshake(){
+        var previousNative=native;var previousCfg=cfg;var previousCalibration=learnedTwist;bool previousKnob=knobHoldActive;float previousAngle=knobAngle;double previousRoll=rollLog;
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["twistSens"]=50;cfg["twistAxis"]="x";cfg["invertTwist"]=false;learnedTwist=null;knobHoldActive=true;knobAngle=0;knobSteps.Reset();
+            var client=new NativeServer.Client{Version=2};native=client;
+            if(SendMotion(NavMode.Roll,30,0,0)||knobSteps.Progress!=0||knobSteps.Nudged)throw new InvalidOperationException("A small nudge was consumed before the native camera handshake.");
+            var pose=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
+            client.Pose=client.BasePose=pose;
+            if(!SendMotion(NavMode.Roll,30,0,0)||Math.Abs(knobAngle-MathF.PI/2)>.0001f||System.Numerics.Vector3.Distance(client.Pose!.Up,pose.Up)<1)throw new InvalidOperationException("The pending small nudge did not produce one native quarter turn.");
+            int queued=client.Out.Count;
+            if(!SendMotion(NavMode.Roll,30,0,0)||client.Out.Count!=queued)throw new InvalidOperationException("Continuing one nudge emitted redundant camera commands.");
+        }finally{native=previousNative;cfg=previousCfg;learnedTwist=previousCalibration;knobHoldActive=previousKnob;knobAngle=previousAngle;rollLog=previousRoll;knobSteps.Reset();}
     }
     internal void VerifyCalibrationNavigation(){
         var previousProfile=profile;var previousWindow=foregroundWindow;bool previousFocus=nativeFocusAllowed;

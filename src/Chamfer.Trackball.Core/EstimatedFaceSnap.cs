@@ -14,6 +14,7 @@ public sealed class EstimatedFaceSnap{
  public bool LastEstimatedTurn{get;private set;}
  public long Samples{get;private set;}
  public float Progress=>turns.Progress;
+ public bool Nudged=>turns.Nudged;
  public string State=>stage switch{1=>"estimating",3=>"twist",_=>"faces"};
  public void Reset(CameraPose? initial=null){
   faces.Reset(initial);pose=initial==null?null:faces.Step(initial,0,0);turns.Reset();pending.Clear();stage=0;began=lastMotion=faceDecisionAt=lastWheel=0;recent.Clear();
@@ -28,7 +29,7 @@ public sealed class EstimatedFaceSnap{
   return pose;
  }
  void Twist(CameraPose start,float x,float y,float gain,string axis,bool reverse,long now,TwistCalibrationModel? calibration=null,float wheel=0){
-  float delta=calibration?.CameraDelta(x,y,wheel,gain,reverse)??KnobTwist.CameraDelta(x,y,axis,reverse,gain);if(delta!=0)LastDirection=-Math.Sign(delta);int steps=turns.Add(delta);
+  float delta=calibration?.NudgeDelta(x,y,wheel,gain,reverse)??KnobTwist.CameraDelta(x,y,axis,reverse,gain);if(delta!=0)LastDirection=-Math.Sign(delta);int steps=turns.AddNudge(delta,now);
   if(steps==0)return;
   pose=CameraMath.Move(pose??start,NavMode.Roll,(steps%4)*KnobSteps.QuarterDelta,0);
   turnedInBurst=true;LastEstimatedTurn=true;QuarterTurns+=Math.Abs(steps);LastDirection=-Math.Sign(steps);LastTurnAt=now;
@@ -51,7 +52,14 @@ public sealed class EstimatedFaceSnap{
    lastMotion=now;Samples++;
   }
   float a=calibration!=null?calibration.Project(x,y,0):axis=="y"?y:x,c=calibration!=null?-x*calibration.AxisY+y*calibration.AxisX:axis=="y"?x:y;
-  if(motion){recent.Enqueue(new(x,y,0,now));while(recent.Count>8)recent.Dequeue();}
+  if(motion){
+   // Do not mix the previous clockwise stroke into a deliberate reverse
+   // nudge on the learned axis; its cancelled net path would look uncertain.
+   if(stage==3&&calibration!=null&&recent.Count>0&&MathF.Abs(a)>=.5f&&MathF.Abs(c)<=Math.Max(.5f,MathF.Abs(a)*.5f)){
+    var previous=recent.Last();if(Math.Sign(calibration.Project(previous.X,previous.Y,0))!=Math.Sign(a))recent.Clear();
+   }
+   recent.Enqueue(new(x,y,0,now));while(recent.Count>8)recent.Dequeue();
+  }
   if(stage==3&&wheel!=0){stage=2;faceDecisionAt=now;turns.Reset();pending.Clear();faces.Reset(pose);return Face(start,x,y,wheel,faceGain,now);}
   if(stage==3){
    if(motion){along+=a;cross+=c;alongEnergy+=a*a;crossEnergy+=c*c;travel+=MathF.Sqrt(a*a+c*c);}
@@ -80,7 +88,10 @@ public sealed class EstimatedFaceSnap{
   bool clearlyDirectional=wheel!=0||pending.Count>=3&&(calibration!=null?MathF.Abs(cross)>Math.Max(8,MathF.Abs(along)*.75f):MathF.Abs(cross)>Math.Max(8,MathF.Abs(along)*.12f)||crossEnergy>alongEnergy*.025f);
   bool ready=now-began>=112&&pending.Count>=4||now-began>=160||pending.Count>=16;
   if(!clearlyDirectional&&!ready)return pose;
-  bool knob=!clearlyDirectional&&(calibration!=null?calibration.Decide(pending.Select(p=>new TwistSample(p.X,p.Y,0,p.Time)).ToArray()).Twist:travel>=60&&MathF.Abs(along)/Math.Max(travel,.001f)>=.97f
+  // A slow slight nudge may arrive as many tiny reports. Wait for its small
+  // trigger distance while motion continues, rather than rejecting it at 160 ms.
+  if(!clearlyDirectional&&travel<30&&now-began<640&&pending.Count<48&&now-lastMotion<80)return pose;
+  bool knob=!clearlyDirectional&&(calibration!=null?calibration.Decide(pending.Select(p=>new TwistSample(p.X,p.Y,0,p.Time)).ToArray()).Twist:travel>=30&&MathF.Abs(along)/Math.Max(travel,.001f)>=.97f
       &&MathF.Abs(cross)<=Math.Max(2,MathF.Abs(along)*.045f)&&crossEnergy<=alongEnergy*.0065f);
   stage=knob?3:2;if(!knob)faceDecisionAt=now;
   foreach(var item in pending){

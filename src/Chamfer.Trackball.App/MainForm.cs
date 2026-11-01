@@ -236,9 +236,9 @@ internal sealed class MainForm:Form{
         for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
         if(studio.Pose==null)throw new Exception("Knob camera handshake missing.");
         await BrowserRead("camera");var knobStart=studio.Pose;var knobSteps=new KnobSteps();
-        float quarterCounts=MathF.PI/2/.001f;
+        const float shortNudgeCounts=30;
         foreach(int sign in new[]{1,-1}){
-            float delta=KnobTwist.CameraDelta(sign*quarterCounts*1.01f,400,"x",false,1);int steps=knobSteps.Add(delta);delta=(steps%4)*KnobSteps.QuarterDelta;
+            float delta=KnobTwist.CameraDelta(sign*shortNudgeCounts,0,"x",false,1);int steps=knobSteps.AddNudge(delta,Environment.TickCount64);delta=(steps%4)*KnobSteps.QuarterDelta;
             if(!native.Move(studio,NavMode.Roll,delta,0,0,false,1))throw new Exception("Held knob rotation was not delivered.");
             var result=await BrowserRead("camera");var up=result["up"]!;
             var actualUp=new System.Numerics.Vector3(up[0]!.GetValue<float>(),up[1]!.GetValue<float>(),up[2]!.GetValue<float>());
@@ -252,7 +252,8 @@ internal sealed class MainForm:Form{
         var estimateRequest=await BrowserRead("begin");var estimateScene=(JsonObject)knobScene.DeepClone();estimateScene["session"]=ConfigStore.S(estimateRequest,"session");await BrowserSend(estimateScene);
         for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
         if(studio.Pose==null)throw new Exception("Alt-only estimate handshake missing.");
-        for(int frame=0;frame<28;frame++){if(!native.Move(studio,NavMode.Snap,60,0,0,false,.2f))throw new Exception("Alt estimate input not delivered.");await Task.Delay(16);}
+        for(int frame=0;frame<8;frame++){if(!native.Move(studio,NavMode.Snap,8,0,0,false,.2f))throw new Exception("Alt nudge input not delivered.");await Task.Delay(16);}
+        native.Move(studio,NavMode.Snap,0,0,0,false,.2f);
         var estimated=native.SnapState(studio);
         if(ConfigStore.S(estimated,"state")!="twist"||ConfigStore.I(estimated,"turns")!=1||System.Numerics.Vector3.Distance(studio.Pose!.Up,-System.Numerics.Vector3.UnitX)>.001f)throw new Exception("Alt-only estimation did not produce exactly one clockwise 90-degree camera turn.");
         int beforeTransitionTurns=ConfigStore.I(estimated,"turns");
@@ -273,6 +274,7 @@ internal sealed class MainForm:Form{
             controller.Status();input.VerifyMotionDelivery();
             var rawDelivery=controller.Status();if(ConfigStore.D(rawDelivery,"rawX")!=24||ConfigStore.D(rawDelivery,"rawY")!=-12)throw new Exception("Raw selected sensor did not reach Controller.Motion.");
             controller.VerifyCalibrationNavigation();
+            controller.VerifyKnobHandshake();
             await NativeSmokeTest();
             await ReleaseSmoke.Run();
             if(BuildInfo.Admin){var state=admin.State();if(state==null)throw new Exception("Admin state unavailable.");}
@@ -292,7 +294,7 @@ internal sealed class MainForm:Form{
             if(passed!="true"||ready!="true"||store.Snapshot()["programs"]?[0]?["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, 90-degree knob steps, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, short knob nudges producing exact 90-degree steps, first-nudge handshake retention and one camera update per stroke, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }
