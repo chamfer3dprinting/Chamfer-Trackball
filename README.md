@@ -1,5 +1,11 @@
 # Chamfer Trackball
 
+## Multiple trackballs and motion feel
+
+In **Buttons & keys → Your trackballs**, use **Add or identify trackball** and roll only the device you are adding. Each identified trackball stays remembered, including the M512 when you add a SlimBlade Pro. Connected devices switch automatically when moved; ordinary mice remain ordinary mice. A held button or drag keeps its device until release. Click and wheel corrections are separate per trackball; keyboard bindings, speed settings and other controls use the selected program. Rename each saved trackball or choose which device's corrections to edit. A new USB/Bluetooth device identity may need one identification.
+
+Navigation requests an 8 ms WinForms timer interval. A standalone Windows timing test on the owner's PC measured roughly 31 ms for the former 16 ms request and 15.5 ms for the new request. This improves camera update cadence without changing the system timer resolution or adding smoothing delay. The standalone diagnostic is `tests/TimerCadenceProbe.ps1`. Physical motion feel and future SlimBlade reports still need testing on the device. Stock twist scrolling alone does not establish access to the full raw three-axis stream used by modified Rotatrix hardware; no stock-device polling-rate or simultaneous-axis guarantee is claimed.
+
 ## Cube faces and orientation
 
 In the 3D modelling program, hold **Alt + ball** to change cube faces. Hold **Alt + the left scroll wheel** for exact 90° orientation turns while keeping the current face and distance. Each notch is one turn; reverse the wheel to rotate back. The right wheel retains its normal/configured behavior. Ball-only twist estimation is off in the default setup. Button 1 remains a normal middle click.

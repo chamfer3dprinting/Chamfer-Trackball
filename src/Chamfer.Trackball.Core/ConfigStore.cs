@@ -73,15 +73,19 @@ public sealed class ConfigStore {
             }
             LoadProgram(config,I(config,"activeProgram",0));
         }
-        config["configVersion"]=29;Validate(config);
-        if(oldVersion<29&&File.Exists(path))Write(config);
+        config["configVersion"]=30;Validate(config);
+        if(oldVersion<30&&File.Exists(path))Write(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
     public void Save(JsonObject incoming) {
         lock(gate){
             var next=(JsonObject)incoming.DeepClone();Normalize(next);
             // Device identity comes from Raw Input, not a possibly stale settings page.
+            bool sameDevice=S(incoming,"selectedDevice").Equals(S(config,"selectedDevice"),StringComparison.OrdinalIgnoreCase);
             next["selectedDevice"]=config["selectedDevice"]?.DeepClone()??JsonValue.Create("");
+            next["trackballs"]=config["trackballs"]!.DeepClone();
+            if(!sameDevice){next["trackballSwapButtons"]=config["trackballSwapButtons"]?.DeepClone();next["trackballSwapWheels"]=config["trackballSwapWheels"]?.DeepClone();}
+            TrackballDevices.SaveCorrections(next);
             // The named library has dedicated mutations; an older page cannot erase it.
             next["presets"]=config["presets"]!.DeepClone();
             var i=Math.Clamp(I(next,"activeProgram",0),0,next["programs"]!.AsArray().Count-1);
@@ -105,12 +109,14 @@ public sealed class ConfigStore {
     public void IdentifyDevice(string device){
         if(string.IsNullOrWhiteSpace(device)||device.Length>4095)throw new ArgumentException("Invalid trackball identity.",nameof(device));
         lock(gate){
-            var next=(JsonObject)config.DeepClone();next["selectedDevice"]=device;
+            var next=(JsonObject)config.DeepClone();TrackballDevices.Remember(next,device);
             Write(next);config=next;Revision++;
         }
     }
+    public JsonObject SelectDevice(string device){lock(gate){var next=(JsonObject)config.DeepClone();TrackballDevices.Select(next,device);return PersistPresetChange(next);}}
+    public JsonObject RenameDevice(string device,string name){lock(gate){var next=(JsonObject)config.DeepClone();TrackballDevices.Rename(next,device,name);return PersistPresetChange(next);}}
     public void Select(int index){lock(gate){var n=(JsonObject)config.DeepClone();LoadProgram(n,index);Write(n);config=n;Revision++;}}
-    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown","selectedDevice","presets"})if(config[k]!=null)n[k]=config[k]!.DeepClone();Write(n);config=n;Revision++;return Snapshot();}}
+    public JsonObject Reset(){lock(gate){var n=Defaults();foreach(var k in new[]{"theme","macros","welcomeDone","trayHintShown","selectedDevice","trackballs","presets"})if(config[k]!=null)n[k]=config[k]!.DeepClone();TrackballDevices.ResetCorrections(n);Write(n);config=n;Revision++;return Snapshot();}}
 
 
     static void ReindexProgramReferences(JsonObject settings,int removed){
@@ -195,9 +201,11 @@ public sealed class ConfigStore {
             if(p["feel"] is not JsonObject)p["feel"]=d["programs"]![0]!["feel"]!.DeepClone();
             foreach(var entry in d["programs"]![0]!["feel"]!.AsObject())if(!p["feel"]!.AsObject().ContainsKey(entry.Key))p["feel"]![entry.Key]=entry.Value?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=29;
+        TrackballDevices.Normalize(c);
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=30;
     }
     public static void Validate(JsonObject c){
+        _=TrackballDevices.Read(c);
         var programs=c["programs"]!.AsArray().Select(n=>n!.AsObject()).ToList();
         if(c["presets"] is not JsonArray presets||presets.Count>64)throw new InvalidDataException("Use a valid library of up to 64 presets.");
         var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);

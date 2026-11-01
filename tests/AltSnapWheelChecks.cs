@@ -40,9 +40,9 @@ static class AltSnapWheelChecks{
    old["programs"]![1]!["altTwistEstimate"]=true;old["programs"]![1]!["feel"]!["orbitSens"]=7;old["programs"]![1]!["twistKeys"]="alt+t";
    var buttons=old["programs"]![1]!["buttons"]!.DeepClone();var presets=old["presets"]!.DeepClone();var other=(JsonObject)old["programs"]![1]!.DeepClone();other["name"]="Other CAD";other["altTwistEstimate"]=true;old["programs"]!.AsArray().Add(other);
    File.WriteAllText(path,old.ToJsonString());var store=new ConfigStore(path);var migrated=store.Snapshot();
-   check(ConfigStore.I(migrated,"configVersion")==29&&!ConfigStore.B(migrated,"altTwistEstimate"),"Existing 3D settings migrate from ambiguous guessing to directional faces");
+   check(ConfigStore.I(migrated,"configVersion")==30&&!ConfigStore.B(migrated,"altTwistEstimate"),"Existing 3D settings migrate from ambiguous guessing to directional faces");
    var saved=JsonNode.Parse(File.ReadAllText(path))!;
-   check(ConfigStore.I(saved,"configVersion")==29&&!ConfigStore.B(saved["programs"]?[1],"altTwistEstimate"),"The upgraded default is persisted atomically so it survives restart immediately");
+   check(ConfigStore.I(saved,"configVersion")==30&&!ConfigStore.B(saved["programs"]?[1],"altTwistEstimate"),"The upgraded default is persisted atomically so it survives restart immediately");
    check(ConfigStore.S(migrated,"twistKeys")=="alt+t"&&ConfigStore.D(migrated,"orbitSens")==7&&JsonNode.DeepEquals(migrated["buttons"],buttons)&&JsonNode.DeepEquals(migrated["presets"],presets)&&ConfigStore.S(migrated,"selectedDevice")=="retained-left-wheel-device","The wheel setup preserves other keys, speed, native buttons, presets and device identity");
    check(ConfigStore.B(migrated["programs"]?[2],"altTwistEstimate"),"The migration does not overwrite a separate custom CAD program");
    migrated["altTwistEstimate"]=true;store.Save(migrated);var reopened=new ConfigStore(path).Snapshot();

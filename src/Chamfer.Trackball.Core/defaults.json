@@ -1,5 +1,5 @@
 {
-  "configVersion": 29,
+  "configVersion": 30,
   "enabled": true,
   "buttons": {
     "middle": {
@@ -800,5 +800,6 @@
   "twistAxis": "x",
   "invertTwist": false,
   "altTwistEstimate": false,
-  "twistCalibration": null
+  "twistCalibration": null,
+  "trackballs": []
 }

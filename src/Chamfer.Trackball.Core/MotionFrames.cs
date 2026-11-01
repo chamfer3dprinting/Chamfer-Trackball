@@ -40,6 +40,9 @@ public sealed class FractionalInput{
  public void Reset()=>x=y=wheel=0;
 }
 public static class MotionPolicy{
+ // A 16 ms WinForms interval often rounds to two 15.6 ms Windows ticks.
+ // Request 8 ms so ordinary timer resolution can deliver one camera frame per tick.
+ public const int FrameIntervalMs=8;
  // 0 stops this motion; 1..50 spans 1%..100%; 50..100 spans 100%..400%.
  public static float Gain(double slider){
   float value=(float)Math.Clamp(slider,0,100);

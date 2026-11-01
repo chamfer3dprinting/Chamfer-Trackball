@@ -1,3 +1,11 @@
+## Remembered trackballs and smoother navigation timing
+
+- Remember each identified trackball instead of replacing the previous one. Add or identify the new trackball once; the M512 stays saved.
+- Switch to the remembered trackball you move, reconnect automatically, and keep ordinary mice pointing normally. A held button/drag prevents another device from stealing the gesture.
+- Save click and wheel correction flags separately per trackball. Show connected/active state, edit corrections and rename each entry in Buttons & keys.
+- Correct the Windows navigation timer cadence: a 16 ms request measured about 31 ms between ticks on the owner's PC; the revised 8 ms request measured about 15.5 ms, without changing system timer settings.
+- Preserve cursor-centred zoom, held shortcuts, button/wheel defaults, programs, presets, calibration and all saved speed/glide settings.
+
 ## Zoom toward the cursor
 
 - Give native zoom its own cursor anchor while keeping orbit's existing pivot and feel.

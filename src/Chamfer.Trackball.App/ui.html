@@ -327,8 +327,10 @@ details .ver{margin-top:10px;font-weight:600}
     <section class="page" data-page="controls">
       <div class="row"><div><h1>Buttons &amp; keys</h1><p class="sub">Choose what each part of your trackball does. Press any button on your trackball to find it below.</p>
 <div class="card" style="margin-bottom:16px" id="deviceCorrection">
-  <h2>Trackball only</h2><p class="mu">Identify the trackball once by rolling its ball. Corrections and 3D controls then use that device.</p>
-  <div class="row" style="margin:12px 0"><button class="btn primary" id="identifyTrackball">Identify trackball</button><button class="btn sm" id="cancelIdentify">Cancel</button><span class="mu" id="deviceIdentity">Loading…</span></div>
+  <h2>Your trackballs</h2><p class="mu">Identify each trackball once. Both stay remembered, reconnect automatically, and the one you move becomes active. Ordinary mice keep working normally.</p>
+  <div class="row" style="margin:12px 0"><button class="btn primary" id="identifyTrackball">Add or identify trackball</button><button class="btn sm" id="cancelIdentify">Cancel</button><span class="mu" id="deviceIdentity">Loading…</span></div>
+  <div id="rememberedTrackballs" style="margin:12px 0"></div>
+  <p class="mu" id="trackballEditing">Corrections for the selected trackball. Keyboard and program controls are shared.</p>
   <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapButtons"> Swap the trackball’s native left / right clicks</label>
   <label class="row" style="margin:8px 0"><input type="checkbox" data-k="trackballSwapWheels"> Swap the trackball’s native vertical / horizontal wheel axes</label>
   <label class="row" style="margin:8px 0"><input type="checkbox" data-k="modePanel"> Show floating control guide</label>
@@ -739,10 +741,30 @@ $("#twistCalClear").onclick=async()=>{
 
 /* ---------- controls page ---------- */
 document.addEventListener("click",async e=>{
- if(e.target.id==="identifyTrackball"||e.target.id==="homeIdentifyTrackball"){await call("ctIdentify");toast("Roll only the M512 ball now — listening for 60 seconds");}
+ if(e.target.id==="identifyTrackball"||e.target.id==="homeIdentifyTrackball"){await call("ctIdentify");toast("Roll only the trackball you want to add now — listening for 60 seconds");}
  if(e.target.id==="cancelIdentify"||e.target.id==="homeCancelIdentify")await call("ctCancelIdentify");
 });
-async function devicePoll(){try{const d=await call("ctDeviceState");$("#deviceIdentity").textContent=d.status}catch{}setTimeout(devicePoll,700)}
+let trackballListKey="";
+function renderTrackballs(d){
+ const list=d.trackballs||[],key=JSON.stringify(list);
+ liveText("#deviceIdentity",d.status||"No trackball identified");
+ const editing=list.find(row=>row.editing);liveText("#trackballEditing",editing?"Click and wheel corrections for "+editing.name+". Keyboard and program controls are shared.":"Identify a trackball to save its click and wheel corrections.");
+ if(key===trackballListKey)return;trackballListKey=key;
+ $("#rememberedTrackballs").innerHTML=list.length?list.map((row,index)=>`<div class="row" style="margin:8px 0"><b>${esc(row.name)}</b><span class="mu">${row.connected?(row.active?"Active · connected":"Connected"):"Disconnected · remembered"}</span><span class="spacer"></span><button class="btn sm" data-trackball-edit="${index}"${row.editing?" disabled":""}>${row.editing?"Editing":"Edit corrections"}</button><button class="btn sm" data-trackball-rename="${index}">Rename</button></div>`).join(""):'<p class="mu">No remembered trackballs yet.</p>';
+ $("#rememberedTrackballs")._devices=list;
+}
+document.addEventListener("click",async e=>{
+ const edit=e.target.closest("[data-trackball-edit]"),rename=e.target.closest("[data-trackball-rename]");
+ if(!edit&&!rename)return;
+ const row=($("#rememberedTrackballs")._devices||[])[Number((edit||rename).dataset[edit?"trackballEdit":"trackballRename"])];if(!row)return;
+ try{
+  await doSave();
+  if(edit){cfg=await call("ctUseTrackball",row.id);renderAll();toast("Editing "+row.name+" corrections");}
+  else {const name=await askText("Trackball name","Name",row.name);if(!name)return;cfg=await call("ctRenameTrackball",row.id,name);toast("Trackball renamed");}
+  trackballListKey="";renderTrackballs(await call("ctDeviceState"));
+ }catch(err){toast(err.message||String(err),true);}
+});
+async function devicePoll(){try{renderTrackballs(await call("ctDeviceState"))}catch{}setTimeout(devicePoll,700)}
 setTimeout(devicePoll,1000);
 
 function opts(map,val){return Object.entries(map).map(([k,v])=>`<option value="${k}"${k===val?" selected":""}>${esc(v)}</option>`).join("")}
@@ -1110,7 +1132,7 @@ const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"P
 function liveText(selector,value){const el=$(selector),text=String(value??"");if(el&&el.textContent!==text)el.textContent=text}
 function liveClass(selector,value){const el=$(selector);if(el&&el.className!==value)el.className=value}
 function liveAttr(el,name,value){if(el&&el.getAttribute(name)!==String(value))el.setAttribute(name,value)}
-const ACTIVE_STATUS_POLL_MS=50; // 20 Hz; device input continues on its independent 16 ms timer.
+const ACTIVE_STATUS_POLL_MS=50; // 20 Hz; navigation uses a separate timer tuned for Windows cadence.
 async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
   if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;if(!savePending&&!saveFlight)reloadConfig()}
   let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}
@@ -1131,7 +1153,7 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   liveText("#stDevice",s.device||"No mouse found");liveClass("#stDevice",s.deviceReady?"":"wn");
   $("#homeDeviceSetup").hidden=!!s.deviceReady;
   $("#homeIdentifyTrackball").disabled=!!s.identifying;$("#homeCancelIdentify").hidden=!s.identifying;
-  liveText("#homeDeviceMessage",s.identifying?"Roll only the M512 ball now — listening…":"Identify your trackball to turn on its 3D controls.");
+  liveText("#homeDeviceMessage",s.identifying?"Roll only the trackball you want to add now — listening…":"Identify your trackball to turn on its 3D controls.");
   const appTxt=s.app?(s.appState==="cad"?s.app+" — 3D on":s.appState==="setup"?s.app+" — identify trackball":s.appState==="off"?s.app+" — 3D off":s.app+" — normal mouse"):"—";
   liveText("#stApp",appTxt);liveText("#integrationState",s.integration||"Normal mouse");liveClass("#stApp",s.appState==="cad"?"ok":"");liveText("#footApp",s.appState==="cad"?s.app:s.appState==="setup"?"Identify trackball for 3D controls":(s.enabled?"Waiting for a CAD app":"Normal mouse everywhere"));
   if(s.lastBtn&&s.lastBtnAge<1500){const key=s.lastBtn+":"+s.lastBtnSeq;if(key!==lastBtnSeen){lastBtnSeen=key;liveText("#lastPressed",BTN[s.lastBtn]||s.lastBtn);if(page==="controls"&&focused){flashRow(s.lastBtn);selectRow(s.lastBtn,false)}}}

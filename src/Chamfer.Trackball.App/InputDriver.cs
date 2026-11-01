@@ -26,13 +26,36 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public Func<bool> IsCad=()=>false;
     public Func<IReadOnlySet<int>,bool> IsNavigationChord=_=>false;
     public Func<string> SelectedDevice=()=>"";
-    readonly DeviceMapping mapping=new();readonly MouseGate gate=new();
+    readonly DeviceMapping mapping=new();readonly MouseGate gate=new();readonly TrackballRoster roster=new();
+    string TargetDevice=>roster.Count==0?SelectedDevice():roster.ActiveId;
+    public string ActiveDevice=>TargetDevice;
+    public string ActiveDeviceName=>roster.Find(TargetDevice)?.Name??"Trackball";
+    bool DeviceButtons(string device)=>roster.Find(device)?.SwapButtons??SwapButtons();
+    bool DeviceWheels(string device)=>roster.Find(device)?.SwapWheels??SwapWheels();
+    public event Action? DeviceChanged;
+    public void ConfigureDevices(JsonObject config){
+        bool changed=roster.Configure(TrackballDevices.Read(config),ConfigStore.S(config,"selectedDevice"));
+        if(changed){motionBlocked=false;DeviceChanged?.Invoke();}
+        nextPresenceCheck=0;
+    }
+    public JsonObject DeviceState()=>new(){
+        ["ready"]=Ready,["status"]=DeviceStatus,["active"]=TargetDevice,["name"]=ActiveDeviceName,
+        ["trackballs"]=new JsonArray(roster.Snapshot().Select(row=>(JsonNode)new JsonObject{
+            ["id"]=row.Device.Id,["name"]=row.Device.Name,["connected"]=row.Connected,["active"]=row.Active,
+            ["editing"]=row.Editing,["swapButtons"]=row.Device.SwapButtons,["swapWheels"]=row.Device.SwapWheels
+        }).ToArray())
+    };
+    void ActivateRemembered(string device){
+        if(!roster.Observe(device,Volatile.Read(ref heldRouting)==0))return;
+        connected=true;if(recoverOnInput){failed=false;recoverOnInput=false;}
+        DeviceChanged?.Invoke();
+    }
     readonly InputRecovery recovery=new();
     long selectedMovementReports,deliveredMovementReports,otherMovementReports,lastMovementAt;
     readonly MotionHealth motionHealth=new();readonly ConcurrentQueue<MouseMatch> matched=[];
     const int DispatchEdges=0x8001,DispatchKeys=0x8002,DispatchFailure=0x8003;
     readonly System.Windows.Forms.Timer watchdog=new(){Interval=30};
-    readonly HashSet<(int,int)> consumed=[];
+    readonly HashSet<(string,int,int)> consumed=[];
     volatile bool failed,connected,motionBlocked;
     bool learning,recoverOnInput;
     long learnUntil,nextRegistrationCheck,nextPresenceCheck;
@@ -40,14 +63,14 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public event Action<string>? Identified;
     public string DeviceStatus {get;private set;}="Identify your trackball to enable device-only controls.";
     public string LastDevice {get;private set;}="";
-    public bool Ready=>connected&&!failed&&SelectedDevice().Length>0;
+    public bool Ready=>connected&&!failed&&TargetDevice.Length>0;
     public bool Identifying=>learning;
     public JsonObject SignalState()=>new(){
         ["selectedMoves"]=selectedMovementReports,["deliveredMoves"]=deliveredMovementReports,["otherMoves"]=otherMovementReports,
         ["lastMoveAgeMs"]=lastMovementAt==0?-1:Math.Max(0,Environment.TickCount64-lastMovementAt),
         ["hooksRunning"]=hooks?.Running==true,["ready"]=Ready
     };
-    bool Routing=>(Ready&&(Enabled()||SwapButtons()||SwapWheels()))||Volatile.Read(ref heldRouting)>0;
+    bool Routing=>(Ready&&(Enabled()||DeviceButtons(TargetDevice)||DeviceWheels(TargetDevice)))||Volatile.Read(ref heldRouting)>0;
     bool HookHealthy{
         get{
             if(hooks?.Running==true&&Environment.TickCount64-Volatile.Read(ref uiPulse)<=150)return true;
@@ -122,15 +145,20 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     }
     void RefreshPresence()=>ApplyPresence(PresentMice());
     void ApplyPresence(IEnumerable<string> names){
-        string selected=SelectedDevice();
-        bool present=selected.Length>0&&names.Any(n=>n.Equals(selected,StringComparison.OrdinalIgnoreCase));
+        string selected=TargetDevice;
+        var presentNames=names.ToArray();
+        if(!presentNames.Contains(selected,StringComparer.OrdinalIgnoreCase)&&connected){FailOpen("Trackball disconnected. Normal mouse remains available.",true);connected=false;}
+        bool changed=roster.UpdatePresence(presentNames);
+        selected=TargetDevice;
+        bool present=selected.Length>0&&presentNames.Any(n=>n.Equals(selected,StringComparison.OrdinalIgnoreCase));
         if(!present){
             if(connected)FailOpen("Trackball disconnected. Normal mouse remains available.",true);
             connected=false;return;
         }
         if(!connected&&recoverOnInput){failed=false;recoverOnInput=false;}
         connected=true;
-        if(!failed&&!learning)DeviceStatus="Trackball connected";
+        if(!failed&&!learning)DeviceStatus=ActiveDeviceName+" connected";
+        if(changed)DeviceChanged?.Invoke();
     }
     internal void VerifyRecovery(){
         hooks?.VerifyResponsive();VerifyKeyDispatch();
@@ -220,9 +248,9 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(flags!=0)Win32.Mouse(flags,0,0,edge.Data);
     }
     void Edge(string device,MouseEdge raw){
-        var edge=mapping.Map(device,SelectedDevice(),raw,SwapButtons(),SwapWheels());
-        bool target=device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
-        var key=(edge.Button,edge.Data);
+        var edge=mapping.Map(device,TargetDevice,raw,DeviceButtons(device),DeviceWheels(device));
+        bool target=device.Equals(TargetDevice,StringComparison.OrdinalIgnoreCase);
+        var key=(device.ToUpperInvariant(),edge.Button,edge.Data);
         bool handled=false;
         if(target&&Enabled())handled=MouseEvent?.Invoke(edge.Message,edge.Data)==true;
         if(edge.Down&&handled)consumed.Add(key);
@@ -313,8 +341,9 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(learning&&(flags&1)==0&&(Math.Abs((long)dx)+Math.Abs((long)dy)>1)&&device.Length>0){
             learning=false;Identified?.Invoke(device);connected=true;failed=false;DeviceStatus="Trackball identified. Original inputs are preserved; corrections are optional.";
         }
-        bool target=device.Length>0&&device.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase);
-        if(target){LastDevice=device;connected=true;if(recoverOnInput){failed=false;recoverOnInput=false;}if(!failed&&!learning)DeviceStatus="Trackball connected";}
+        if(device.Length>0&&(flags&1)==0&&(dx!=0||dy!=0||buttons!=0)&&!learning)ActivateRemembered(device);
+        bool target=device.Length>0&&device.Equals(TargetDevice,StringComparison.OrdinalIgnoreCase);
+        if(target){LastDevice=device;connected=true;if(recoverOnInput){failed=false;recoverOnInput=false;}if(!failed&&!learning)DeviceStatus=ActiveDeviceName+" connected";}
         if(dx!=0||dy!=0){
             if(target){selectedMovementReports++;lastMovementAt=Environment.TickCount64;}else otherMovementReports++;
             lock(routingGate)motionHealth.Raw();
@@ -336,6 +365,40 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         }
         foreach(var (flag,msg,value) in new (int,int,int)[]{(1,0x201,0),(2,0x202,0),(4,0x204,0),(8,0x205,0),(16,0x207,0),(32,0x208,0),(64,0x20b,1),(128,0x20c,1),(256,0x20b,2),(512,0x20c,2),(1024,0x20a,data),(2048,0x20e,data)})
             if((buttons&flag)!=0){MouseMatch? match;lock(routingGate)match=gate.Raw(device,new(msg,value),Environment.TickCount64);Match(match);}
+    }
+    internal void VerifyMultipleTrackballs(){
+        var selected=SelectedDevice;var enabled=Enabled;var capture=IsCapture;var cad=IsCad;
+        var savedEntries=roster.Snapshot().Select(r=>r.Device).ToArray();string savedActive=roster.ActiveId;
+        bool savedConnected=connected,savedFailed=failed,savedRecover=recoverOnInput,savedLearning=learning;
+        string savedStatus=DeviceStatus,savedLast=LastDevice;
+        long savedCount=selectedMovementReports,savedDelivered=deliveredMovementReports,savedOthers=otherMovementReports,savedAt=lastMovementAt;
+        int savedHeld=Volatile.Read(ref heldRouting),moves=0,changes=0;
+        void MotionSeen(int x,int y,string device,bool captured){if(captured)throw new InvalidOperationException("Device switching captured an ordinary pointer.");moves++;}
+        void Switched()=>changes++;
+        Motion+=MotionSeen;DeviceChanged+=Switched;
+        try{
+            SelectedDevice=()=>"m512-fixture";Enabled=()=>true;IsCapture=()=>false;IsCad=()=>false;
+            connected=true;failed=recoverOnInput=learning=false;motionBlocked=false;Volatile.Write(ref heldRouting,0);Volatile.Write(ref stalled,0);
+            roster.Configure([new("m512-fixture","M512"),new("slimblade-fixture","SlimBlade Pro",true,false)],"m512-fixture");
+            roster.UpdatePresence(["m512-fixture","slimblade-fixture"]);
+            RawMouse("m512-fixture",0,0,0,4,2);RawMouse("slimblade-fixture",0,0,0,3,-2);
+            if(ActiveDevice!="slimblade-fixture"||moves!=2||changes!=1||!DeviceButtons("slimblade-fixture")||DeviceButtons("m512-fixture"))throw new InvalidOperationException("Two remembered sensors did not switch with separate corrections.");
+            RawMouse("ordinary-mouse",0,0,0,2,1);
+            if(ActiveDevice!="slimblade-fixture"||moves!=2)throw new InvalidOperationException("An ordinary mouse stole navigation.");
+            Volatile.Write(ref heldRouting,1);RawMouse("m512-fixture",0,0,0,2,1);
+            if(ActiveDevice!="slimblade-fixture")throw new InvalidOperationException("Another device stole a held drag.");
+            Volatile.Write(ref heldRouting,0);RawMouse("m512-fixture",0,0,0,2,1);
+            if(ActiveDevice!="m512-fixture"||moves!=3)throw new InvalidOperationException("A remembered device did not resume after release.");
+            ApplyPresence(["slimblade-fixture"]);
+            if(!Ready||ActiveDevice!="slimblade-fixture"||DeviceState()["trackballs"]!.AsArray().Count!=2)throw new InvalidOperationException("Disconnect fallback lost the other trackball.");
+        }finally{
+            Motion-=MotionSeen;DeviceChanged-=Switched;SelectedDevice=selected;Enabled=enabled;IsCapture=capture;IsCad=cad;
+            roster.Configure(savedEntries,selected());if(savedActive.Length>0)roster.Observe(savedActive,true);
+            roster.UpdatePresence(PresentMice());
+            connected=savedConnected;failed=savedFailed;recoverOnInput=savedRecover;learning=savedLearning;DeviceStatus=savedStatus;LastDevice=savedLast;
+            selectedMovementReports=savedCount;deliveredMovementReports=savedDelivered;otherMovementReports=savedOthers;lastMovementAt=savedAt;Volatile.Write(ref heldRouting,savedHeld);
+        }
+        Console.WriteLine("Remembered trackballs verified: two raw sensors, automatic switching, ordinary-mouse isolation, held-drag lock, separate corrections and disconnect fallback.");
     }
     internal void VerifyMotionDelivery(){
         var selected=SelectedDevice;var enabled=Enabled;var capture=IsCapture;var cad=IsCad;
@@ -370,7 +433,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
             while(matched.TryDequeue(out var match))try{Edge(match.Device,match.Edge);}catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}
         }
         if(m.Msg==0xfe){
-            if(m.WParam==2&&deviceNames.TryGetValue(m.LParam,out var removed)&&removed.Equals(SelectedDevice(),StringComparison.OrdinalIgnoreCase)){
+            if(m.WParam==2&&deviceNames.TryGetValue(m.LParam,out var removed)&&removed.Equals(TargetDevice,StringComparison.OrdinalIgnoreCase)){
                 connected=false;FailOpen("Trackball disconnected. Normal mouse remains available.",true);
             }
             deviceNames.Clear();

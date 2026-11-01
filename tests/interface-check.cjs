@@ -15,8 +15,8 @@ const pollSource=html.slice(pollAt,pollEnd);
 assert.ok(!pollSource.includes('requestAnimationFrame(poll)'),'status polling must not run on every display frame');
 assert.ok(pollSource.includes('page==="home"||page==="controls"?ACTIVE_STATUS_POLL_MS:250'));
 const controller=fs.readFileSync('src/Chamfer.Trackball.App/Controller.cs','utf8');
-assert.ok(controller.includes('System.Windows.Forms.Timer timer=new(){Interval=16}'),'native sensor processing must retain its 16 ms timer');
-console.log('Maximized UI polling is capped at 20 Hz; native sensor processing remains at 16 ms.');
+assert.ok(controller.includes('System.Windows.Forms.Timer timer=new(){Interval=MotionPolicy.FrameIntervalMs}'),'navigation must use the measured Windows cadence policy');
+console.log('Maximized UI polling stays capped at 20 Hz; navigation uses its independent Windows cadence policy.');
 
 for(const key of ['ctIdentify','trackballSwapButtons','trackballSwapWheels','adminConnect','modePanel'])assert.ok(html.includes(key));
 assert.ok(html.includes('data-k="trackballSwapWheels"'));
@@ -81,7 +81,7 @@ assert.ok(hookPump.includes('Application.Run()')&&hookPump.includes('thread.Star
 console.log('Global input hooks hand off keyboard injection, controller work and recovery outside their callbacks.');
 
 const identificationStart=html.indexOf('document.addEventListener("click",async e=>{',html.indexOf('/* ---------- controls page'));
-const identificationEnd=html.indexOf('async function devicePoll',identificationStart);
+const identificationEnd=html.indexOf('let trackballListKey=',identificationStart);
 assert.ok(identificationStart>0&&identificationEnd>identificationStart);
 (async()=>{
  let handler;const calls=[];
@@ -300,3 +300,23 @@ assert.ok(wheelHintMessages['#homeFaceTurn'].includes('left scroll wheel')&&whee
 assert.equal(wheelHintMessages['#homeFaceTurn'],wheelHintMessages['#controlFaceTurn']);
 assert.ok(html.includes('hold the same keys')||html.includes('Hold the same keys'));
 console.log('Home and Controls describe Alt plus ball for faces and Alt plus left wheel for exact orientation snaps; quick setups keep guessing off.');
+
+const devicesStart=html.indexOf('let trackballListKey=""');
+const devicesEnd=html.indexOf('document.addEventListener("click",async e=>{',devicesStart);
+assert.ok(devicesStart>0&&devicesEnd>devicesStart);
+{
+ let renders=0,markup="";
+ const list={set innerHTML(value){renders++;markup=value},get innerHTML(){return markup}},labels={};
+ const context={$:selector=>list,liveText:(selector,value)=>labels[selector]=value,esc:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')};
+ vm.runInNewContext(html.slice(devicesStart,devicesEnd),context);
+ const state={status:'Trackball connected',trackballs:[{id:'a',name:'M512',connected:true,active:true,editing:true},{id:'b',name:'SlimBlade <test>',connected:false,active:false,editing:false}]};
+ context.renderTrackballs(state);
+ assert.ok(markup.includes('M512')&&markup.includes('SlimBlade &lt;test&gt;')&&!markup.includes('SlimBlade <test>'));
+ assert.ok(markup.includes('Active · connected')&&markup.includes('Disconnected · remembered')&&markup.includes('data-trackball-edit="1"'));
+ assert.ok(labels['#trackballEditing'].includes('M512'));assert.equal(renders,1);
+ context.renderTrackballs(state);assert.equal(renders,1,'idle device polling must not rebuild the device list');
+ const changed=structuredClone(state);changed.trackballs[0].active=false;changed.trackballs[1].active=true;changed.trackballs[1].connected=true;
+ context.renderTrackballs(changed);assert.equal(renders,2,'a real device change updates the device list');
+ assert.equal(list._devices.length,2);
+ console.log('Remembered trackballs render names safely, show active/connected state and update only when changed.');
+}
