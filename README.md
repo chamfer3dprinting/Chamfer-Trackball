@@ -1,5 +1,9 @@
 # Chamfer Trackball
 
+## Cube faces and orientation
+
+In the 3D modelling program, hold **Alt + ball** to change cube faces. Hold **Alt + the left scroll wheel** for exact 90° orientation turns while keeping the current face and distance. Each notch is one turn; reverse the wheel to rotate back. The right wheel retains its normal/configured behavior. Ball-only twist estimation is off in the default setup. Button 1 remains a normal middle click.
+
 Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds and verifies the single-file executables; no development folder is needed on the owner's PC.
 
 ## Editions and release channels

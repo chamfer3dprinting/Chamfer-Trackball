@@ -7,7 +7,7 @@ on the owner's PC. Deliver only the executable as the user-facing download.
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
 mouse button swapping to implement app bindings. The owner's latest requested controls
 are Shift orbit, Ctrl+Shift pan, Ctrl plus ball for zoom, Alt plus ball for six-face
-snapping with the explicitly approved experimental Alt-only knob estimator, an optional separate Twist hold, and Windows navigation with Alt for height. Reserve the Windows tap in the 3D
+snapping, Alt plus the physical LEFT scroll wheel for 90-degree face-orientation snaps, an optional separate Twist hold, and Windows navigation with Alt for height. Automatic ball-only twist estimation is now off in the 3D default. Reserve the Windows tap in the 3D
 context so releasing it never opens Start; keep system shortcuts and non-3D Windows input normal. Ctrl alone is permitted for
 Zoom in 3D apps; other Ctrl keyboard shortcuts must remain normal. The 3D program
 points normally until a held navigation command is used.
@@ -280,3 +280,14 @@ Lower the neutral trigger to eight raw-axis counts, retaining exact one-step-per
 For saved X/Y calibration, add a nudge decision using its geometric features without penalizing a different recorded movement amount/speed. Keep ordinary calibrated face patterns and identical-pattern overlap fallback. Preserve the existing full calibration model/schema and all owner settings. This remains the approved experimental Alt-only intent estimate; do not claim independent hardware twist measurement or guarantee recognition of physically unreported motion.
 
 Validation: 506 full core checks pass in memory, including 23 new tiny-burst cases for both signs, one-packet/one-count input, quantization wobble, after-face transitions, exact face/distance/orientation, reverse/pause/continuation, stopped subthreshold movement, jitter, gains/inversion and older long calibration. Actual Controller/native smoke now uses eight-count explicit and one-packet estimated nudges, checks the immediate opposite turn and continuing-stroke latch. Full Windows workflows, next Admin-only release/install and owner physical feel confirmation are pending. Leave public stable unchanged; do not create local development folders.
+
+
+# 2026-11-01 — Use Alt plus the left scroll wheel for exact orientation snaps
+
+The owner's latest clarification selects Alt + ball for neighboring cube faces and Alt + the small left scroll wheel for 90-degree orientation snaps. Preserve the top-left button as middle click. Do not ship the superseded button-held proposal. The confirmed native wheel layout is left = vertical and right = horizontal, with device correction flags false; do not swap axes or buttons.
+
+Disable ambiguous X/Y twist estimation in the 3D template and quick setups. Schema 29 migrates only the existing 3D template (including a renamed program with that defaultKind), persists the migration atomically, and leaves separate custom programs, saved presets, learned calibration, optional custom Twist chords and speed settings intact. A later explicit opt-in to the legacy estimate remains possible.
+
+Route only the left/vertical wheel through native Snap orientation. A full 120-unit notch makes one exact quarter turn; partial reports accumulate, reverse notches rotate back, and releasing the gesture discards unfinished wheel progress. Preserve other navigation modes' existing two-wheel behavior; the right wheel in Snap takes its normal/configured path. Update Home, held-key instructions and the floating guide to describe the wheel action without estimated-twist labels in the default setup.
+
+Add core checks for wheel routing, partial/full/reverse notches, all six cube faces, face/distance preservation, zero proportional gain, four-step return, atomic one-time default migration and preservation of custom programs/settings. The actual Controller/native smoke exercises wheel messages through the pending frame/camera path and verifies right-wheel pass-through and Alt-ball face selection without using the estimator. All 539 core checks and 26 interface behavior checks pass in memory. Full Windows/native verification, the next Admin-only release/install and physical wheel feel confirmation are pending. Public stable stays unchanged; no local development folders are permitted.
