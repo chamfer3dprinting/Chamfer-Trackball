@@ -1,5 +1,5 @@
 {
-  "configVersion": 27,
+  "configVersion": 28,
   "enabled": true,
   "buttons": {
     "middle": {
@@ -694,7 +694,8 @@
       "circleZoom": false,
       "circleSize": 160,
       "twistKeys": "none",
-      "altTwistEstimate": false
+      "altTwistEstimate": false,
+      "twistCalibration": null
     },
     {
       "name": "3D modelling",
@@ -753,7 +754,8 @@
       "circleZoom": true,
       "circleSize": 160,
       "twistKeys": "none",
-      "altTwistEstimate": true
+      "altTwistEstimate": true,
+      "twistCalibration": null
     }
   ],
   "activeProgram": 0,
@@ -797,5 +799,6 @@
   "twistSens": 50,
   "twistAxis": "x",
   "invertTwist": false,
-  "altTwistEstimate": false
+  "altTwistEstimate": false,
+  "twistCalibration": null
 }

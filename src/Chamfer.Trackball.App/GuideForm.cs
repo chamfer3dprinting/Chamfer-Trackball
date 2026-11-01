@@ -37,7 +37,7 @@ internal sealed class GuideForm:Form{
    string label=a=="normal"?defaults[i]:a switch{"keys"=>ConfigStore.S(s["bindings"]?[names[i]],"keys"),"panToggle"=>"Orbit / pan","lock3d"=>"3D on/off",_=>a};
    g.DrawString(label,tiny,text,new RectangleF(x+47,y+3,109,21));
   }
-  var mode=ConfigStore.S(s,"mode");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>"Navigate","Snap"=>"Snap to angle","Roll"=>"Twist",_=>mode};
+  var mode=ConfigStore.S(s,"mode");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>"Navigate","Snap"=>ConfigStore.S(s,"snapLabel","Snap faces"),"Roll"=>"Twist",_=>mode};
   var measure=g.MeasureString(title,bold);g.DrawString(title,bold,mode=="Idle"?text:accent,(330-measure.Width)/2,99);
   string program="Program: "+ConfigStore.S(s,"program");var pm=g.MeasureString(program,font);g.DrawString(program,font,muted,(330-pm.Width)/2,123);
   using var ball=new SolidBrush(Color.FromArgb(12,16,18));

@@ -226,6 +226,7 @@ details .ver{margin-top:10px;font-weight:600}
 /* modal & toast */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px)}
 .modal.show{display:flex}
+.calSteps{display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0}.calSteps .btn{text-align:left}.calSteps .btn span{float:right}#twistCalModal .box{max-height:92vh;overflow:auto}#twistCalProgress{width:100%;height:12px}#twistCalPreview{text-align:center}.calDial{position:relative;margin:12px auto;width:62px;height:62px;border:2px solid var(--accent);border-radius:50%}.calDial span{position:absolute;left:28px;top:6px;width:3px;height:23px;background:var(--accent);transform-origin:50% 24px}
 .modal .box{width:min(520px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow)}
 .modal h3{margin:0 0 6px;font-size:18px}
 .modal .acts{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
@@ -402,6 +403,12 @@ details .ver{margin-top:10px;font-weight:600}
         <p class="mu" id="controlFaceTurn" style="margin:10px 0 0"></p>
       </div>
       <div class="card" style="margin-top:16px">
+        <h2>Twist calibration</h2>
+        <p class="mu">Teach the app your clockwise and anticlockwise knob turns while keeping up/down/left/right face snapping. Saved with this program and its presets.</p>
+        <p id="twistCalSummary" class="mu"></p>
+        <div class="row"><button class="btn primary" id="twistCalOpen">Calibrate twist</button><button class="btn" id="twistCalClear">Clear calibration</button></div>
+      </div>
+      <div class="card" style="margin-top:16px">
         <h2>Circle zoom</h2>
         <div class="opt"><div class="t">Draw circles to zoom<small>Select the 3D modelling program and place the pointer over the 3D viewport. Roll straight to orbit or pan. Draw one small circle to start zooming: clockwise zooms in and anticlockwise zooms out. The first recognized loop already zooms; slightly uneven circles and brief pauses are accepted. Keep circling for continuous zoom; roll straight to return to navigation. This is enabled by default in the 3D modelling program.</small></div><label class="sw"><input type="checkbox" data-k="circleZoom"><span></span></label></div>
         <div class="opt"><div class="t">Circle size<small>Increase this if your circles are larger; decrease it if broad curved orbits trigger zoom. Zoom speed uses Zoom sensitivity in Speed &amp; direction.</small></div><input type="range" min="60" max="400" step="10" data-k="circleSize"></div>
@@ -463,9 +470,9 @@ details .ver{margin-top:10px;font-weight:600}
         <div class="slider"><b>Pan</b><input type="range" min="0" max="100" data-k="panSens"><span class="val" data-v="panSens"></span></div>
         <div class="slider"><b>Zoom</b><input type="range" min="0" max="100" data-k="zoomSens"><span class="val" data-v="zoomSens"></span></div>
         <div class="slider"><b>Twist</b><input type="range" min="0" max="100" data-k="twistSens"><span class="val" data-v="twistSens"></span></div>
-        <div class="opt"><div class="t">Twist direction<small>Horizontal matches the tested M512 knob motion. Choose Vertical for a ball whose knob motion reports in the other direction.</small></div><select data-k="twistAxis"><option value="x">Horizontal</option><option value="y">Vertical</option></select></div>
+        <div class="opt"><div class="t">Twist direction<small id="twistAxisHelp">Choose Horizontal or Vertical, or learn the direction with Twist calibration in Buttons &amp; keys.</small></div><select data-k="twistAxis"><option value="x">Horizontal</option><option value="y">Vertical</option></select></div>
         <div class="opt"><div class="t">Reverse twist<small>Switch on if turning clockwise turns the view the other way.</small></div><label class="sw"><input type="checkbox" data-k="invertTwist"><span></span></label></div>
-        <p class="mu" style="font-size:12px">Twist uses its own held shortcut and speed. It stops with the ball while the shortcut is held; it does not coast. Change the keys in Buttons &amp; keys.</p>
+        <p class="mu" style="font-size:12px">Twist has its own speed. Use it with Alt Snap or an optional separate held shortcut. It stops with the ball while the shortcut is held; it does not coast. Change the keys in Buttons &amp; keys.</p>
       </div>
       <div class="card" style="margin-bottom:16px">
         <h2>Precision</h2>
@@ -565,6 +572,25 @@ details .ver{margin-top:10px;font-weight:600}
 </div>
 
 <div class="modal" id="modal"><div class="box"><h3 id="mTitle"></h3><div id="mBody" class="mu"></div><div class="acts" id="mActs"></div></div></div>
+<div class="modal" id="twistCalModal" role="dialog" aria-modal="true" aria-labelledby="twistCalTitle"><div class="box">
+  <h3 id="twistCalTitle">Calibrate twist</h3>
+  <p class="mu" id="twistCalProgram"></p>
+  <p class="mu">Use only your selected trackball. Record each movement for five seconds, without holding keys or buttons. Leave the scroll wheels alone.</p>
+  <div class="calSteps">
+    <button class="btn" data-cal-record="faces">1 · Normal rolls <span id="twistCalCountFaces"></span></button>
+    <button class="btn" data-cal-record="clockwise">2 · Clockwise <span id="twistCalCountCw"></span></button>
+    <button class="btn" data-cal-record="anticlockwise">3 · Anticlockwise <span id="twistCalCountCcw"></span></button>
+  </div>
+  <p id="twistCalPrompt" aria-live="polite">Start with normal up/down/left/right rolls.</p>
+  <progress id="twistCalProgress" value="0" max="1" hidden></progress>
+  <p id="twistCalResult" class="mu" aria-live="polite"></p>
+  <div id="twistCalPreview" hidden>
+    <div class="calDial" aria-hidden="true"><span id="twistCalNeedle"></span></div>
+    <p id="twistCalIntent"></p><p id="twistCalTurns" class="mu"></p>
+    <small class="mu">This preview stays here. Apply the calibration to use it in your 3D view.</small>
+  </div>
+  <div class="acts"><button class="btn" id="twistCalCancel">Cancel</button><button class="btn" id="twistCalTest" disabled>Test</button><button class="btn primary" id="twistCalApply" disabled>Apply to program</button></div>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -648,6 +674,68 @@ async function doSave(){
 }
 function flashSaved(){$$(".saved").forEach(s=>{s.textContent="✓ Saved";s.style.opacity=1;clearTimeout(s._t);s._t=setTimeout(()=>s.style.opacity=0,1400)})}
 
+/* ---------- twist calibration ---------- */
+let twistCalOpen=false,twistCalBusy=false;
+const CAL_PROMPTS={
+ faces:"Roll up, down, left and right as you do to change cube faces.",
+ clockwise:"Turn the ball CLOCKWISE like a volume knob. Lift your fingers to reposition; pause briefly between turns.",
+ anticlockwise:"Turn the ball ANTICLOCKWISE like a volume knob. Lift your fingers to reposition; pause briefly between turns."
+};
+function renderCalibration(){
+ const model=cfg.twistCalibration;
+ liveText("#twistCalSummary",!model?"No calibration saved. The experimental Alt-only estimate is available.":model.source==="wheel"?"Saved: twist scroll signal · 90° turns.":"Saved: learned ball-motion estimate · "+(model.separation>=.65?"good separation in your samples.":"patterns overlap; try Test before using."));
+ $("#twistCalClear").disabled=!model;
+ $("[data-k=twistAxis]").disabled=!!model;
+ liveText("#twistAxisHelp",model?"Using the saved twist calibration. Clear or re-record it to choose a different direction.":"Choose Horizontal or Vertical, or learn the direction with Twist calibration in Buttons & keys.");
+}
+function updateCalibration(s){
+ if(!twistCalOpen)return;
+ if(!s?.active){closeCalibration();toast("Calibration stopped. Open it again to record.",true);return}
+ const record=!!s.recording;
+ $$("#twistCalModal [data-cal-record]").forEach(b=>b.disabled=record||twistCalBusy);
+ const counts=s.samples||{};
+ liveText("#twistCalCountFaces",counts.faces?"✓ "+counts.faces:"");
+ liveText("#twistCalCountCw",counts.clockwise?"✓ "+counts.clockwise:"");
+ liveText("#twistCalCountCcw",counts.anticlockwise?"✓ "+counts.anticlockwise:"");
+ liveText("#twistCalPrompt",record?(s.starting?"Get ready… ":CAL_PROMPTS[s.phase]+" ")+Math.ceil((s.remainingMs||0)/1000)+"s":s.testing?"Try a knob turn in each direction, then normal up/down/left/right rolls. No keys needed.":s.hasModel?"Ready to test. If a normal roll is mistaken for twist, re-record the samples.":"Record each of the three movements. You can repeat a sample.");
+ $("#twistCalProgress").hidden=!record;$("#twistCalProgress").value=s.progress||0;
+ liveText("#twistCalResult",s.error||((s.quality?s.quality+". ":"")+(s.summary||"")));
+ $("#twistCalResult").classList.toggle("err",!!s.error);
+ $("#twistCalTest").disabled=!s.hasModel||record||twistCalBusy;
+ $("#twistCalApply").disabled=!s.hasModel||record||twistCalBusy;
+ $("#twistCalPreview").hidden=!s.testing;
+ liveText("#twistCalIntent",s.testIntent||"");
+ liveText("#twistCalTurns",(s.testTurns||0)+" quarter turns · next turn "+(s.testProgress||0)+"%");
+ $("#twistCalNeedle").style.transform="rotate("+((s.testTurns||0)*90)+"deg)";
+}
+function closeCalibration(){twistCalOpen=false;$("#twistCalModal").classList.remove("show");$("#twistCalOpen").focus()}
+async function calibrationAction(name,...args){
+ if(twistCalBusy)return;
+ twistCalBusy=true;
+ try{const result=await call(name,...args);updateCalibration(result);return result}
+ catch(e){toast(String(e.message||e),true)}
+ finally{twistCalBusy=false}
+}
+$("#twistCalOpen").onclick=async()=>{
+ if(twistCalBusy)return;
+ await doSave();
+ try{const state=await call("ctTwistCalOpen");twistCalOpen=true;liveText("#twistCalProgram","Program: "+cfg.programs[cfg.activeProgram].name);$("#twistCalModal").classList.add("show");updateCalibration(state);$("#twistCalCancel").focus()}
+ catch(e){toast(String(e.message||e),true)}
+};
+$$("#twistCalModal [data-cal-record]").forEach(b=>b.onclick=()=>calibrationAction("ctTwistCalRecord",b.dataset.calRecord));
+$("#twistCalTest").onclick=()=>calibrationAction("ctTwistCalTest");
+$("#twistCalCancel").onclick=async()=>{await call("ctTwistCalCancel");closeCalibration()};
+$("#twistCalApply").onclick=async()=>{
+ if(twistCalBusy)return;twistCalBusy=true;
+ try{cfg=await call("ctTwistCalApply");closeCalibration();renderAll();toast("Twist calibration saved for this program")}
+ catch(e){toast(String(e.message||e),true)}
+ finally{twistCalBusy=false}
+};
+$("#twistCalClear").onclick=async()=>{
+ const yes=await modal("Clear twist calibration?","This removes the learned twist for this program.",[["Cancel","",false],["Clear calibration","primary",true]]);if(!yes)return;
+ cfg=await call("ctTwistCalClear");renderCalibration();toast("Twist calibration cleared");
+};
+
 /* ---------- controls page ---------- */
 document.addEventListener("click",async e=>{
  if(e.target.id==="identifyTrackball"||e.target.id==="homeIdentifyTrackball"){await call("ctIdentify");toast("Roll only the M512 ball now — listening for 60 seconds");}
@@ -715,7 +803,7 @@ document.addEventListener("change",e=>{const t=e.target;
     if(a==="macro"&&!cur.macro&&cfg.macros.length)cur.macro=cfg.macros[0].id;
     if(a==="program")cur.program=cur.program||0;
     if(a==="gestures")setTimeout(()=>$("#gestCard").scrollIntoView({behavior:"smooth",block:"start"}),60);
-    renderBinds();renderGestures();renderCheat();save();return}
+    renderBinds();renderCalibration();renderGestures();renderCheat();save();return}
   if(t.dataset.mact){const b=t.dataset.mact,a=t.value;cfg.modeButtons=cfg.modeButtons||{};
     if(a==="normal"){delete cfg.modeButtons[b];renderBinds();save();return}
     const cur=cfg.modeButtons[b]=Object.assign(cfg.modeButtons[b]||{tap:"click"},{action:a});
@@ -830,7 +918,7 @@ function renderKeyboard(){
 function updateKeyboard(s){
  const keys=new Set(s.keys||[]);
  $$("#liveKeyboard [data-vk]").forEach(el=>{const down=keys.has(+el.dataset.vk);if(el.classList.contains("down")!==down)el.classList.toggle("down",down)});
- liveText("#keyboardMode",s.appState==="cad"?"3D controls: "+(MODEN[s.mode]||s.mode):"Normal keyboard — 3D shortcuts activate in a supported 3D view.");
+ liveText("#keyboardMode",s.appState==="cad"?"3D controls: "+(s.snapLabel||MODEN[s.mode]||s.mode):"Normal keyboard — 3D shortcuts activate in a supported 3D view.");
 }
 
 function updateFaceTurn(s){
@@ -1015,14 +1103,15 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   if(s.rollLog){rotRoll(-s.rollLog);changed=true}
   const amount=s.zoomLog===undefined?(s.zoom||0)/700:s.zoomLog;
   if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
+  if(twistCalOpen)updateCalibration(s.twistCalibration);
   const focused=!document.hidden&&document.hasFocus();
   if(page==="home"&&!document.hidden)updateKeyboard(s);
   if((page==="home"||page==="controls")&&!document.hidden)updateFaceTurn(s);
   if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1)+" · twist "+gainLabel(s.twistGain??1));
   if(changed&&page==="home"&&focused)drawPad();
-  const live=s.mode!=="Idle";liveText("#padMode",live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
+  const live=s.mode!=="Idle";liveText("#padMode",live?(s.snapLabel||MODEN[s.mode]):"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
   const dirTxt=s.ballDir?" "+s.ballDir:"";
-  liveText("#stMode",(s.lock3d?"3D mode · ":"")+(MODEN[s.mode]||s.mode)+(live?dirTxt:""));liveClass("#stMode",live?"ok":"");
+  liveText("#stMode",(s.lock3d?"3D mode · ":"")+(s.snapLabel||MODEN[s.mode]||s.mode)+(live?dirTxt:""));liveClass("#stMode",live?"ok":"");
   if(page==="controls"&&focused)updateBall(s,live);
   liveText("#stDevice",s.device||"No mouse found");liveClass("#stDevice",s.deviceReady?"":"wn");
   $("#homeDeviceSetup").hidden=!!s.deviceReady;
@@ -1073,7 +1162,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="askIn
 
 /* ---------- programs ---------- */
 let cfgRev=-1;
-const PROGRAM_FIELDS=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","altTwistEstimate","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+const PROGRAM_FIELDS=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","altTwistEstimate","twistCalibration","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
 const FEEL_FIELDS=["orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"];
 const clone=v=>v===undefined?null:JSON.parse(JSON.stringify(v));
 function snapshotProgram(name){

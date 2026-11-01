@@ -125,7 +125,7 @@ try{
  Check(ConfigStore.I(repaired,"orbitSens")==82&&ConfigStore.I(repaired,"panSens")==50&&ConfigStore.I(repaired,"pointerSpeed")==10,"An incomplete added program gets its own full motion defaults instead of leaking the previous program");
  store.Select(0);
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==27,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==28,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
@@ -459,7 +459,7 @@ try{
  foreach(var node in old["programs"]!.AsArray()){node!.AsObject().Remove("twistKeys");node["feel"]!.AsObject().Remove("twistSens");node["feel"]!.AsObject().Remove("twistAxis");node["feel"]!.AsObject().Remove("invertTwist");}
  old["programs"]![1]!["feel"]!["orbitSens"]=4;old["programs"]![0]!["pointerSpeed"]=3;File.WriteAllText(twistPath,old.ToJsonString());
  var store=new ConfigStore(twistPath);var migrated=store.Snapshot();
- Check(ConfigStore.I(migrated,"configVersion")==27&&ConfigStore.S(migrated,"twistKeys")=="none"&&ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program gains approved Alt-only estimation without a Shift requirement");
+ Check(ConfigStore.I(migrated,"configVersion")==28&&ConfigStore.S(migrated,"twistKeys")=="none"&&ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program gains approved Alt-only estimation without a Shift requirement");
  Check(ConfigStore.S(migrated,"selectedDevice")=="twist-device"&&ConfigStore.I(migrated,"orbitSens")==4&&ConfigStore.I(migrated["programs"]![0],"pointerSpeed")==3,"Twist migration preserves trackball identity and existing speed settings");
  Check(ConfigStore.S(migrated["programs"]![0],"twistKeys")=="none","Twist migration leaves Normal mouse shortcuts off");
  migrated["twistKeys"]="alt+t";migrated["twistSens"]=23;migrated["twistAxis"]="y";migrated["invertTwist"]=true;store.Save(migrated);store.SavePreset("Knob");
@@ -561,4 +561,30 @@ for(int frame=0;frame<12;frame++)estimatedWheelPose=estimatedWheelInput.Step(stu
 estimatedWheelPose=estimatedWheelInput.Step(studioView,0,0,120,.2f,1,"x",false,1300);
 Check(Vector3.Dot(estimatedWheelPose.Up,Vector3.UnitX)>.999f&&Math.Abs(Vector3.Distance(estimatedWheelPose.Eye,estimatedWheelPose.Target)-10)<.0001&&!estimatedWheelInput.LastEstimatedTurn,"Alt plus wheel remains an exact face quarter turn after an estimated knob candidate; it never becomes zoom");
 
+
+var heldTransitionInput=new EstimatedFaceSnap();heldTransitionInput.Reset(studioView);var heldTransitionPose=studioView;
+for(int transitionFrame=0;transitionFrame<30;transitionFrame++)heldTransitionPose=heldTransitionInput.Step(studioView,0,60,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(heldTransitionInput.State=="faces","Vertical motion starts as directional faces within a held Alt session");
+var heldTransitionFace=Vector3.Normalize(heldTransitionPose.Eye-heldTransitionPose.Target);
+for(int transitionFrame=30;transitionFrame<100;transitionFrame++)heldTransitionPose=heldTransitionInput.Step(studioView,60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(heldTransitionInput.EstimatedTwist&&heldTransitionInput.QuarterTurns>0&&heldTransitionInput.LastDirection==1,"A later knob motion is reconsidered without pausing or releasing Alt");
+Check(Vector3.Dot(Vector3.Normalize(heldTransitionPose.Eye-heldTransitionPose.Target),heldTransitionFace)>.999f,"Reconsidered knob motion turns the currently selected face instead of changing it");
+var noisyStartInput=new EstimatedFaceSnap();noisyStartInput.Reset(studioView);
+for(int transitionFrame=0;transitionFrame<30;transitionFrame++)noisyStartInput.Step(studioView,60,18,0,.2f,1,"x",false,1000+transitionFrame*16);
+for(int transitionFrame=30;transitionFrame<100;transitionFrame++)noisyStartInput.Step(studioView,-60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(noisyStartInput.EstimatedTwist&&noisyStartInput.QuarterTurns>0&&noisyStartInput.LastDirection==-1,"An early noisy face decision cannot lock out a later anticlockwise knob turn");
+var repeatedTransitionInput=new EstimatedFaceSnap();repeatedTransitionInput.Reset(studioView);
+for(int transitionFrame=0;transitionFrame<35;transitionFrame++)repeatedTransitionInput.Step(studioView,60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+int firstTransitionTurns=repeatedTransitionInput.QuarterTurns;
+for(int transitionFrame=35;transitionFrame<60;transitionFrame++)repeatedTransitionInput.Step(studioView,0,60,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(!repeatedTransitionInput.EstimatedTwist,"A knob turn can return to vertical directional faces during the same Alt hold");
+for(int transitionFrame=60;transitionFrame<110;transitionFrame++)repeatedTransitionInput.Step(studioView,60,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(repeatedTransitionInput.EstimatedTwist&&repeatedTransitionInput.QuarterTurns>firstTransitionTurns,"Faces can return to estimated twist repeatedly without an Alt mode switch");
+var jitterTransitionInput=new EstimatedFaceSnap();jitterTransitionInput.Reset(studioView);
+for(int transitionFrame=0;transitionFrame<20;transitionFrame++)jitterTransitionInput.Step(studioView,0,60,0,.2f,1,"x",false,1000+transitionFrame*16);
+for(int transitionFrame=20;transitionFrame<80;transitionFrame++)jitterTransitionInput.Step(studioView,.5f,0,0,.2f,1,"x",false,1000+transitionFrame*16);
+Check(!jitterTransitionInput.Pending&&!jitterTransitionInput.EstimatedTwist,"Sub-count directional noise does not repeatedly reopen twist observation");
+Check(SnapLabels.For("twist")=="Estimated twist 90°"&&SnapLabels.For("faces")=="Snap faces"&&SnapLabels.For("estimating")=="Reading Alt motion","The guide prominently distinguishes estimated twist, face snapping and observation");
+
+TwistCalibrationChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

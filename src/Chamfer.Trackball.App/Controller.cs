@@ -13,6 +13,8 @@ internal sealed class Controller:IDisposable{
     readonly Queue<JsonObject> logs=new();long seq;long revision=-1;
     readonly HashSet<int> sentMods=[];readonly HashSet<string> sentButtons=[];
     volatile NavMode mode=NavMode.Idle;NavMode latched=NavMode.Idle;string gestureButton="";
+    TwistCalibrationModel? learnedTwist;
+    readonly TwistCalibrationSession calibration=new();readonly MotionFrames calibrationMotion=new();int calibrationProgram;string calibrationProgramName="",calibrationDevice="";
     readonly KnobSteps knobSteps=new();readonly CircleZoom circle=new();readonly MotionGlide glide=new();readonly PointerMotion pointer=new();
     double gx,gy;readonly MotionFrames pending=new(),motionSamples=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
     bool stoppedByClick,emulating,knobHoldActive;float knobAngle;double rollLog;volatile bool nativeFocusAllowed=true;int foregroundPid;volatile nint foregroundWindow;
@@ -20,12 +22,15 @@ internal sealed class Controller:IDisposable{
     double ox,oy,px,py,zoom,zoomLog,rawX,rawY;bool fit;string lastBtn="",lastAction="";DateTime lastBtnTime;long lastBtnSeq;
     CancellationTokenSource? macro;
     public string Mode=>circle.Active?"Zoom":mode.ToString();
-    public JsonObject GuideState()=>new(){["mode"]=Mode,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=mode==NavMode.Snap?server.SnapState(native):null,["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+    public JsonObject GuideState(){
+        var snap=mode==NavMode.Snap?server.SnapState(native):null;
+        return new(){["mode"]=Mode,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+    }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
-    public bool IsCad=>profile!=null&&nativeFocusAllowed&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
+    public bool IsCad=>!calibration.Active&&profile!=null&&nativeFocusAllowed&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
     public Controller(ConfigStore store,InputDriver input,NativeServer server){
-        this.store=store;this.input=input;this.server=server;cfg=store.Snapshot();
+        this.store=store;this.input=input;this.server=server;cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);
         input.IsCad=()=>IsCad;input.IsCapture=()=>mode!=NavMode.Idle||PointerCapture;input.SelectedDevice=()=>ConfigStore.S(cfg,"selectedDevice");
         input.SwapButtons=()=>ConfigStore.B(cfg,"trackballSwapButtons");input.SwapWheels=()=>ConfigStore.B(cfg,"trackballSwapWheels");input.Enabled=()=>ConfigStore.B(cfg,"enabled");
         input.Identified+=device=>{store.IdentifyDevice(device);cfg=store.Snapshot();Log("Trackball identified; original clicks and wheel axes are preserved unless you enable a correction.");};
@@ -38,9 +43,13 @@ public string AppName{get;private set;}="";
     public JsonArray LogAfter(long s)=>new(logs.Where(x=>ConfigStore.D(x,"seq")>s).Select(x=>x.DeepClone()).ToArray());
     void Tick(object? sender,EventArgs e){
         const int idleInterval=50;
-        int interval=mode==NavMode.Idle&&!pointer.Active?idleInterval:16;
+        int interval=mode==NavMode.Idle&&!pointer.Active&&!calibration.Receiving?idleInterval:16;
         if(timer.Interval!=interval)timer.Interval=interval;
-        if(revision!=store.Revision){End();cfg=store.Snapshot();revision=store.Revision;foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
+        if(revision!=store.Revision){End();cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);revision=store.Revision;foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
+        if(calibration.Active&&(calibrationProgram!=ConfigStore.I(cfg,"activeProgram")||calibrationProgramName!=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name")||calibrationDevice!=ConfigStore.S(cfg,"selectedDevice")||!input.Ready||!ConfigStore.B(cfg,"enabled"))){
+            calibration.Cancel();calibrationMotion.Reset();Log("Calibration stopped because the program or trackball changed.","err");
+        }
+        if(calibration.Receiving){var sample=calibrationMotion.Peek();calibrationMotion.Reset();calibration.Tick(sample.X,sample.Y,sample.Wheel,Environment.TickCount64);}
         var w=Win32.GetForegroundWindow();
         if(w!=foregroundWindow){
             End();latched=NavMode.Idle;combos.Clear();pressed.Clear();intercepted.Clear();comboUsed.Clear();foregroundWindow=w;
@@ -96,7 +105,7 @@ public string AppName{get;private set;}="";
         }
         if(native==null&&!demo&&!ConfigStore.B(cfg,"allowEmulation",true)){Integration="Native integration required";return;}
         mode=next;knobHoldActive=nextKnob;timer.Interval=16;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
-        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"));}
+        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist);}
     }
     void End(){
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();
@@ -118,6 +127,7 @@ public string AppName{get;private set;}="";
     float GlideSeconds=>(float)(.05+Math.Clamp(ConfigStore.D(cfg,"glide",5),1,100)/100*1.45);
     void Motion(int x,int y,string device,bool captured){
         rawX+=x;rawY+=y;
+        if(calibration.Receiving){calibrationMotion.Move(x,y);timer.Interval=16;}
         if(!captured)return;
         if(mode==NavMode.Idle&&IsCad&&input.Ready){
             var desired=Resolve();
@@ -161,13 +171,13 @@ public string AppName{get;private set;}="";
         if(output==NavMode.Orbit){x*=ConfigStore.B(cfg,"invertOrbitX")?-1:1;y*=ConfigStore.B(cfg,"invertOrbitY")?-1:1;}
         if(output==NavMode.PanZoom&&ConfigStore.B(cfg,"invertPan")){x=-x;y=-y;}
         if(output==NavMode.Zoom&&ConfigStore.B(cfg,"invertZoom"))y=-y;
-        if(ConfigStore.B(cfg,"invertZoom"))w=-w;
+        if(output!=NavMode.Snap&&!(output==NavMode.Roll&&knobHoldActive)&&ConfigStore.B(cfg,"invertZoom"))w=-w;
         var scaled=MotionPolicy.Scale(output,x,y,w,OrbitGain,PanGain,ZoomGain);
         // Snap receives unscaled X/Y so dial recognition is independent of Orbit speed.
         float nativeGain=output==NavMode.Snap?MotionPolicy.SnapGain(ConfigStore.D(cfg,"orbitSens",50)):1;
         if(output==NavMode.Roll&&knobHoldActive){
-            float delta=KnobTwist.CameraDelta(x,y,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),TwistGain);
-            twistSteps=knobSteps.Add(delta);x=(twistSteps%4)*KnobSteps.QuarterDelta;y=0;w=scaled.Wheel;
+            float delta=learnedTwist?.CameraDelta(x,y,w,TwistGain,ConfigStore.B(cfg,"invertTwist"))??KnobTwist.CameraDelta(x,y,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),TwistGain);
+            twistSteps=knobSteps.Add(delta);x=(twistSteps%4)*KnobSteps.QuarterDelta;y=0;w=learnedTwist?.Source=="wheel"?0:scaled.Wheel;
         }else if(output!=NavMode.Snap){x=scaled.X;y=scaled.Y;w=scaled.Wheel;}
         bool demo=ConfigStore.S(profile,"id")=="demo";
         if(native!=null)try{if(!server.Move(native,output,x,y,w,input.Keys.Contains(18),nativeGain))return false;}
@@ -200,6 +210,7 @@ public string AppName{get;private set;}="";
     }
     bool MouseEvent(int msg,int data){
         bool wheel=msg is 0x20a or 0x20e;
+        if(wheel&&calibration.Receiving){if(msg==0x20a)calibrationMotion.Wheel(data);timer.Interval=16;return true;}
         if(wheel&&mode!=NavMode.Idle){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);else pending.Wheel(data);return true;}
         if(wheel){
             var prefix=msg==0x20a?"right":"left";var wheelAction=ConfigStore.S(cfg,prefix+"Wheel","normal");
@@ -298,9 +309,27 @@ public string AppName{get;private set;}="";
     JsonArray KeysState()=>new(input.Keys.Order().Select(key=>(JsonNode?)JsonValue.Create(key)).ToArray());
     JsonArray ShortcutState()=>new(new[]{("orbitKeys","Orbit"),("panKeys","Pan"),("zoomKeys","Zoom"),("snapKeys","Snap"),("twistKeys","Twist"),("navigateKeys","Navigate")}.Select(pair=>(JsonNode)new JsonObject{["chord"]=ConfigStore.S(cfg,pair.Item1,"none"),["label"]=pair.Item2}).ToArray());
     public JsonObject Status(){
-        var result=new JsonObject{["mode"]=Mode,["rollLog"]=rollLog,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["twistGain"]=TwistGain,["snapTurn"]=mode==NavMode.Snap?server.SnapState(native):null,["navigationMode"]=Mode,["keys"]=KeysState(),["pointerGain"]=PointerGain,["orbitGain"]=OrbitGain,["panGain"]=PanGain,["zoomGain"]=ZoomGain,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?(input.Ready?"cad":"setup"):"mouse",["deviceReady"]=input.Ready,["identifying"]=input.Identifying,["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
+        var snap=mode==NavMode.Snap?server.SnapState(native):null;
+        var result=new JsonObject{["mode"]=Mode,["rollLog"]=rollLog,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["twistGain"]=TwistGain,["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["navigationMode"]=Mode,["keys"]=KeysState(),["pointerGain"]=PointerGain,["orbitGain"]=OrbitGain,["panGain"]=PanGain,["zoomGain"]=ZoomGain,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?(input.Ready?"cad":"setup"):"mouse",["deviceReady"]=input.Ready,["identifying"]=input.Identifying,["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
+        if(calibration.Active)result["twistCalibration"]=calibration.State(Environment.TickCount64);
         ox=oy=px=py=zoom=zoomLog=rawX=rawY=rollLog=0;fit=false;return result;
     }
+    public JsonObject CalibrationOpen(){
+        cfg=store.Snapshot();
+        if(!input.Ready||!ConfigStore.B(cfg,"enabled"))throw new InvalidOperationException("Identify and enable your trackball first.");
+        End();calibrationProgram=ConfigStore.I(cfg,"activeProgram");calibrationProgramName=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name");calibrationDevice=ConfigStore.S(cfg,"selectedDevice");
+        calibrationMotion.Reset();calibration.Open();return calibration.State(Environment.TickCount64);
+    }
+    public JsonObject CalibrationRecord(string kind){if(!calibration.Active)throw new InvalidOperationException("Open calibration first.");calibrationMotion.Reset();calibration.Record(kind,Environment.TickCount64);timer.Interval=16;return calibration.State(Environment.TickCount64);}
+    public JsonObject CalibrationTest(){calibrationMotion.Reset();calibration.Test();timer.Interval=16;return calibration.State(Environment.TickCount64);}
+    public void CalibrationCancel(){calibration.Cancel();calibrationMotion.Reset();}
+    public JsonObject CalibrationApply(){
+        cfg=store.Snapshot();
+        if(!calibration.Active||calibration.Model==null)throw new InvalidOperationException("Record all three samples before applying calibration.");
+        if(calibrationProgram!=ConfigStore.I(cfg,"activeProgram")||calibrationProgramName!=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name")||calibrationDevice!=ConfigStore.S(cfg,"selectedDevice"))throw new InvalidOperationException("The program or trackball changed. Record again.");
+        var model=calibration.Model;CalibrationCancel();var result=store.SetTwistCalibration(model);cfg=store.Snapshot();learnedTwist=model;Log("Twist calibration saved for "+calibrationProgramName+".");return result;
+    }
+    public JsonObject CalibrationClear(){CalibrationCancel();var result=store.SetTwistCalibration(null);cfg=store.Snapshot();learnedTwist=null;return result;}
     public void Pad(int x,int y,int w,int h,bool visible,Point origin){pad=new(x,y,w,h);padVisible=visible;padOrigin=origin;}
-    public void Dispose(){timer.Stop();timer.Dispose();macro?.Cancel();End();}
+    public void Dispose(){timer.Stop();timer.Dispose();macro?.Cancel();CalibrationCancel();End();}
 }
