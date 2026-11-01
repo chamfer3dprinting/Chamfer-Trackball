@@ -11,22 +11,27 @@ public sealed class EstimatedFaceSnap{
  public int QuarterTurns{get;private set;}
  public long LastTurnAt{get;private set;}
  public int LastDirection{get;private set;}
+ public bool LastEstimatedTurn{get;private set;}
  public long Samples{get;private set;}
  public float Progress=>turns.Progress;
  public string State=>stage switch{1=>"estimating",3=>"twist",_=>"faces"};
  public void Reset(CameraPose? initial=null){
   faces.Reset(initial);pose=initial==null?null:faces.Step(initial,0,0);turns.Reset();pending.Clear();stage=0;began=lastMotion=0;
-  along=cross=alongEnergy=crossEnergy=travel=0;QuarterTurns=0;LastDirection=0;LastTurnAt=0;Samples=0;
+  along=cross=alongEnergy=crossEnergy=travel=0;QuarterTurns=0;LastDirection=0;LastTurnAt=0;LastEstimatedTurn=false;Samples=0;
  }
  void Start(long now){
   stage=1;turnedInBurst=false;began=now;along=cross=alongEnergy=crossEnergy=travel=0;pending.Clear();turns.Reset();faces.Reset(pose);
  }
- CameraPose Face(CameraPose start,float x,float y,float wheel,float gain,long now)=>pose=faces.Step(pose??start,x,y,wheel,gain,now);
+ CameraPose Face(CameraPose start,float x,float y,float wheel,float gain,long now){
+  int before=faces.TurnCount;pose=faces.Step(pose??start,x,y,wheel,gain,now);
+  if(faces.TurnCount!=before){QuarterTurns+=faces.TurnCount-before;LastDirection=faces.LastTurnDirection;LastTurnAt=now;LastEstimatedTurn=false;}
+  return pose;
+ }
  void Twist(CameraPose start,float x,float y,float gain,string axis,bool reverse,long now){
   float delta=KnobTwist.CameraDelta(x,y,axis,reverse,gain);if(delta!=0)LastDirection=-Math.Sign(delta);int steps=turns.Add(delta);
   if(steps==0)return;
   pose=CameraMath.Move(pose??start,NavMode.Roll,(steps%4)*KnobSteps.QuarterDelta,0);
-  turnedInBurst=true;QuarterTurns+=Math.Abs(steps);LastDirection=-Math.Sign(steps);LastTurnAt=now;
+  turnedInBurst=true;LastEstimatedTurn=true;QuarterTurns+=Math.Abs(steps);LastDirection=-Math.Sign(steps);LastTurnAt=now;
  }
  public CameraPose Step(CameraPose start,float x,float y,float wheel,float faceGain,float twistGain,string axis,bool reverse,long now){
   if(!float.IsFinite(x)||!float.IsFinite(y)||!float.IsFinite(wheel))throw new ArgumentException("Invalid snap input.");
@@ -37,6 +42,7 @@ public sealed class EstimatedFaceSnap{
    lastMotion=now;Samples++;
   }
   float a=axis=="y"?y:x,c=axis=="y"?x:y;
+  if(stage==3&&wheel!=0){stage=2;turns.Reset();pending.Clear();faces.Reset(pose);return Face(start,x,y,wheel,faceGain,now);}
   if(stage==3){
    if(motion){along+=a;cross+=c;alongEnergy+=a*a;crossEnergy+=c*c;travel+=MathF.Sqrt(a*a+c*c);}
    bool uncertain=motion&&(MathF.Abs(c)>MathF.Abs(a)*.5f&&MathF.Abs(c)>8||travel>160&&(crossEnergy>alongEnergy*.012f||MathF.Abs(cross)>MathF.Abs(along)*.07f));
@@ -47,7 +53,7 @@ public sealed class EstimatedFaceSnap{
    }else{
     if(motion&&!turnedInBurst){pending.Add((x,y,now));if(pending.Count>32)pending.RemoveAt(0);}
     Twist(start,x,y,twistGain,axis,reverse,now);if(turnedInBurst)pending.Clear();
-    if(wheel!=0)pose=CameraMath.Move(pose,NavMode.Roll,0,0,wheel);return pose;
+    return pose;
    }
   }
   if(stage==2)return Face(start,x,y,wheel,faceGain,now);

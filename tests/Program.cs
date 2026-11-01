@@ -555,4 +555,10 @@ obliqueEstimate.Reset(obliqueStart);var obliqueTurn=obliqueStart;
 for(int frame=0;frame<40;frame++)obliqueTurn=obliqueEstimate.Step(obliqueStart,60,0,0,.2f,1,"x",false,1000+frame*16);
 Check(obliqueEstimate.QuarterTurns==1&&IsFace(obliqueTurn),"Alt estimated twist first aligns an oblique starting view to a cube face before its 90-degree turn");
 
+
+var estimatedWheelInput=new EstimatedFaceSnap();estimatedWheelInput.Reset(studioView);var estimatedWheelPose=studioView;
+for(int frame=0;frame<12;frame++)estimatedWheelPose=estimatedWheelInput.Step(studioView,100,0,0,.2f,1,"x",false,1000+frame*16);
+estimatedWheelPose=estimatedWheelInput.Step(studioView,0,0,120,.2f,1,"x",false,1300);
+Check(Vector3.Dot(estimatedWheelPose.Up,Vector3.UnitX)>.999f&&Math.Abs(Vector3.Distance(estimatedWheelPose.Eye,estimatedWheelPose.Target)-10)<.0001&&!estimatedWheelInput.LastEstimatedTurn,"Alt plus wheel remains an exact face quarter turn after an estimated knob candidate; it never becomes zoom");
+
 Console.WriteLine(count+" regression checks passed.");

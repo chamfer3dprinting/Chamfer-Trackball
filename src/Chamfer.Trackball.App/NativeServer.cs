@@ -47,7 +47,7 @@ internal sealed class NativeServer:IDisposable {
         lock(c.Gate){
             if(c.EstimateTwist){
                 var input=c.EstimatedSnap;string message=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?"Estimated twist · "+(input.LastDirection<0?"anticlockwise":"clockwise")+" · next "+Math.Round(input.Progress*100)+"%":"Faces · roll up/down/left/right";
-                if(input.LastTurnAt!=0&&Environment.TickCount64-input.LastTurnAt<1400)message="Estimated "+(input.LastDirection>0?"clockwise":"anticlockwise")+" 90°";
+                if(input.LastTurnAt!=0&&Environment.TickCount64-input.LastTurnAt<1400)message=(input.LastEstimatedTurn?"Estimated ":"")+(input.LastDirection>0?"clockwise":"anticlockwise")+" 90°";
                 return new(){["state"]=input.State,["message"]=message,["samples"]=input.Samples,["turns"]=input.QuarterTurns,["direction"]=input.LastDirection};
             }
             var snap=c.Snap;bool recent=snap.TurnCount>0&&Environment.TickCount64-snap.LastTurnAt<1400;
