@@ -46,9 +46,9 @@ internal sealed class NativeServer:IDisposable {
         if(c==null)return new(){["state"]="unavailable",["message"]="Face turns need a native 3D connection."};
         lock(c.Gate){
             if(c.EstimateTwist){
-                var input=c.EstimatedSnap;string message=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?"Estimated twist · "+(input.LastDirection<0?"anticlockwise":"clockwise")+" · next "+Math.Round(input.Progress*100)+"%":"Faces · roll up/down/left/right";
-                if(input.LastTurnAt!=0&&Environment.TickCount64-input.LastTurnAt<1400)message=(input.LastEstimatedTurn?"Estimated ":"")+(input.LastDirection>0?"clockwise":"anticlockwise")+" 90°";
-                return new(){["state"]=input.State,["message"]=message,["samples"]=input.Samples,["turns"]=input.QuarterTurns,["direction"]=input.LastDirection};
+                var input=c.EstimatedSnap;string estimateMessage=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?"Estimated twist · "+(input.LastDirection<0?"anticlockwise":"clockwise")+" · next "+Math.Round(input.Progress*100)+"%":"Faces · roll up/down/left/right";
+                if(input.LastTurnAt!=0&&Environment.TickCount64-input.LastTurnAt<1400)estimateMessage=(input.LastEstimatedTurn?"Estimated ":"")+(input.LastDirection>0?"clockwise":"anticlockwise")+" 90°";
+                return new(){["state"]=input.State,["message"]=estimateMessage,["samples"]=input.Samples,["turns"]=input.QuarterTurns,["direction"]=input.LastDirection};
             }
             var snap=c.Snap;bool recent=snap.TurnCount>0&&Environment.TickCount64-snap.LastTurnAt<1400;
             string state=c.Pose==null?"waiting":recent?"turned":snap.Samples==0?"ready":"rolling";
