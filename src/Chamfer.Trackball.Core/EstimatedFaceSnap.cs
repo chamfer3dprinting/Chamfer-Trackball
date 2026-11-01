@@ -88,7 +88,10 @@ public sealed class EstimatedFaceSnap{
   bool clearlyDirectional=wheel!=0||pending.Count>=3&&(calibration!=null?MathF.Abs(cross)>Math.Max(8,MathF.Abs(along)*.75f):MathF.Abs(cross)>Math.Max(8,MathF.Abs(along)*.12f)||crossEnergy>alongEnergy*.025f);
   bool ready=now-began>=112&&pending.Count>=4||now-began>=160||pending.Count>=16;
   if(!clearlyDirectional&&!ready)return pose;
-  bool knob=!clearlyDirectional&&(calibration!=null?calibration.Decide(pending.Select(p=>new TwistSample(p.X,p.Y,0,p.Time)).ToArray()).Twist:travel>=60&&MathF.Abs(along)/Math.Max(travel,.001f)>=.97f
+  // A slow slight nudge may arrive as many tiny reports. Wait for its small
+  // trigger distance while motion continues, rather than rejecting it at 160 ms.
+  if(!clearlyDirectional&&travel<30&&now-began<640&&pending.Count<48&&now-lastMotion<80)return pose;
+  bool knob=!clearlyDirectional&&(calibration!=null?calibration.Decide(pending.Select(p=>new TwistSample(p.X,p.Y,0,p.Time)).ToArray()).Twist:travel>=30&&MathF.Abs(along)/Math.Max(travel,.001f)>=.97f
       &&MathF.Abs(cross)<=Math.Max(2,MathF.Abs(along)*.045f)&&crossEnergy<=alongEnergy*.0065f);
   stage=knob?3:2;if(!knob)faceDecisionAt=now;
   foreach(var item in pending){

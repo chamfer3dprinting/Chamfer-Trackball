@@ -32,6 +32,16 @@ static class KnobNudgeChecks{
   for(int n=0;n<8;n++)pose=estimated.Step(start,-8,0,0,.2f,1,"x",false,1700+n*16);
   check(estimated.QuarterTurns==2&&estimated.LastDirection==-1&&Vector3.Dot(pose.Up,Vector3.UnitY)>.999f,"A short anticlockwise nudge returns the face orientation by exactly one step");
 
+  var firstSmall=new EstimatedFaceSnap();firstSmall.Reset(start);
+  for(int n=0;n<4;n++)firstSmall.Step(start,8,0,0,.2f,1,"x",false,1000+n*16);
+  firstSmall.Step(start,0,0,0,.2f,1,"x",false,1120);
+  check(firstSmall.QuarterTurns==1,"The first 32-count nudge also passes recognition rather than only shortening an already-active twist");
+  var firstSlow=new EstimatedFaceSnap();firstSlow.Reset(start);
+  for(int n=0;n<32;n++)firstSlow.Step(start,1,0,0,.2f,1,"x",false,1000+n*16);
+  check(firstSlow.QuarterTurns==1,"A slow first nudge made of one-count reports is retained until the short trigger distance");
+  var stoppedTiny=new EstimatedFaceSnap();stoppedTiny.Reset(start);stoppedTiny.Step(start,1,0,0,.2f,1,"x",false,1000);stoppedTiny.Step(start,0,0,0,.2f,1,"x",false,1700);
+  check(!stoppedTiny.Pending&&stoppedTiny.QuarterTurns==0,"A stopped sub-trigger movement times out without firing or staying pending");
+
   var model=TwistCalibrationChecks.Model();model.QuarterCounts=32000;model.Validate();
   var calibrated=new KnobSteps();float projected=model.NudgeDelta(model.AxisX*30,model.AxisY*30,0,1,false);
   check(calibrated.AddNudge(projected,1000)==-1,"An old calibration with a long recorded turn distance still responds to a small physical nudge");
