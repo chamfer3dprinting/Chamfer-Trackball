@@ -15,12 +15,12 @@ internal sealed class Controller:IDisposable{
     volatile NavMode mode=NavMode.Idle;NavMode latched=NavMode.Idle;string gestureButton="";
     readonly CircleZoom circle=new();readonly MotionGlide glide=new();readonly PointerMotion pointer=new();
     double gx,gy;readonly MotionFrames pending=new(),motionSamples=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
-    bool stoppedByClick,emulating;volatile bool nativeFocusAllowed=true;int foregroundPid;volatile nint foregroundWindow;
+    bool stoppedByClick,emulating,knobHoldActive;float knobAngle;double rollLog;volatile bool nativeFocusAllowed=true;int foregroundPid;volatile nint foregroundWindow;
     Rectangle pad;bool padVisible;Point padOrigin;
     double ox,oy,px,py,zoom,zoomLog,rawX,rawY;bool fit;string lastBtn="",lastAction="";DateTime lastBtnTime;long lastBtnSeq;
     CancellationTokenSource? macro;
     public string Mode=>circle.Active?"Zoom":mode.ToString();
-    public JsonObject GuideState()=>new(){["mode"]=Mode,["snapTurn"]=mode==NavMode.Snap?server.SnapState(native):null,["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+    public JsonObject GuideState()=>new(){["mode"]=Mode,["knobActive"]=knobHoldActive,["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=mode==NavMode.Snap?server.SnapState(native):null,["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
     public bool IsCad=>profile!=null&&nativeFocusAllowed&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
@@ -65,7 +65,7 @@ public string AppName{get;private set;}="";
         var desired=Resolve();
         if(desired==NavMode.Idle)stoppedByClick=false;
         desired=MotionPolicy.WhilePaused(desired,stoppedByClick,HeldNavigation);
-        if(desired!=mode)Change(desired);
+        if(desired!=mode||WantsKnob(desired)!=knobHoldActive)Change(desired);
         if(native!=null&&mode!=NavMode.Idle){
             if(native.Version>=2&&native.Pose==null&&DateTime.UtcNow-native.Began>TimeSpan.FromMilliseconds(300)){End();stoppedByClick=true;Integration="Place the pointer over a 3D viewport, release the keys, and try again.";return;}
             if(server.Find(ConfigStore.S(profile,"id"),foregroundPid)!=native){End();Integration="Integration disconnected";return;}
@@ -81,8 +81,10 @@ public string AppName{get;private set;}="";
         return ConfigStore.S(cfg,"ball","pointer") switch{"orbit"=>NavMode.Orbit,"pan"=>NavMode.PanZoom,"zoom"=>NavMode.Zoom,_=>NavMode.Idle};
     }
     bool HeldNavigation=>ModeResolver.Resolve(cfg,input.Keys)!=NavMode.Idle||pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
-    void KeysChanged(){if(!IsCad||!input.Ready)return;var n=Resolve();if(n==NavMode.Idle)stoppedByClick=false;n=MotionPolicy.WhilePaused(n,stoppedByClick,HeldNavigation);if(n!=mode)Change(n);}
+    void KeysChanged(){if(!IsCad||!input.Ready)return;var n=Resolve();if(n==NavMode.Idle)stoppedByClick=false;n=MotionPolicy.WhilePaused(n,stoppedByClick,HeldNavigation);if(n!=mode||WantsKnob(n)!=knobHoldActive)Change(n);}
+    bool WantsKnob(NavMode next)=>next==NavMode.Roll&&ModeResolver.Resolve(cfg,input.Keys)==NavMode.Roll;
     void Change(NavMode next){
+        bool nextKnob=WantsKnob(next);
         if(mode!=NavMode.Idle&&IsCad&&input.Ready)Flush();
         End();if(next==NavMode.Idle||!IsCad||!input.Ready)return;
         if(next==NavMode.Gestures){mode=next;timer.Interval=16;return;}
@@ -93,12 +95,12 @@ public string AppName{get;private set;}="";
             Integration=next+" requires the native integration for "+ConfigStore.S(profile,"name");return;
         }
         if(native==null&&!demo&&!ConfigStore.B(cfg,"allowEmulation",true)){Integration="Native integration required";return;}
-        mode=next;timer.Interval=16;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
+        mode=next;knobHoldActive=nextKnob;timer.Interval=16;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
         if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y);}
     }
     void End(){
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();
-        ReleaseEmulation();mode=NavMode.Idle;
+        ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;
     }
     void ReleaseEmulation(){
         foreach(var b in sentButtons.ToArray())try{Button(b,false);}catch(InvalidOperationException){ }sentButtons.Clear();
@@ -110,6 +112,7 @@ public string AppName{get;private set;}="";
     bool PointerCapture=>mode==NavMode.Idle&&PointerPolicy.Capture(ConfigStore.I(cfg,"pointerSpeed",10),ConfigStore.B(cfg,"smooth",true));
     float PointerGain=>PointerPolicy.Gain(ConfigStore.I(cfg,"pointerSpeed",10));
     float OrbitGain=>MotionPolicy.Gain(ConfigStore.D(cfg,"orbitSens",50));
+    float TwistGain=>MotionPolicy.Gain(ConfigStore.D(cfg,"twistSens",50));
     float PanGain=>MotionPolicy.Gain(ConfigStore.D(cfg,"panSens",50));
     float ZoomGain=>MotionPolicy.Gain(ConfigStore.D(cfg,"zoomSens",50));
     float GlideSeconds=>(float)(.05+Math.Clamp(ConfigStore.D(cfg,"glide",5),1,100)/100*1.45);
@@ -142,7 +145,7 @@ public string AppName{get;private set;}="";
         if(!consumed)pending.Move(sample.X,sample.Y);
         var frame=pending.Peek();
         float seconds=GlideSeconds;
-        var smooth=glide.Step(frame.X,frame.Y,Environment.TickCount64,seconds,mode!=NavMode.Snap&&ConfigStore.B(cfg,"smooth",true));
+        var smooth=glide.Step(frame.X,frame.Y,Environment.TickCount64,seconds,mode!=NavMode.Snap&&!knobHoldActive&&ConfigStore.B(cfg,"smooth",true));
         if(frame.HasPrimary||smooth.X!=0||smooth.Y!=0){
             if(!SendMotion(mode,smooth.X,smooth.Y,frame.Wheel))return;
             pending.ClearPrimary();
@@ -161,7 +164,9 @@ public string AppName{get;private set;}="";
         var scaled=MotionPolicy.Scale(output,x,y,w,OrbitGain,PanGain,ZoomGain);
         // Snap receives unscaled X/Y so dial recognition is independent of Orbit speed.
         float nativeGain=output==NavMode.Snap?MotionPolicy.SnapGain(ConfigStore.D(cfg,"orbitSens",50)):1;
-        if(output!=NavMode.Snap){x=scaled.X;y=scaled.Y;w=scaled.Wheel;}
+        if(output==NavMode.Roll&&knobHoldActive){
+            x=KnobTwist.CameraDelta(x,y,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),TwistGain);y=0;w=scaled.Wheel;
+        }else if(output!=NavMode.Snap){x=scaled.X;y=scaled.Y;w=scaled.Wheel;}
         bool demo=ConfigStore.S(profile,"id")=="demo";
         if(native!=null)try{if(!server.Move(native,output,x,y,w,input.Keys.Contains(18),nativeGain))return false;}
         catch(ArgumentException ex){Log("Camera movement stopped: "+ex.Message,"err");End();stoppedByClick=true;Integration="Release the keys and use the normal view controls before trying again.";return false;}
@@ -174,6 +179,7 @@ public string AppName{get;private set;}="";
             }catch(Exception ex){Log(ex.Message,"err");End();return false;}
         }
         if(output==NavMode.Orbit){ox+=x;oy+=y;}if(output is NavMode.PanZoom or NavMode.Navigate){px+=x;py+=y;}
+        if(output==NavMode.Roll){double angle=-x*.005;rollLog+=angle;if(knobHoldActive)knobAngle+=(float)angle;}
         zoomLog+=MotionPolicy.ZoomAmount(output,y,w);
         zoom+=output==NavMode.Zoom?-y*5.6f+w:w;return true;
     }
@@ -288,10 +294,10 @@ public string AppName{get;private set;}="";
         }catch(OperationCanceledException){ }catch(Exception ex){Log(ex.Message,"err");}finally{if(macro==cancellation)macro=null;cancellation.Dispose();}
     }
     JsonArray KeysState()=>new(input.Keys.Order().Select(key=>(JsonNode?)JsonValue.Create(key)).ToArray());
-    JsonArray ShortcutState()=>new(new[]{("orbitKeys","Orbit"),("panKeys","Pan"),("zoomKeys","Zoom"),("snapKeys","Snap"),("navigateKeys","Navigate")}.Select(pair=>(JsonNode)new JsonObject{["chord"]=ConfigStore.S(cfg,pair.Item1,"none"),["label"]=pair.Item2}).ToArray());
+    JsonArray ShortcutState()=>new(new[]{("orbitKeys","Orbit"),("panKeys","Pan"),("zoomKeys","Zoom"),("snapKeys","Snap"),("twistKeys","Twist"),("navigateKeys","Navigate")}.Select(pair=>(JsonNode)new JsonObject{["chord"]=ConfigStore.S(cfg,pair.Item1,"none"),["label"]=pair.Item2}).ToArray());
     public JsonObject Status(){
-        var result=new JsonObject{["mode"]=Mode,["snapTurn"]=mode==NavMode.Snap?server.SnapState(native):null,["navigationMode"]=Mode,["keys"]=KeysState(),["pointerGain"]=PointerGain,["orbitGain"]=OrbitGain,["panGain"]=PanGain,["zoomGain"]=ZoomGain,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?(input.Ready?"cad":"setup"):"mouse",["deviceReady"]=input.Ready,["identifying"]=input.Identifying,["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
-        ox=oy=px=py=zoom=zoomLog=rawX=rawY=0;fit=false;return result;
+        var result=new JsonObject{["mode"]=Mode,["rollLog"]=rollLog,["knobActive"]=knobHoldActive,["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["twistGain"]=TwistGain,["snapTurn"]=mode==NavMode.Snap?server.SnapState(native):null,["navigationMode"]=Mode,["keys"]=KeysState(),["pointerGain"]=PointerGain,["orbitGain"]=OrbitGain,["panGain"]=PanGain,["zoomGain"]=ZoomGain,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?(input.Ready?"cad":"setup"):"mouse",["deviceReady"]=input.Ready,["identifying"]=input.Identifying,["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
+        ox=oy=px=py=zoom=zoomLog=rawX=rawY=rollLog=0;fit=false;return result;
     }
     public void Pad(int x,int y,int w,int h,bool visible,Point origin){pad=new(x,y,w,h);padVisible=visible;padOrigin=origin;}
     public void Dispose(){timer.Stop();timer.Dispose();macro?.Cancel();End();}

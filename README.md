@@ -48,12 +48,13 @@ The Normal mouse program preserves the manufacturer's clicks and wheel axes. The
 | Ctrl | Zoom in/out by rolling up/down |
 | Alt | Straight rolls change faces; a clockwise/counterclockwise curved roll turns the face by 90° |
 | Alt + wheel | Turn the aligned face by 90 degrees |
+| Alt + Shift | Hold and turn the ball like a knob to turn the current view’s orientation |
 | Windows | Move through the scene |
 | Windows + Alt | Move vertically through the scene |
 
-Windows release does not open Start when reserved by the active program in a 3D view. Other system shortcuts and Windows input outside that context remain normal. All held controls are editable. Snap and Navigate require a native integration.
+Windows release does not open Start when reserved by the active program in a 3D view. Other system shortcuts and Windows input outside that context remain normal. All held controls are editable. Snap, Twist and Navigate require a native integration. Alt plus straight up/down/left/right still switches cube faces; Alt+Shift selects Twist instead. Twist interprets the selected X/Y component of the existing ball movement, because the measured knob and ordinary rolling patterns overlap. It does not claim independent three-axis sensing.
 
-Pointer speed/effective DPI now changes the identified trackball's delivered pointer counts. Hardware DPI selection only calibrates the estimate. Pointer speed, Orbit/Pan/Zoom speed, soft stop and glide are saved per program and retained by Add, Duplicate, switching and restart. Pointer gain does not multiply camera speed. Smooth 3D speed has a 1% low end, 100% at the center and a zero stop value. Normal mouse pointer DPI and glide are independent program settings. Soft stop applies to pointing and navigation; clicks and mode changes stop the tail. A live keyboard on Home and in the guide highlights currently held shortcut keys without recording typed text.
+Pointer speed/effective DPI now changes the identified trackball's delivered pointer counts. Hardware DPI selection only calibrates the estimate. Pointer speed, Orbit/Pan/Zoom/Twist speed, soft stop and glide are saved per program and retained by Add, Duplicate, switching and restart. Pointer gain does not multiply camera speed. Twist has its own speed, Horizontal/Vertical direction and Reverse setting in Speed & direction. The tested M512 uses Horizontal; clockwise is positive raw X. Held Twist stops immediately with the ball and does not coast. Smooth 3D speed has a 1% low end, 100% at the center and a zero stop value. Normal mouse pointer DPI and glide are independent program settings. Soft stop applies to pointing and navigation; clicks and mode changes stop the tail. A live keyboard on Home and in the guide highlights currently held shortcut keys without recording typed text.
 
 Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep their coordinate convention. While snapping, a clockwise/counterclockwise X/Y loop turns the selected face like the cube arrows; roll straight again to change faces. Recognition adapts to the size of the roll. The floating guide and Home show “Curve detected” then “Clockwise 90°” or “Counterclockwise 90°” when a turn is recognized. The standard M512 sensor still supplies only X/Y ball movement. A pure in-place twist with no X/Y report cannot be sensed; the face turn is a gesture inferred from a curved roll path.
 
@@ -62,7 +63,7 @@ Studio uses its Y-up view cube for upright snaps; existing Z-up adapters keep th
 
 In Buttons & keys, choose **Save current as preset**, give the setup a name, and save. The Speed & direction page has the same Save control. Choose a saved preset and click **Apply** to use it in the active program. Rename or delete a preset from the same card; saving an existing name asks before replacing it.
 
-Presets include buttons, held keys, wheels, combinations, gestures, pointer speed, Orbit/Pan/Zoom speed and motion feel. They survive app restarts and control resets. Applying one preserves the program name, other programs and selected trackball. Hardware DPI calibration and general app settings stay outside a program preset.
+Presets include buttons, held keys, wheels, combinations, gestures, pointer speed, Orbit/Pan/Zoom/Twist speed and motion feel. They survive app restarts and control resets. Applying one preserves the program name, other programs and selected trackball. Hardware DPI calibration and general app settings stay outside a program preset.
 
 ## Build and verification
 

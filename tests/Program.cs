@@ -125,7 +125,7 @@ try{
  Check(ConfigStore.I(repaired,"orbitSens")==82&&ConfigStore.I(repaired,"panSens")==50&&ConfigStore.I(repaired,"pointerSpeed")==10,"An incomplete added program gets its own full motion defaults instead of leaking the previous program");
  store.Select(0);
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==25,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==26,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
@@ -522,5 +522,64 @@ foreach(int stroke in new[]{5,20,100,400}){
  }
  Check(noCornerTurn,"Raw sharp corners and reversals remain face-switch strokes at "+stroke+" counts");
 }
+
+
+var twistDefaults=ConfigStore.Defaults();
+Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Normal mouse keeps Alt+Shift as ordinary keyboard input");
+ConfigStore.LoadProgram(twistDefaults,1);
+Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Roll,"Alt+Shift selects the new held Twist mode");
+Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{18})==NavMode.Snap&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16})==NavMode.Orbit,"Alt face switching and Shift orbit stay separate from Twist");
+Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,17})==NavMode.PanZoom&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{17})==NavMode.Zoom,"Existing pan and zoom chords are preserved");
+Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18,65})==NavMode.Idle&&ModeResolver.Resolve(twistDefaults,new HashSet<int>())==NavMode.Idle,"Ordinary typing and releasing the Twist keys exit held Twist");
+Check(KnobTwist.CameraDelta(100,900,"x",false,1)==-20&&KnobTwist.CameraDelta(100,900,"y",false,1)==-180,"Twist selects the measured sensor axis and ignores the orthogonal direction");
+Check(KnobTwist.CameraDelta(100,0,"x",true,1)==20&&KnobTwist.CameraDelta(100,0,"x",false,0)==0,"Twist direction can be reversed and zero speed stops it");
+Check(Math.Abs(KnobTwist.CameraDelta(100,0,"x",false,MotionPolicy.Gain(1)))<.201f&&KnobTwist.CameraDelta(100,0,"x",false,MotionPolicy.Gain(50))==-20,"Twist has its own fine-to-default speed response");
+Check(Math.Abs(KnobTwist.CameraDelta(1e20f,0,"x",false,4))<=1000,"Twist input remains bounded at very large report counts");
+bool invalidTwist=false;try{KnobTwist.CameraDelta(float.NaN,0,"x",false,1);}catch(ArgumentException){invalidTwist=true;}
+Check(invalidTwist,"Invalid Twist samples cannot poison camera orientation");
+foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ}){
+ var initial=CameraMath.AlignFace(studioView,axis);
+ var clockwise=CameraMath.Move(initial,NavMode.Roll,KnobTwist.CameraDelta(100,0,"x",false,1),0);
+ var anticlockwise=CameraMath.Move(initial,NavMode.Roll,KnobTwist.CameraDelta(-100,0,"x",false,1),0);
+ var rightAfter=Vector3.Normalize(Vector3.Cross(clockwise.Up,axis));var leftAfter=Vector3.Normalize(Vector3.Cross(anticlockwise.Up,axis));
+ Check(Vector3.Dot(Vector3.Normalize(clockwise.Eye-clockwise.Target),axis)>.999f&&Vector3.Dot(initial.Up,rightAfter)>.09f,"Clockwise knob motion turns orientation without changing the "+axis+" face");
+ Check(Vector3.Dot(Vector3.Normalize(anticlockwise.Eye-anticlockwise.Target),axis)>.999f&&Vector3.Dot(initial.Up,leftAfter)<-.09f,"Anticlockwise knob motion turns orientation without changing the "+axis+" face");
+ var returned=CameraMath.Move(clockwise,NavMode.Roll,KnobTwist.CameraDelta(-100,0,"x",false,1),0);
+ Check(Vector3.Distance(returned.Up,initial.Up)<.0001&&Math.Abs(Vector3.Distance(clockwise.Eye,clockwise.Pivot)-Vector3.Distance(initial.Eye,initial.Pivot))<.0001,"Opposite knob turns cancel and preserve the cursor pivot on "+axis);
+}
+var directionalStillWorks=new FaceSnap();directionalStillWorks.Reset(studioView);var directionsSeen=new HashSet<string>();
+foreach(var direction in new[]{new Vector2(5,0),new Vector2(-5,0),new Vector2(0,5),new Vector2(0,-5)}){
+ directionalStillWorks.Reset(studioView);bool changed=false;
+ for(int frame=0;frame<70;frame++){
+  var next=directionalStillWorks.Step(studioView,direction.X,direction.Y,0,.2f,1000+frame*16);
+  changed|=Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),Vector3.UnitZ)<.99f;
+ }
+ Check(changed&&directionalStillWorks.TurnCount==0,"Alt directional face switching still works for "+direction);
+}
+var twistPath=Path.Combine(Path.GetTempPath(),"chamfer-twist-"+Guid.NewGuid().ToString("N")+".json");
+try{
+ var old=ConfigStore.Defaults();old["configVersion"]=25;old["activeProgram"]=1;old["selectedDevice"]="twist-device";
+ foreach(var node in old["programs"]!.AsArray()){node!.AsObject().Remove("twistKeys");node["feel"]!.AsObject().Remove("twistSens");node["feel"]!.AsObject().Remove("twistAxis");node["feel"]!.AsObject().Remove("invertTwist");}
+ old["programs"]![1]!["feel"]!["orbitSens"]=4;old["programs"]![0]!["pointerSpeed"]=3;File.WriteAllText(twistPath,old.ToJsonString());
+ var store=new ConfigStore(twistPath);var migrated=store.Snapshot();
+ Check(ConfigStore.I(migrated,"configVersion")==26&&ConfigStore.S(migrated,"twistKeys")=="alt+shift","The existing 3D program gains its approved Twist hold on migration");
+ Check(ConfigStore.S(migrated,"selectedDevice")=="twist-device"&&ConfigStore.I(migrated,"orbitSens")==4&&ConfigStore.I(migrated["programs"]![0],"pointerSpeed")==3,"Twist migration preserves trackball identity and existing speed settings");
+ Check(ConfigStore.S(migrated["programs"]![0],"twistKeys")=="none","Twist migration leaves Normal mouse shortcuts off");
+ migrated["twistKeys"]="alt+t";migrated["twistSens"]=23;migrated["twistAxis"]="y";migrated["invertTwist"]=true;store.Save(migrated);store.SavePreset("Knob");
+ store.Select(0);var reopened=new ConfigStore(twistPath);reopened.Select(1);var restored=reopened.Snapshot();
+ Check(ConfigStore.S(restored,"twistKeys")=="alt+t"&&ConfigStore.I(restored,"twistSens")==23&&ConfigStore.S(restored,"twistAxis")=="y"&&ConfigStore.B(restored,"invertTwist"),"Twist shortcut, speed, axis and direction survive program switches and restart");
+ var edited=reopened.Snapshot();edited["twistSens"]=80;edited["twistAxis"]="x";edited["invertTwist"]=false;reopened.Save(edited);var applied=reopened.ApplyPreset(0);
+ Check(ConfigStore.I(applied,"twistSens")==23&&ConfigStore.S(applied,"twistAxis")=="y"&&ConfigStore.B(applied,"invertTwist")&&ConfigStore.S(applied,"twistKeys")=="alt+t","A named preset restores every Twist setting");
+ var oldPreset=reopened.Snapshot();oldPreset["presets"]![0]!["settings"]!["feel"]!.AsObject().Remove("twistSens");oldPreset["presets"]![0]!["settings"]!["feel"]!.AsObject().Remove("twistAxis");oldPreset["presets"]![0]!["settings"]!["feel"]!.AsObject().Remove("invertTwist");
+ File.WriteAllText(twistPath,oldPreset.ToJsonString());var withOldPreset=new ConfigStore(twistPath);var oldApplied=withOldPreset.ApplyPreset(0);
+ Check(ConfigStore.I(oldApplied,"twistSens")==23&&ConfigStore.S(oldApplied,"twistAxis")=="y","An older preset without Twist feel fields retains the current Twist tuning");
+ var conflicting=ConfigStore.Defaults();conflicting["configVersion"]=25;conflicting["activeProgram"]=1;conflicting["programs"]![1]!["twistKeys"]="none";conflicting["programs"]![1]!["orbitKeys"]="alt+shift";
+ File.WriteAllText(twistPath,conflicting.ToJsonString());var conflictSaved=new ConfigStore(twistPath).Snapshot();
+ Check(ConfigStore.S(conflictSaved,"orbitKeys")=="alt+shift"&&ConfigStore.S(conflictSaved,"twistKeys")=="none","Twist migration never takes over an existing Alt+Shift binding");
+ var duplicate=ConfigStore.Defaults();duplicate["programs"]![1]!["twistKeys"]="alt";bool rejected=false;try{ConfigStore.Validate(duplicate);}catch(InvalidDataException){rejected=true;}
+ Check(rejected,"Twist and Snap cannot share the same held shortcut");
+ var badAxis=ConfigStore.Defaults();badAxis["programs"]![1]!["feel"]!["twistAxis"]="z";bool badAxisRejected=false;try{ConfigStore.Validate(badAxis);}catch(InvalidDataException){badAxisRejected=true;}
+ Check(badAxisRejected,"An unsupported Twist axis is rejected before saving");
+}finally{foreach(var suffix in new[]{"",".previous",".writing"})if(File.Exists(twistPath+suffix))File.Delete(twistPath+suffix);}
 
 Console.WriteLine(count+" regression checks passed.");
