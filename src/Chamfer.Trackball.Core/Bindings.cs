@@ -26,7 +26,7 @@ public sealed record KeyChord(int[] Keys,string Canonical) {
 }
 public static class ModeResolver {
     public static NavMode Resolve(System.Text.Json.Nodes.JsonObject config,IReadOnlySet<int> keys){
-        var options=new[]{("panKeys",NavMode.PanZoom),("navigateKeys",NavMode.Navigate),("snapKeys",NavMode.Snap),("zoomKeys",NavMode.Zoom),("orbitKeys",NavMode.Orbit)};
+        var options=new[]{("panKeys",NavMode.PanZoom),("navigateKeys",NavMode.Navigate),("snapKeys",NavMode.Snap),("twistKeys",NavMode.Roll),("zoomKeys",NavMode.Zoom),("orbitKeys",NavMode.Orbit)};
         foreach(var (name,mode) in options){
             var spec=ConfigStore.S(config,name,"none");
             if(spec is "" or "none")continue;

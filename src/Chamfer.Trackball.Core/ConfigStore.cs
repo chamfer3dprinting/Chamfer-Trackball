@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Chamfer.Trackball.Core;
 
 public sealed class ConfigStore {
-    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
     private readonly object gate=new();
     private readonly string path;
     private JsonObject config;
@@ -53,6 +53,11 @@ public sealed class ConfigStore {
             if(navigation!=null&&S(navigation,"navigateKeys")=="backtick")navigation["navigateKeys"]="win";
             LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=25;
         }
+        if(oldVersion<26){
+            var navigation=nodeProgram(config,"3D");
+            if(navigation!=null&&(S(navigation,"twistKeys","none") is "" or "none")&&ModeResolver.Resolve(navigation,new HashSet<int>{16,18})==NavMode.Idle)navigation["twistKeys"]="alt+shift";
+            LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=26;
+        }
         Validate(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
@@ -68,7 +73,7 @@ public sealed class ConfigStore {
             var p=next["programs"]![i]!.AsObject();
             foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
             p["feel"]??=new JsonObject();
-            foreach(var key in new[]{"orbitSens","panSens","zoomSens","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
+            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
             next["feel"]=p["feel"]!.DeepClone();
             Validate(next);Write(next);config=next;Revision++;
         }
@@ -127,7 +132,11 @@ public sealed class ConfigStore {
     public JsonObject ApplyPreset(int index){lock(gate){
         var n=(JsonObject)config.DeepClone();var settings=PresetAt(n,index)["settings"]!.AsObject();
         int active=I(n,"activeProgram");var current=n["programs"]![active]!.AsObject();
-        foreach(var field in ProgramFields)if(settings.ContainsKey(field))current[field]=settings[field]?.DeepClone();
+        foreach(var field in ProgramFields)if(settings.ContainsKey(field)){
+            if(field=="feel"&&settings[field] is JsonObject feel){
+                current["feel"]??=new JsonObject();foreach(var entry in feel)current["feel"]![entry.Key]=entry.Value?.DeepClone();
+            }else current[field]=settings[field]?.DeepClone();
+        }
         if(settings["defaultKind"]!=null)current["defaultKind"]=settings["defaultKind"]!.DeepClone();
         LoadProgram(n,active);return PersistPresetChange(n);
     }}
@@ -158,11 +167,11 @@ public sealed class ConfigStore {
         if(c["programs"] is not JsonArray ps||ps.Count==0)throw new InvalidDataException("At least one program is required.");
         foreach(var node in ps){
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
-            foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
+            foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "twistKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
             if(p["feel"] is not JsonObject)p["feel"]=d["programs"]![0]!["feel"]!.DeepClone();
             foreach(var entry in d["programs"]![0]!["feel"]!.AsObject())if(!p["feel"]!.AsObject().ContainsKey(entry.Key))p["feel"]![entry.Key]=entry.Value?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=25;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=26;
     }
     public static void Validate(JsonObject c){
         var programs=c["programs"]!.AsArray().Select(n=>n!.AsObject()).ToList();
@@ -175,12 +184,13 @@ public sealed class ConfigStore {
         }
         foreach(var p in programs){
             var used=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach(var key in new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys"}){
+            foreach(var key in new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys"}){
                 var chord=S(p,key,"none");if(chord=="none"||chord=="")continue;
                 var binding=KeyChord.Parse(chord);
                 if(binding.IsCtrlAlone&&key!="zoomKeys")throw new InvalidDataException("Ctrl by itself is available for Zoom. Choose another key for this navigation command.");
                 if(!used.Add(binding.Canonical))throw new InvalidDataException("Two navigation modes cannot use the same held keys. Pan and zoom share the Pan + zoom mode.");
             }
+            if(S(p["feel"],"twistAxis","x") is not "x" and not "y")throw new InvalidDataException("Twist axis must be X or Y.");
             if(p["combos"] is JsonArray combos && combos.Count>64)throw new InvalidDataException("A program supports up to 64 combinations.");
         }
     }

@@ -7,7 +7,7 @@ on the owner's PC. Deliver only the executable as the user-facing download.
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
 mouse button swapping to implement app bindings. The owner's latest requested controls
 are Shift orbit, Ctrl+Shift pan, Ctrl plus ball for zoom, Alt plus ball for six-face
-snapping, and Windows navigation with Alt for height. Reserve the Windows tap in the 3D
+snapping, Alt+Shift for the new customizable held Twist, and Windows navigation with Alt for height. Reserve the Windows tap in the 3D
 context so releasing it never opens Start; keep system shortcuts and non-3D Windows input normal. Ctrl alone is permitted for
 Zoom in 3D apps; other Ctrl keyboard shortcuts must remain normal. The 3D program
 points normally until a held navigation command is used.
@@ -164,3 +164,14 @@ Public stable remains public-v1.0.1; no public stable promotion occurred. The ow
 After installation, the owner says the feature works and clarifies that “twist” means turning the ball in place like a volume knob. This differs from recognizing a curved X/Y roll path. Read-only HID capability inspection of the selected mouse collection reports an 8-byte report ID 1 with Generic Desktop X and Y (16 bits each), Wheel (8 bits), and Consumer AC Pan (8 bits). It advertises no independent Rx/Ry/Rz ball-twist axis. Matching receiver collections include an opaque vendor-page 0xFF01 input, report ID 2 with seven payload bytes; no rotation semantics for it are established. This inspection does not prove anything about undocumented firmware or internal sensors.
 
 No input reports were captured and no device output reports or settings changes were sent. The metadata query succeeded outside the restricted shell after the restricted attempt received access denied. Keep the confirmed working v1.5.24 curved-roll controls and all owner defaults. Do not promise reliable knob-style independent twist from ordinary X/Y input. Supporting that exact motion requires a verified separate hardware/firmware signal or a deliberate additional mode selection.
+
+
+# 2026-10-31 — Use the measured M512 knob motion with an explicit Twist hold
+
+The owner asks to detect the actual ball motion used to turn a volume knob. A temporary read-only Raw Input listener received the selected M512's physical clockwise, anticlockwise and normal left/right passes. Those passes all project onto nearly the same horizontal sensor axis, so the motion is observable but does not uniquely identify intent. The owner explicitly chooses “Add the Twist hold” and reiterates that Alt up/down/left/right must keep switching faces. The earlier categorical statement that knob motion always requires another sensor was too broad: separate intent makes the existing signal useful.
+
+Add customizable twistKeys, default Alt+Shift in the 3D program and off in Normal mouse. Reuse native Roll to turn view orientation without changing the view direction. Keep Alt Snap and every other existing key/button/wheel mapping unchanged. Twist has independent speed, axis and reverse controls, positive raw X mapping to a clockwise model turn for the tested M512, and no glide. Latch the held intent through the final pending frame on release and restart the camera session if a latched Roll mode changes into/out of the new held interpretation. Show the current turn angle, extend the guide for six shortcut rows and rotate the preview.
+
+Migrate to schema 26 without taking an already assigned Alt+Shift chord; preserve old custom keys, speeds, hardware identity and saved presets. New presets include Twist fields. Applying an older feel snapshot merges its fields so it cannot erase newer Twist tuning. No source folder, device firmware write, input blocking or keyboard capture was used by the temporary listener; the listener has stopped and removed its own per-process registration.
+
+Focused in-memory C# checks pass 41 cases for exact held-mode resolution, both directions on all six faces, unchanged view direction/pivot, zero/fine/large movement, persistence, old preset compatibility, migration conflicts and all four unchanged Alt face-switch directions. Interface syntax and new feedback/preview helper checks pass. Full PR/main Windows workflows and installation are pending. Physical held-Twist feel remains for owner confirmation after the new Admin build.

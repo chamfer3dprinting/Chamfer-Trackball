@@ -1,5 +1,5 @@
 {
-  "configVersion": 25,
+  "configVersion": 26,
   "enabled": true,
   "buttons": {
     "middle": {
@@ -671,7 +671,10 @@
         "preciseSlow": true,
         "clickSlop": 8,
         "smooth": true,
-        "glide": 5
+        "glide": 5,
+        "twistSens": 50,
+        "twistAxis": "x",
+        "invertTwist": false
       },
       "modeButtons": {},
       "combos": [
@@ -689,7 +692,8 @@
       "snapKeys": "none",
       "navigateKeys": "none",
       "circleZoom": false,
-      "circleSize": 160
+      "circleSize": 160,
+      "twistKeys": "none"
     },
     {
       "name": "3D modelling",
@@ -736,14 +740,18 @@
         "preciseSlow": true,
         "clickSlop": 8,
         "smooth": true,
-        "glide": 5
+        "glide": 5,
+        "twistSens": 50,
+        "twistAxis": "x",
+        "invertTwist": false
       },
       "modeButtons": {},
       "combos": [],
       "snapKeys": "alt",
       "navigateKeys": "win",
       "circleZoom": true,
-      "circleSize": 160
+      "circleSize": 160,
+      "twistKeys": "alt+shift"
     }
   ],
   "activeProgram": 0,
@@ -768,7 +776,10 @@
     "preciseSlow": true,
     "clickSlop": 8,
     "smooth": true,
-    "glide": 5
+    "glide": 5,
+    "twistSens": 50,
+    "twistAxis": "x",
+    "invertTwist": false
   },
   "snapKeys": "none",
   "navigateKeys": "none",
@@ -779,5 +790,9 @@
   "trackballSwapWheels": false,
   "circleZoom": false,
   "circleSize": 160,
-  "presets": []
+  "presets": [],
+  "twistKeys": "none",
+  "twistSens": 50,
+  "twistAxis": "x",
+  "invertTwist": false
 }

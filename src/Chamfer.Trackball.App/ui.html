@@ -461,6 +461,10 @@ details .ver{margin-top:10px;font-weight:600}
         <div class="slider"><b>Orbit</b><input type="range" min="0" max="100" data-k="orbitSens"><span class="val" data-v="orbitSens"></span></div>
         <div class="slider"><b>Pan</b><input type="range" min="0" max="100" data-k="panSens"><span class="val" data-v="panSens"></span></div>
         <div class="slider"><b>Zoom</b><input type="range" min="0" max="100" data-k="zoomSens"><span class="val" data-v="zoomSens"></span></div>
+        <div class="slider"><b>Twist</b><input type="range" min="0" max="100" data-k="twistSens"><span class="val" data-v="twistSens"></span></div>
+        <div class="opt"><div class="t">Twist direction<small>Horizontal matches the tested M512 knob motion. Choose Vertical for a ball whose knob motion reports in the other direction.</small></div><select data-k="twistAxis"><option value="x">Horizontal</option><option value="y">Vertical</option></select></div>
+        <div class="opt"><div class="t">Reverse twist<small>Switch on if turning clockwise turns the view the other way.</small></div><label class="sw"><input type="checkbox" data-k="invertTwist"><span></span></label></div>
+        <p class="mu" style="font-size:12px">Twist uses its own held shortcut and speed. It stops with the ball while the shortcut is held; it does not coast. Change the keys in Buttons &amp; keys.</p>
       </div>
       <div class="card" style="margin-bottom:16px">
         <h2>Precision</h2>
@@ -689,7 +693,7 @@ function renderBinds(){
     const warn=bs.length<2?'<div class="desc wn">Pick at least two buttons.</div>':"";
     out.push(`<div class="bind" data-row="combo-${ci}"><div class="nm"><b>${bs.length?bs.map(n=>"btn"+n).join(" + "):"New combination"}</b><small>Combination ${ci+1}</small></div><div class="opts"><div class="line">${boxes}</div><div class="line"><select data-cact="${ci}">${opts(CACT,bd.action)}</select><button class="btn sm" data-cdel="${ci}">Remove</button></div>${warn}${extra}</div></div>`)});
   $("#binds").innerHTML=out.join("");
-  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll straight up, down, left or right to change the cube face. Curl the ball path into a clockwise or counterclockwise loop to turn that face 90° in the same direction, like the cube’s rotate arrow. Roll straight again to change faces. Watch the floating guide for “Curve detected” then “Clockwise 90°” or “Counterclockwise 90°”. The wheel also turns the face. Requires a native integration; the gesture uses X/Y movement, not a separately sensed physical twist."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Windows release will not open Start in this program’s 3D view. Requires a native integration."]].map(([k,n,d])=>
+  $("#keyBinds").innerHTML=[["orbitKeys","Orbit","Hold and roll to rotate; the wheel adds roll with a native integration."],["panKeys","Pan + zoom","Hold and roll to pan. Turn the wheel to zoom at the same time, or draw small circles with the ball to zoom when Circle zoom is enabled. Roll straight to pan again."],["zoomKeys","Zoom","Hold and roll up/down to zoom. Ctrl is the default; other held keys can be assigned here. Pan + zoom also supports wheel zoom and enabled circle zoom."],["snapKeys","Snap to angle","Hold and roll straight up, down, left or right to change the cube face. Curl the ball path into a clockwise or counterclockwise loop to turn that face 90° in the same direction, like the cube’s rotate arrow. Roll straight again to change faces. Watch the floating guide for “Curve detected” then “Clockwise 90°” or “Counterclockwise 90°”. The wheel also turns the face. Requires a native integration; the gesture uses X/Y movement, not a separately sensed physical twist."],["twistKeys","Twist / face orientation","Hold the keys and turn the ball in place clockwise or anticlockwise, like a volume knob. This turns the view’s orientation without switching its face. Release to point normally. Twist speed, sensor direction and Reverse twist are separate in Speed & direction. Requires a native integration. The held keys select the meaning of the existing ball movement; this is not independent three-axis sensing."],["navigateKeys","Navigate","Hold and roll to move through the scene. Add Alt for height; wheel turns. Windows release will not open Start in this program’s 3D view. Requires a native integration."]].map(([k,n,d])=>
     `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(cfg[k]).replace(/ \+ /g,"+")):`<span class="mu">${k==="zoomKeys"&&cfg.panKeys&&cfg.panKeys!=="none"?"Included in Pan + zoom":"Off"}</span>` }<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key, except Windows, which stays reserved for navigation.</div></div></div>`).join("");
   $$("[data-k]").forEach(i=>{const k=i.dataset.k;if(i.type==="checkbox")i.checked=!!cfg[k];else i.value=cfg[k]});
   $$("[data-v]").forEach(v=>v.textContent=valLabel(v.dataset.v,cfg[v.dataset.v]));
@@ -761,14 +765,14 @@ async function applyPreset(p){
   if(!await modal("Apply setup?","Your button, wheel and held-key choices for this program will be replaced.",[["Cancel","",false],["Apply","primary",true]]))return;
   const d=JSON.parse(JSON.stringify(S.defaults));
   const buttons=Object.fromEntries(["middle","back","right","forward"].map(b=>[b,{action:"normal",tap:"click"}]));
-  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:p==="ballonly"?"none":"ctrl",snapKeys:p==="ballonly"?"none":"alt",navigateKeys:p==="ballonly"?"none":"win",ball:"pointer",circleZoom:false,circleSize:160});
+  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:p==="ballonly"?"none":"ctrl",snapKeys:p==="ballonly"?"none":"alt",twistKeys:p==="ballonly"?"none":"alt+shift",navigateKeys:p==="ballonly"?"none":"win",ball:"pointer",circleZoom:false,circleSize:160});
   if(p==="ballnav"){cfg.ball="orbit";cfg.circleZoom=true;cfg.buttons.back={action:"panToggle",tap:"click"};}
   if(p==="both"){cfg.buttons.back={action:"orbit",tap:"click"};cfg.buttons.middle={action:"pan",tap:"click"};}
   renderBinds();renderCheat();await doSave();toast("Setup saved");
 }
 $("#resetControls").onclick=async()=>{if(await modal("Reset buttons & keys?","All buttons, wheels, keys and combinations of this program go back to how they come.",[["Cancel","",false],["Reset","primary",true]])){
   const pd=programDefault();const d=clone(pd);
-  Object.assign(cfg,{ball:d.ball||"pointer",circleZoom:!!d.circleZoom,circleSize:d.circleSize||160,buttons:d.buttons,leftWheel:d.leftWheel,rightWheel:d.rightWheel,orbitKeys:d.orbitKeys,panKeys:d.panKeys,zoomKeys:d.zoomKeys,snapKeys:d.snapKeys||"none",navigateKeys:d.navigateKeys||"none",modeButtons:d.modeButtons||{},combos:d.combos||[],wheelPrograms:d.wheelPrograms||[0,1,0,1],leftWheelUpKeys:"",leftWheelDownKeys:"",rightWheelUpKeys:"",rightWheelDownKeys:""});
+  Object.assign(cfg,{ball:d.ball||"pointer",circleZoom:!!d.circleZoom,circleSize:d.circleSize||160,buttons:d.buttons,leftWheel:d.leftWheel,rightWheel:d.rightWheel,orbitKeys:d.orbitKeys,panKeys:d.panKeys,zoomKeys:d.zoomKeys,snapKeys:d.snapKeys||"none",twistKeys:d.twistKeys||"none",navigateKeys:d.navigateKeys||"none",modeButtons:d.modeButtons||{},combos:d.combos||[],wheelPrograms:d.wheelPrograms||[0,1,0,1],leftWheelUpKeys:"",leftWheelDownKeys:"",rightWheelUpKeys:"",rightWheelDownKeys:""});
   if(!pd)Object.assign(cfg,{buttonWheelZoom:d.buttonWheelZoom,returnCursor:d.returnCursor,shortcutsEverywhere:d.shortcutsEverywhere});renderBinds();renderCheat();save(true)}};
 $("#resetAll").onclick=async()=>{if(!await modal("Reset everything?","Every program, button, wheel, combination, speed and the guide go back to normal settings. Your macros and look are kept.",[["Cancel","",false],["Reset","primary",true]]))return;
   try{const n=await call("ctResetAll");const theme=cfg.theme;cfg=n;cfg.theme=theme;renderAll();toast("Everything is back to normal settings")}catch(err){toast(String(err.message||err),true)}};
@@ -784,7 +788,7 @@ function recordShortcut(target){
   recording={target,combo:""};
   modal("Record a shortcut",`Press the keys now, for example <b>Ctrl + Z</b>. <div class="rec" id="recBox"><span class="mu">Waiting for keys…</span></div><p style="margin:10px 0 0;font-size:12.5px">Esc cancels.</p>`,[["Cancel","",false],["Save","primary",true]]).then(ok=>{
     const r=recording;recording=null;
-    if(r.target.startsWith("hold:")){const k=r.target.slice(5);if(ok&&r.combo){const v=r.combo.toLowerCase();if((v==="ctrl"||v==="control")&&k!=="zoomKeys"){toast("Ctrl by itself is available for Zoom. Choose another key for this command.",true);return}const clash=["orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys"].find(o=>o!==k&&cfg[o]===v);
+    if(r.target.startsWith("hold:")){const k=r.target.slice(5);if(ok&&r.combo){const v=r.combo.toLowerCase();if((v==="ctrl"||v==="control")&&k!=="zoomKeys"){toast("Ctrl by itself is available for Zoom. Choose another key for this command.",true);return}const clash=["orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys"].find(o=>o!==k&&cfg[o]===v);
       if(clash){toast(holdLabel(v)+" is already used for "+clash.replace("Keys","")+". Pick other keys.");return}cfg[k]=v;renderBinds();renderCheat();save(true)}return}
     if(r.target.startsWith("combo:")){const c=cfg.combos[+r.target.slice(6)];if(ok&&r.combo){c.bind.keys=r.combo}else if(!c.bind.keys){c.bind.action="fit"}renderBinds();save(true);return}
     if(r.target.startsWith("mode:")){const b=r.target.slice(5);if(ok&&r.combo){cfg.modeButtons[b].keys=r.combo}else if(!cfg.modeButtons[b]?.keys){delete cfg.modeButtons[b]}renderBinds();save(true);return}
@@ -819,7 +823,7 @@ function chordVks(chord){
 }
 function renderKeyboard(){
  const el=$("#liveKeyboard");if(!el)return;
- const bound=new Set(["orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys"].flatMap(k=>chordVks(cfg[k])));
+ const bound=new Set(["orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys"].flatMap(k=>chordVks(cfg[k])));
  el.innerHTML=KEY_ROWS.map(row=>'<div class="key-row">'+row.map(([name,key])=>'<span class="key-cap'+(name.length>1?' wide':'')+(bound.has(key)?' bound':'')+'" data-vk="'+key+'">'+esc(name)+'</span>').join("")+'</div>').join("");
 }
 function updateKeyboard(s){
@@ -830,7 +834,8 @@ function updateKeyboard(s){
 
 function updateFaceTurn(s){
  const hint=cfg.snapKeys==="none"?"Assign Snap keys to change faces and turn their orientation.":"Hold "+holdLabel(cfg.snapKeys)+" and draw a curved roll to turn the face; roll straight to change faces.";
- const message="Face orientation: "+(s.snapTurn?.message||hint);
+ const degrees=Number(s.knobDegrees||0);
+ const message=s.knobActive?"Twist: "+(degrees===0?"turn the ball like a knob":(degrees>0?"Clockwise ":"Anticlockwise ")+Math.abs(degrees).toFixed(0)+"°"):"Face orientation: "+(s.snapTurn?.message||hint);
  liveText("#homeFaceTurn",message);liveText("#controlFaceTurn",message);
 }
 
@@ -846,7 +851,7 @@ function renderCheat(){renderKeyboard();const items=[];const b=cfg.buttons;
   const z=[...who("zoom"),...(cfg.zoomKeys!=="none"?["hold "+holdLabel(cfg.zoomKeys)]:[])];
   const zw=["leftWheel","rightWheel"].filter(w=>cfg[w]==="zoom").map(w=>BTN[w].toLowerCase());
   if(z.length||zw.length)items.push(`<div class="it"><span class="k">Zoom</span><span>${[...z.map(x=>x+' <span class="mu">+ roll</span>'),...zw].join(" <span class='mu'>or</span> ")}</span></div>`);
-  for(const [key,name] of [["snapKeys","Snap"],["navigateKeys","Navigate"]])if(cfg[key]&&cfg[key]!=="none")items.push('<div class="it"><span class="k">'+name+'</span><span>hold '+esc(holdLabel(cfg[key]))+' + ball</span></div>');
+  for(const [key,name] of [["snapKeys","Snap"],["twistKeys","Twist"],["navigateKeys","Navigate"]])if(cfg[key]&&cfg[key]!=="none")items.push('<div class="it"><span class="k">'+name+'</span><span>hold '+esc(holdLabel(cfg[key]))+' + ball</span></div>');
   const fit=[...Object.keys(b).filter(k=>b[k].action==="fit").map(k=>"press "+BTN[k]),...Object.keys(b).filter(k=>["orbit","pan","zoom"].includes(b[k].action)&&b[k].tap==="fit").map(k=>"tap "+BTN[k])];
   Object.keys(b).filter(k=>b[k].action==="lock3d").forEach(k=>items.push(`<div class="it"><span class="k">3D mode</span><span>press ${BTN[k]} <span class="mu">— then just roll to orbit</span></span></div>`));
   if(fit.length)items.push(`<div class="it"><span class="k">Fit</span><span>${fit.join(" <span class='mu'>or</span> ")}</span></div>`);
@@ -970,6 +975,7 @@ document.addEventListener("click",async e=>{const r=e.target.dataset.rel,w=e.tar
 const pad={rot:[1,0,0,0,1,0,0,0,1],px:0,py:0,s:1};
 function mul(a,b){const r=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++)r[i*3+j]=a[i*3]*b[j]+a[i*3+1]*b[3+j]+a[i*3+2]*b[6+j];return r}
 function rot(yaw,pitch){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);pad.rot=mul([1,0,0,0,cp,-sp,0,sp,cp],mul([cy,0,sy,0,1,0,-sy,0,cy],pad.rot))}
+function rotRoll(angle){const c=Math.cos(angle),s=Math.sin(angle);pad.rot=mul([c,-s,0,s,c,0,0,0,1],pad.rot)}
 function padReset(){pad.rot=[1,0,0,0,1,0,0,0,1];rot(-.6,.45);pad.px=pad.py=0;pad.s=1}
 padReset();$("#padReset").onclick=()=>{padReset();drawPad()};
 const V=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],F=[[4,5,6,7],[1,0,3,2],[0,4,7,3],[5,1,2,6],[7,6,2,3],[0,1,5,4]];
@@ -996,7 +1002,7 @@ addEventListener("resize",()=>{padColors=null;reportPad()});$("#main").addEventL
 document.addEventListener("visibilitychange",reportPad);
 
 /* ---------- live status ---------- */
-const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Rolling",Snap:"Snap to angle",Navigate:"Navigating",Gestures:"Gesture"};
+const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Twisting",Snap:"Snap to angle",Navigate:"Navigating",Gestures:"Gesture"};
 function liveText(selector,value){const el=$(selector),text=String(value??"");if(el&&el.textContent!==text)el.textContent=text}
 function liveClass(selector,value){const el=$(selector);if(el&&el.className!==value)el.className=value}
 function liveAttr(el,name,value){if(el&&el.getAttribute(name)!==String(value))el.setAttribute(name,value)}
@@ -1004,12 +1010,13 @@ const ACTIVE_STATUS_POLL_MS=50; // 20 Hz; device input continues on its independ
 async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
   if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;if(!savePending&&!saveFlight)reloadConfig()}
   let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}
+  if(s.rollLog){rotRoll(-s.rollLog);changed=true}
   const amount=s.zoomLog===undefined?(s.zoom||0)/700:s.zoomLog;
   if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
   const focused=!document.hidden&&document.hasFocus();
   if(page==="home"&&!document.hidden)updateKeyboard(s);
   if((page==="home"||page==="controls")&&!document.hidden)updateFaceTurn(s);
-  if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1));
+  if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1)+" · twist "+gainLabel(s.twistGain??1));
   if(changed&&page==="home"&&focused)drawPad();
   const live=s.mode!=="Idle";liveText("#padMode",live?MODEN[s.mode]:"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
   const dirTxt=s.ballDir?" "+s.ballDir:"";
@@ -1064,8 +1071,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="askIn
 
 /* ---------- programs ---------- */
 let cfgRev=-1;
-const PROGRAM_FIELDS=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
-const FEEL_FIELDS=["orbitSens","panSens","zoomSens","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"];
+const PROGRAM_FIELDS=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+const FEEL_FIELDS=["orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"];
 const clone=v=>v===undefined?null:JSON.parse(JSON.stringify(v));
 function snapshotProgram(name){
  const p=clone(cfg.programs[cfg.activeProgram]);p.name=name||p.name;

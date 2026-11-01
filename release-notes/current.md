@@ -1,3 +1,13 @@
+## Knob-style Twist hold
+
+- Hold Alt+Shift in a supported native 3D view and turn the ball in place like a volume knob to turn its orientation. Release to point normally.
+- Alt plus ball up/down/left/right still changes cube faces. Existing Shift orbit, Ctrl+Shift pan, Ctrl zoom and Windows navigation remain unchanged.
+- Change the Twist shortcut in Buttons & keys. Set its independent speed, Horizontal/Vertical direction and Reverse option in Speed & direction.
+- Show the Twist shortcut and current turn angle in Home and the floating guide. The built-in preview now displays orientation turns.
+- Twist stops with the ball. Existing glide remains available for the other modes.
+- Save all Twist settings with programs and presets. Existing custom chords are preserved; an occupied Alt+Shift chord is not reassigned.
+- This uses the existing X/Y movement with an explicit hold. It does not measure an independent third rotation axis. Mouse clicks and wheel axes remain unchanged.
+
 ## Face orientation recognition
 
 - Recognize curved face-turn rolls across small and larger sensor paths instead of rejecting anything wider than 80 raw counts.
