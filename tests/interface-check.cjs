@@ -104,7 +104,7 @@ assert.ok(shortcutRecorderStart>0&&shortcutRecorderEnd>shortcutRecorderStart);
  assert.equal(context.cfg.zoomKeys,'ctrl');assert.equal(saves.length,1);
  context.recordShortcut('hold:orbitKeys');context.recording.combo='Ctrl';accept(true);await Promise.resolve();await Promise.resolve();
  assert.equal(context.cfg.orbitKeys,'shift');assert.equal(saves.length,1);assert.ok(messages.some(text=>text.includes('Zoom')));
- assert.ok(html.includes('straight up, down, left or right to change the cube face')&&html.includes('clockwise or counterclockwise loop')&&!html.includes('align to a face, edge or corner'));
+ assert.ok(html.includes('up, down, left or right to switch to a neighboring cube face')&&html.includes('estimates knob motion')&&!html.includes('align to a face, edge or corner'));
  console.log('Ctrl can be recorded for Zoom, Shift Orbit is preserved, and snapping describes only the six faces.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
