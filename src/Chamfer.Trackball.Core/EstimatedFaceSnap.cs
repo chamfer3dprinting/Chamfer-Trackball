@@ -52,7 +52,14 @@ public sealed class EstimatedFaceSnap{
    lastMotion=now;Samples++;
   }
   float a=calibration!=null?calibration.Project(x,y,0):axis=="y"?y:x,c=calibration!=null?-x*calibration.AxisY+y*calibration.AxisX:axis=="y"?x:y;
-  if(motion){recent.Enqueue(new(x,y,0,now));while(recent.Count>8)recent.Dequeue();}
+  if(motion){
+   // Do not mix the previous clockwise stroke into a deliberate reverse
+   // nudge on the learned axis; its cancelled net path would look uncertain.
+   if(stage==3&&calibration!=null&&recent.Count>0&&MathF.Abs(a)>=4&&MathF.Abs(c)<=Math.Max(2,MathF.Abs(a)*.5f)){
+    var previous=recent.Last();if(Math.Sign(calibration.Project(previous.X,previous.Y,0))!=Math.Sign(a))recent.Clear();
+   }
+   recent.Enqueue(new(x,y,0,now));while(recent.Count>8)recent.Dequeue();
+  }
   if(stage==3&&wheel!=0){stage=2;faceDecisionAt=now;turns.Reset();pending.Clear();faces.Reset(pose);return Face(start,x,y,wheel,faceGain,now);}
   if(stage==3){
    if(motion){along+=a;cross+=c;alongEnergy+=a*a;crossEnergy+=c*c;travel+=MathF.Sqrt(a*a+c*c);}

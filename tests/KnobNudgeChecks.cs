@@ -43,5 +43,7 @@ static class KnobNudgeChecks{
   Record("faces",TwistCalibrationChecks.Faces(),1000);Record("clockwise",TwistCalibrationChecks.Knob(1),7000);Record("anticlockwise",TwistCalibrationChecks.Knob(-1),13000);
   session.Test();for(int n=0;n<8;n++)session.Tick(8,4,0,20000+n*16);
   check(session.State(20200)["testTurns"]!.GetValue<int>()==1,"The calibration preview uses the same short-nudge trigger as the real 3D view");
+  for(int n=0;n<8;n++)session.Tick(-8,-4,0,20200+n*16);
+  check(session.State(20400)["testTurns"]!.GetValue<int>()==0,"A short opposite nudge also reverses a calibrated preview without mixing the previous stroke into its classifier");
  }
 }
