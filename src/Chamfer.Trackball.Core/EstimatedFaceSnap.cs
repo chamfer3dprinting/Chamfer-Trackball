@@ -55,7 +55,7 @@ public sealed class EstimatedFaceSnap{
   if(motion){
    // Do not mix the previous clockwise stroke into a deliberate reverse
    // nudge on the learned axis; its cancelled net path would look uncertain.
-   if(stage==3&&calibration!=null&&recent.Count>0&&MathF.Abs(a)>=4&&MathF.Abs(c)<=Math.Max(2,MathF.Abs(a)*.5f)){
+   if(stage==3&&calibration!=null&&recent.Count>0&&MathF.Abs(a)>=.5f&&MathF.Abs(c)<=Math.Max(.5f,MathF.Abs(a)*.5f)){
     var previous=recent.Last();if(Math.Sign(calibration.Project(previous.X,previous.Y,0))!=Math.Sign(a))recent.Clear();
    }
    recent.Enqueue(new(x,y,0,now));while(recent.Count>8)recent.Dequeue();

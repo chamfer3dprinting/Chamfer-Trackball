@@ -45,5 +45,7 @@ static class KnobNudgeChecks{
   check(session.State(20200)["testTurns"]!.GetValue<int>()==1,"The calibration preview uses the same short-nudge trigger as the real 3D view");
   for(int n=0;n<8;n++)session.Tick(-8,-4,0,20200+n*16);
   check(session.State(20400)["testTurns"]!.GetValue<int>()==0,"A short opposite nudge also reverses a calibrated preview without mixing the previous stroke into its classifier");
+  for(int n=0;n<20;n++)session.Tick(2,1,0,20400+n*16);
+  check(session.State(20800)["testTurns"]!.GetValue<int>()==1,"A very slow small reverse nudge also works when each sensor report is below four counts");
  }
 }
