@@ -587,4 +587,5 @@ Check(!jitterTransitionInput.Pending&&!jitterTransitionInput.EstimatedTwist,"Sub
 Check(SnapLabels.For("twist")=="Estimated twist 90°"&&SnapLabels.For("faces")=="Snap faces"&&SnapLabels.For("estimating")=="Reading Alt motion","The guide prominently distinguishes estimated twist, face snapping and observation");
 
 TwistCalibrationChecks.Run(Check);
+InputRecoveryChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

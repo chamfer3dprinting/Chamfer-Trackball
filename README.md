@@ -99,3 +99,6 @@ In **Buttons & keys → Twist calibration**, record normal up/down/left/right ro
 The app detects whether knob turns report a separate scroll signal or learns an experimental X/Y pattern. The preview reports overlapping patterns when normal rolls and twists are too similar; uncertain X/Y motion falls back to face selection. Calibration cannot recover an independently unreported axis. Kensington lists dual optical sensors for its [SlimBlade Pro twist scrolling](https://www.kensington.com/en-ca/p/products/control/trackballs/slimblade-pro-trackball/); this does not change the M512 hardware.
 
 Calibration saves per program and preset, works with Alt Snap or a separate Twist hold, and respects Twist speed and Reverse. Re-record or Clear calibration to change the learned direction. Recordings stay in memory; only the learned model is saved. Native mouse clicks/wheel axes, existing programs, selected device and other controls are preserved.
+
+
+Calibration only reserves input during recording or the local Test preview. Switching to another app stops that capture, keeps completed samples, and restores navigation. Home and calibration now show actual received ball movement separately from device presence. Temporary UI-pause recovery requires a stable healthy input loop before resuming; native mouse input remains available while recovering.

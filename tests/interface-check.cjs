@@ -265,3 +265,22 @@ const renderContext={S:{pointerAccel:false,settingsPath:'test',startup:false},cf
 vm.runInNewContext(renderAllSource,renderContext);renderContext.renderAll();
 assert.equal(calibrationRenders,1,'Startup and program reload must render the saved calibration summary and axis controls');
 console.log('Calibration summary initializes with the full page and reconnecting input keeps the wizard usable.');
+
+assert.ok(!controller.includes('IsCad=>!calibration.Active'),'An open calibration review must not disable all CAD input');
+assert.ok(controller.includes('calibration.Foreground(pid==Environment.ProcessId)'),'Switching apps must release recording/test capture');
+assert.ok(controller.includes('["inputSignal"]=input.SignalState()'),'Status must report actual selected-device input');
+const signalStart=html.indexOf('function inputSignalText('),signalEnd=html.indexOf('/* ---------- live status ---------- */',signalStart);
+const signalLabels={};const signalContext={Number,twistCalOpen:true,liveText:(id,value)=>signalLabels[id]=value};
+vm.runInNewContext(html.slice(signalStart,signalEnd),signalContext);
+signalContext.updateInputSignal({selectedMoves:0,otherMoves:0,ready:true});
+assert.ok(signalLabels['#stSignal'].includes('No ball movement'));
+signalContext.updateInputSignal({selectedMoves:0,otherMoves:12,ready:true});
+assert.ok(signalLabels['#stSignal'].includes('Another mouse'));
+signalContext.updateInputSignal({selectedMoves:24,lastMoveAgeMs:0,ready:true});
+assert.ok(signalLabels['#stSignal'].includes('24 movements')&&signalLabels['#stSignal'].includes('receiving'));
+assert.equal(signalLabels['#stSignal'],signalLabels['#twistCalSignal']);
+signalContext.updateInputSignal({selectedMoves:24,lastMoveAgeMs:5000,ready:true});
+assert.ok(signalLabels['#stSignal'].includes('idle'));
+signalContext.updateInputSignal({selectedMoves:24,lastMoveAgeMs:0,ready:false});
+assert.ok(signalLabels['#stSignal'].includes('recovering'));
+console.log('Live sensor feedback distinguishes waiting, other-device input, active movement, idle and recovery without claiming presence is movement.');

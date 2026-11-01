@@ -61,3 +61,15 @@ public sealed class MotionHealth{
  public bool Expired(long now)=>waitingSince is long since&&lastBlocked-since>500&&now-lastBlocked<150;
  public void Reset(){waitingSince=null;lastBlocked=0;}
 }
+
+// Resume after a temporary UI pause only after a stable series of healthy
+// watchdog ticks. An idle ball must not need a physical stroke to recover.
+public sealed class InputRecovery{
+ long? healthySince;long? previous;
+ public bool Observe(bool canRecover,long now){
+  if(!canRecover||previous is long p&&(now<p||now-p>150))healthySince=null;
+  previous=now;if(!canRecover)return false;
+  healthySince??=now;return now-healthySince.Value>=250;
+ }
+ public void Reset(){healthySince=previous=null;}
+}
