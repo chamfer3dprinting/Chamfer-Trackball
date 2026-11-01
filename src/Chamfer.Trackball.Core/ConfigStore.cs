@@ -66,7 +66,15 @@ public sealed class ConfigStore {
             }
             LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=27;
         }
-        config["configVersion"]=28;Validate(config);
+        if(oldVersion<29){
+            foreach(var node in config["programs"]!.AsArray()){
+                var p=node!.AsObject();
+                if(S(p,"defaultKind",S(p,"name")).Equals("3D modelling",StringComparison.OrdinalIgnoreCase))p["altTwistEstimate"]=false;
+            }
+            LoadProgram(config,I(config,"activeProgram",0));
+        }
+        config["configVersion"]=29;Validate(config);
+        if(oldVersion<29&&File.Exists(path))Write(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
     public void Save(JsonObject incoming) {
@@ -187,7 +195,7 @@ public sealed class ConfigStore {
             if(p["feel"] is not JsonObject)p["feel"]=d["programs"]![0]!["feel"]!.DeepClone();
             foreach(var entry in d["programs"]![0]!["feel"]!.AsObject())if(!p["feel"]!.AsObject().ContainsKey(entry.Key))p["feel"]![entry.Key]=entry.Value?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=28;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=29;
     }
     public static void Validate(JsonObject c){
         var programs=c["programs"]!.AsArray().Select(n=>n!.AsObject()).ToList();

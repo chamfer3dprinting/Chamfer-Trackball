@@ -1,5 +1,5 @@
 {
-  "configVersion": 28,
+  "configVersion": 29,
   "enabled": true,
   "buttons": {
     "middle": {
@@ -754,7 +754,7 @@
       "circleZoom": true,
       "circleSize": 160,
       "twistKeys": "none",
-      "altTwistEstimate": true,
+      "altTwistEstimate": false,
       "twistCalibration": null
     }
   ],

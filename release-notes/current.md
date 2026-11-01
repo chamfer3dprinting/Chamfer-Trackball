@@ -1,3 +1,11 @@
+## Alt + left scroll wheel for 90° orientation snaps
+
+- Hold Alt and roll the ball up/down/left/right to switch cube faces.
+- Hold Alt and turn the LEFT scroll wheel one notch for one exact 90° face-orientation turn; turn it the other way to rotate back.
+- Keep the same face and zoom distance. The right wheel keeps its normal/configured behavior during Snap.
+- Turn off ambiguous ball-only twist estimation in the 3D default and quick setups.
+- Preserve normal middle/left/right clicks, wheel axes, saved programs, presets, optional Twist shortcuts, calibration and speeds.
+
 ## Tiny knob turns respond without a long stroke
 
 - Trigger one full 90° cube rotation from a much smaller clockwise or anticlockwise knob nudge.

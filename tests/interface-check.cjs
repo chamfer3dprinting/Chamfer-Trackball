@@ -104,7 +104,7 @@ assert.ok(shortcutRecorderStart>0&&shortcutRecorderEnd>shortcutRecorderStart);
  assert.equal(context.cfg.zoomKeys,'ctrl');assert.equal(saves.length,1);
  context.recordShortcut('hold:orbitKeys');context.recording.combo='Ctrl';accept(true);await Promise.resolve();await Promise.resolve();
  assert.equal(context.cfg.orbitKeys,'shift');assert.equal(saves.length,1);assert.ok(messages.some(text=>text.includes('Zoom')));
- assert.ok(html.includes('up, down, left or right to switch to a neighboring cube face')&&html.includes('estimates knob motion')&&!html.includes('align to a face, edge or corner'));
+ assert.ok(html.includes('up, down, left or right to switch to a neighboring cube face')&&html.includes('LEFT scroll wheel')&&!html.includes('align to a face, edge or corner'));
  console.log('Ctrl can be recorded for Zoom, Shift Orbit is preserved, and snapping describes only the six faces.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
@@ -289,3 +289,14 @@ assert.ok(html.includes('A small knob nudge triggers one complete 90° cube rota
 assert.ok(html.includes('Pause briefly or reverse direction for another step'));
 assert.ok(controller.includes('learnedTwist?.NudgeDelta('));
 console.log('Short knob nudges trigger full cube quarter turns; the interface explains the pause/reverse reset and calibrated distance is decoupled.');
+
+assert.ok(controller.includes('SnapWheelPolicy.Captures(mode,msg)'),'Actual mouse routing must distinguish left-wheel snaps from the normal right wheel');
+assert.ok(!html.includes('altTwistEstimate:p!=="ballonly"'),'Quick setups must not turn ambiguous guessing back on');
+const wheelHintStart=html.indexOf('function updateFaceTurn('),wheelHintEnd=html.indexOf('/* cheat sheet on Home */',wheelHintStart);
+const wheelHintMessages={};const wheelHintContext={cfg:{snapKeys:'alt',altTwistEstimate:false},holdLabel:key=>key,liveText:(id,value)=>wheelHintMessages[id]=value};
+vm.runInNewContext(html.slice(wheelHintStart,wheelHintEnd),wheelHintContext);
+wheelHintContext.updateFaceTurn({});
+assert.ok(wheelHintMessages['#homeFaceTurn'].includes('left scroll wheel')&&wheelHintMessages['#homeFaceTurn'].includes('90°')&&!wheelHintMessages['#homeFaceTurn'].includes('estimated'));
+assert.equal(wheelHintMessages['#homeFaceTurn'],wheelHintMessages['#controlFaceTurn']);
+assert.ok(html.includes('hold the same keys')||html.includes('Hold the same keys'));
+console.log('Home and Controls describe Alt plus ball for faces and Alt plus left wheel for exact orientation snaps; quick setups keep guessing off.');

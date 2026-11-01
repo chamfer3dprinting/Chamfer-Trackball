@@ -224,7 +224,7 @@ public string AppName{get;private set;}="";
         UpdateCalibrationForeground();
         bool wheel=msg is 0x20a or 0x20e;
         if(wheel&&calibration.Receiving){if(msg==0x20a)calibrationMotion.Wheel(data);timer.Interval=16;return true;}
-        if(wheel&&mode!=NavMode.Idle){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);else pending.Wheel(data);return true;}
+        if(wheel&&SnapWheelPolicy.Captures(mode,msg)){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);else pending.Wheel(data);return true;}
         if(wheel){
             var prefix=msg==0x20a?"right":"left";var wheelAction=ConfigStore.S(cfg,prefix+"Wheel","normal");
             if(wheelAction=="normal")return false;
@@ -327,6 +327,26 @@ public string AppName{get;private set;}="";
         result["inputSignal"]=input.SignalState();
         if(calibration.Active)result["twistCalibration"]=CalibrationState();
         ox=oy=px=py=zoom=zoomLog=rawX=rawY=rollLog=0;fit=false;return result;
+    }
+    internal void VerifySnapWheelRouting(){
+        var previousCfg=cfg;var previousNative=native;var previousMode=mode;var previousProfile=profile;bool previousKnob=knobHoldActive;double previousZoom=zoom,previousZoomLog=zoomLog;
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["altTwistEstimate"]=false;cfg["leftWheel"]="normal";cfg["rightWheel"]="normal";cfg["orbitSens"]=50;
+            profile=new(){["id"]="demo"};mode=NavMode.Snap;knobHoldActive=false;pending.Reset();motionSamples.Reset();
+            var pose=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
+            var client=new NativeServer.Client{Version=2,Pose=pose,BasePose=pose,EstimateTwist=false};client.Snap.Reset(pose);native=client;
+            if(!MouseEvent(0x20a,60))throw new InvalidOperationException("Snap did not capture the left wheel.");
+            Flush();if(System.Numerics.Vector3.Distance(client.Pose!.Up,pose.Up)>.001f)throw new InvalidOperationException("A partial wheel notch emitted a full turn too early.");
+            if(!MouseEvent(0x20a,60))throw new InvalidOperationException("Snap lost the rest of the left-wheel notch.");
+            Flush();var turned=client.Pose!;
+            if(Math.Abs(System.Numerics.Vector3.Dot(turned.Up,pose.Up))>.001f||System.Numerics.Vector3.Distance(turned.Eye,pose.Eye)>.001f||System.Numerics.Vector3.Distance(turned.Target,pose.Target)>.001f)throw new InvalidOperationException("The left wheel did not make one exact orientation turn while preserving its cube face and distance.");
+            if(MouseEvent(0x20e,120)||pending.Peek().HasPrimary||System.Numerics.Vector3.Distance(client.Pose!.Up,turned.Up)>.001f)throw new InvalidOperationException("Snap took over the right wheel or treated it as an orientation turn.");
+            MouseEvent(0x20a,-120);Flush();
+            if(System.Numerics.Vector3.Distance(client.Pose!.Up,pose.Up)>.001f)throw new InvalidOperationException("The opposite left-wheel notch did not restore the previous orientation.");
+            SendMotion(NavMode.Snap,1000,0,0);
+            if(Math.Abs(System.Numerics.Vector3.Dot(System.Numerics.Vector3.Normalize(client.Pose!.Eye-client.Pose.Target),System.Numerics.Vector3.UnitZ))>.001f||client.EstimatedSnap.QuarterTurns!=0)throw new InvalidOperationException("Alt ball movement did not select a neighboring face without twist estimation.");
+        }finally{pending.Reset();motionSamples.Reset();glide.Reset();cfg=previousCfg;native=previousNative;mode=previousMode;profile=previousProfile;knobHoldActive=previousKnob;zoom=previousZoom;zoomLog=previousZoomLog;}
+        Console.WriteLine("Alt left-wheel routing verified: partial/full notches, opposite 90-degree orientation turns, preserved face/distance, right-wheel pass-through and directional ball faces.");
     }
     internal void VerifyKnobHandshake(){
         var previousNative=native;var previousCfg=cfg;var previousCalibration=learnedTwist;bool previousKnob=knobHoldActive;float previousAngle=knobAngle;double previousRoll=rollLog;

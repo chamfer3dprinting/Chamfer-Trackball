@@ -125,7 +125,7 @@ try{
  Check(ConfigStore.I(repaired,"orbitSens")==82&&ConfigStore.I(repaired,"panSens")==50&&ConfigStore.I(repaired,"pointerSpeed")==10,"An incomplete added program gets its own full motion defaults instead of leaking the previous program");
  store.Select(0);
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==28,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==29,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
@@ -422,7 +422,7 @@ foreach(int step in new[]{2,10,19}){
 var twistDefaults=ConfigStore.Defaults();
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Normal mouse keeps Alt+Shift as ordinary keyboard input");
 ConfigStore.LoadProgram(twistDefaults,1);
-Check(ConfigStore.B(twistDefaults,"altTwistEstimate")&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Factory 3D uses Alt estimation without requiring Shift");
+Check(!ConfigStore.B(twistDefaults,"altTwistEstimate")&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Factory 3D uses Alt faces and wheel orientation without requiring Shift");
 twistDefaults["twistKeys"]="alt+shift";
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Roll,"Alt+Shift selects the new held Twist mode");
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{18})==NavMode.Snap&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16})==NavMode.Orbit,"Alt face switching and Shift orbit stay separate from Twist");
@@ -459,7 +459,7 @@ try{
  foreach(var node in old["programs"]!.AsArray()){node!.AsObject().Remove("twistKeys");node["feel"]!.AsObject().Remove("twistSens");node["feel"]!.AsObject().Remove("twistAxis");node["feel"]!.AsObject().Remove("invertTwist");}
  old["programs"]![1]!["feel"]!["orbitSens"]=4;old["programs"]![0]!["pointerSpeed"]=3;File.WriteAllText(twistPath,old.ToJsonString());
  var store=new ConfigStore(twistPath);var migrated=store.Snapshot();
- Check(ConfigStore.I(migrated,"configVersion")==28&&ConfigStore.S(migrated,"twistKeys")=="none"&&ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program gains approved Alt-only estimation without a Shift requirement");
+ Check(ConfigStore.I(migrated,"configVersion")==29&&ConfigStore.S(migrated,"twistKeys")=="none"&&!ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program uses approved Alt faces and left-wheel turns without a Shift requirement");
  Check(ConfigStore.S(migrated,"selectedDevice")=="twist-device"&&ConfigStore.I(migrated,"orbitSens")==4&&ConfigStore.I(migrated["programs"]![0],"pointerSpeed")==3,"Twist migration preserves trackball identity and existing speed settings");
  Check(ConfigStore.S(migrated["programs"]![0],"twistKeys")=="none","Twist migration leaves Normal mouse shortcuts off");
  migrated["twistKeys"]="alt+t";migrated["twistSens"]=23;migrated["twistAxis"]="y";migrated["invertTwist"]=true;store.Save(migrated);store.SavePreset("Knob");
@@ -547,7 +547,7 @@ Check(acceptedOverlap.EstimatedTwist,"A mathematically identical horizontal roll
 var estimateDefaults=ConfigStore.Defaults();
 Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate"),"Normal mouse does not estimate 3D twist");
 ConfigStore.LoadProgram(estimateDefaults,1);
-Check(ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="alt","The 3D default uses Alt for experimental faces and 90-degree knob turns without a switch or Shift");
+Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="alt","The 3D default separates ball faces and left-wheel orientation turns under Alt");
 
 
 var obliqueEstimate=new EstimatedFaceSnap();var obliqueStart=studioView with{Eye=new Vector3(4,6,10)};
@@ -591,4 +591,5 @@ TwistCalibrationChecks.Run(Check);
 InputRecoveryChecks.Run(Check);
 KnobNudgeChecks.Run(Check);
 TinyKnobChecks.Run(Check);
+AltSnapWheelChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");
