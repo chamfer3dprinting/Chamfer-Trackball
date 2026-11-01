@@ -166,6 +166,22 @@ internal sealed class MainForm:Form{
         if(connection.Pose==null||!native.Move(connection,NavMode.Orbit,20,10,60,false,1))throw new Exception("Native camera/pivot handshake failed.");
         var pose=JsonNode.Parse(await client.GetStringAsync("http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId))!;
         if(!pose["commands"]!.AsArray().Any(x=>ConfigStore.S(x,"t")=="camera"))throw new Exception("Native camera response missing.");
+        // The real HTTP scene handshake must carry an off-centre cursor anchor.
+        foreach(bool ortho in new[]{false,true}){
+            native.Begin(connection,NavMode.Zoom,240,120);
+            var zoomScene=(JsonObject)scene.DeepClone();zoomScene["session"]=connection.Session;
+            zoomScene["zoomPivot"]=new JsonArray(3,2,0);zoomScene["orthographic"]=ortho;
+            using(var response=await client.PostAsync("http://127.0.0.1:47613/native/scene",new StringContent(zoomScene.ToJsonString(),Encoding.UTF8,"application/json")))response.EnsureSuccessStatusCode();
+            var before=connection.Pose??throw new Exception("Cursor zoom scene missing.");
+            var anchor=new Vector3(3,2,0);if(before.ZoomPivot!=anchor)throw new Exception("Cursor anchor was lost in the native handshake.");
+            if(!native.Move(connection,NavMode.Zoom,0,-20,0,false,1)||connection.Pose==null)throw new Exception("Native cursor zoom did not move.");
+            var expected=CameraMath.Move(before,NavMode.Zoom,0,-20);
+            if(Vector3.Distance(connection.Pose.Eye,expected.Eye)>.0001f||Vector3.Distance(connection.Pose.Target,expected.Target)>.0001f||Math.Abs(connection.Pose.OrthoHeight-expected.OrthoHeight)>.0001f||connection.Pose.Pivot!=before.Pivot)throw new Exception("Native cursor zoom used the orbit centre.");
+            zoomScene["zoomPivot"]=new JsonArray("invalid",0,0);
+            using(var response=await client.PostAsync("http://127.0.0.1:47613/native/scene",new StringContent(zoomScene.ToJsonString(),Encoding.UTF8,"application/json")))response.EnsureSuccessStatusCode();
+            if(connection.Pose!=expected)throw new Exception("Malformed cursor anchor replaced a valid pose.");
+        }
+        native.End(connection);
         var wheelCalibration=new TwistCalibrationModel{Source="wheel",WheelSign=-1,QuarterCounts=120,Separation=1};wheelCalibration.Validate();
         native.Begin(connection,NavMode.Snap,240,120,false,true,1,"x",false,wheelCalibration);
         scene["session"]=connection.Session;
@@ -301,7 +317,7 @@ internal sealed class MainForm:Form{
             if(passed!="true"||ready!="true"||store.Snapshot()["programs"]?[0]?["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, tiny one-packet knob nudges and reverse nudges producing exact 90-degree steps, first-nudge handshake retention and one camera update per stroke, Alt left-wheel orientation with right-wheel pass-through and directional ball faces, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Cursor-anchored perspective/orthographic zoom over the real native scene handshake, malformed anchor rejection, Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, tiny one-packet knob nudges and reverse nudges producing exact 90-degree steps, first-nudge handshake retention and one camera update per stroke, Alt left-wheel orientation with right-wheel pass-through and directional ball faces, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }

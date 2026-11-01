@@ -84,7 +84,7 @@ internal sealed class NativeServer:IDisposable {
         try{
             Vector3 vec(string key){var a=m[key]!.AsArray();if(a.Count!=3)throw new FormatException();return new(a[0]!.GetValue<float>(),a[1]!.GetValue<float>(),a[2]!.GetValue<float>());}
             var p=new CameraPose(vec("eye"),vec("target"),vec("up"),vec("pivot"),(float)ConfigStore.D(m,"verticalFov",.785398),(float)ConfigStore.D(m,"orthoHeight",10),ConfigStore.I(m,"width",800),ConfigStore.I(m,"height",600),ConfigStore.B(m,"orthographic"));
-            p=p with{WorldUp=m["worldUp"] is JsonArray?vec("worldUp"):c.App=="chamfer3d"?Vector3.UnitY:Vector3.UnitZ};
+            p=p with{ZoomPivot=m["zoomPivot"]!=null?vec("zoomPivot"):null,WorldUp=m["worldUp"] is JsonArray?vec("worldUp"):c.App=="chamfer3d"?Vector3.UnitY:Vector3.UnitZ};
             if(p.Valid&&CameraPose.Finite(p.WorldUp)&&p.WorldUp.LengthSquared()>1e-12f)lock(c.Gate){
                 c.Pose=c.BasePose=p;c.Snap.Reset(p);c.EstimatedSnap.Reset(p);
                 if(c.SnapTwist){c.Pose=c.BasePose=c.Snap.Step(p,0,0);Queue(c,PoseMessage(c));}

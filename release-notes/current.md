@@ -1,3 +1,11 @@
+## Zoom toward the cursor
+
+- Give native zoom its own cursor anchor while keeping orbit's existing pivot and feel.
+- Zoom toward the visible point under the pointer. Over empty space, use the cursor ray at the current view depth instead of the model or selection centre.
+- Keep that point fixed on screen while zooming in or out, in perspective and orthographic views.
+- Support the separate anchor in Chamfer Studio, Blender and Fusion integrations, with compatibility for older integrations.
+- Preserve held controls, native clicks and wheel axes, saved programs, presets, calibration and sensitivity.
+
 ## Alt + left scroll wheel for 90° orientation snaps
 
 - Hold Alt and roll the ball up/down/left/right to switch cube faces.

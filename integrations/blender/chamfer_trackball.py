@@ -1,4 +1,4 @@
-bl_info = {"name": "Chamfer Trackball", "author": "Chamfer3D", "version": (1, 5, 6), "blender": (4, 2, 0), "location": "3D View", "description": "Cursor pivot and direct camera navigation from Chamfer Trackball", "category": "3D View"}
+bl_info = {"name": "Chamfer Trackball", "author": "Chamfer3D", "version": (1, 5, 33), "blender": (4, 2, 0), "location": "3D View", "description": "Cursor pivot and direct camera navigation from Chamfer Trackball", "category": "3D View"}
 import bpy
 import json
 import math
@@ -91,13 +91,18 @@ def _begin(command):
     up = rotation @ Vector((0, 1, 0))
     eye = target + back * max(1e-6, rv.view_distance)
     pivot = target.copy()
+    zoom_pivot = target.copy()
     try:
+        # Empty space zooms along the cursor ray at the current view depth.
+        # Keep the selection/model fallback for orbit only.
+        zoom_pivot = view3d_utils.region_2d_to_location_3d(region, rv, coord, target)
         origin = view3d_utils.region_2d_to_origin_3d(region, rv, coord)
         direction = view3d_utils.region_2d_to_vector_3d(region, rv, coord)
         with bpy.context.temp_override(window=window, area=area, region=region):
             hit, location, normal, index, obj, matrix = bpy.context.scene.ray_cast(bpy.context.evaluated_depsgraph_get(), origin, direction)
         if hit:
             pivot = location
+            zoom_pivot = location.copy()
         elif bpy.context.selected_objects:
             obj = bpy.context.selected_objects[0]
             pivot = obj.matrix_world @ (sum((Vector(v) for v in obj.bound_box), Vector()) / 8)
@@ -106,7 +111,7 @@ def _begin(command):
     fov = 2 * math.atan(16 / max(1e-6, space.lens) * region.height / max(1, region.width))
     ortho = max(1e-6, 2 / max(1e-9, abs(rv.window_matrix[1][1])))
     _ortho_height, _view_distance = ortho, max(1e-6, rv.view_distance)
-    _put(_outgoing, {"t": "scene", "session": _session, "eye": list(eye), "target": list(target), "up": list(up), "pivot": list(pivot), "verticalFov": fov, "orthoHeight": ortho, "width": region.width, "height": region.height, "orthographic": rv.view_perspective == "ORTHO"})
+    _put(_outgoing, {"t": "scene", "session": _session, "eye": list(eye), "target": list(target), "up": list(up), "pivot": list(pivot), "zoomPivot": list(zoom_pivot), "verticalFov": fov, "orthoHeight": ortho, "width": region.width, "height": region.height, "orthographic": rv.view_perspective == "ORTHO"})
 
 def _apply(command):
     if not _context or command.get("session") != _session:

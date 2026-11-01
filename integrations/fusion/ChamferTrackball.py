@@ -59,6 +59,7 @@ def _begin(command):
     camera = viewport.camera
     eye, target, up = camera.eye, camera.target, camera.upVector
     pivot = target
+    zoom_pivot = target.copy()
     ortho = camera.cameraType == adsk.core.CameraTypes.OrthographicCameraType
     try:
         sample = viewport.viewToModelSpace(point)
@@ -71,12 +72,26 @@ def _begin(command):
             distance = sample.vectorTo(eye).dotProduct(back)
             back.scaleBy(distance)
             origin.translateBy(back)
+        # A cursor ray at target depth is the empty-space zoom anchor.
+        # Orbit keeps its existing model/selection fallback.
+        normal = eye.vectorTo(target)
+        normal.normalize()
+        denominator = direction.dotProduct(normal)
+        if abs(denominator) > 1e-9:
+            along = origin.vectorTo(target).dotProduct(normal) / denominator
+            zoom_pivot = origin.copy()
+            offset = direction.copy()
+            offset.scaleBy(along)
+            zoom_pivot.translateBy(offset)
         design = adsk.fusion.Design.cast(_app.activeProduct)
         if design:
             hits = adsk.core.ObjectCollection.create()
             design.rootComponent.findBRepUsingRay(origin, direction, adsk.fusion.BRepEntityTypes.BRepFaceEntityType, -1.0, True, hits)
             if hits.count:
                 pivot = hits.item(0)
+                forward = [hits.item(i) for i in range(hits.count) if origin.vectorTo(hits.item(i)).dotProduct(direction) >= 0]
+                if forward:
+                    zoom_pivot = min(forward, key=lambda p: origin.distanceTo(p)).copy()
             else:
                 ui = _app.userInterface
                 if ui.activeSelections.count:
@@ -96,7 +111,7 @@ def _begin(command):
     if not 0.01 < fov < 3.12:
         fov = 0.785398
     _session = command["session"]
-    _put(_outgoing, {"t": "scene", "session": _session, "eye": eye.asArray(), "target": target.asArray(), "up": up.asArray(), "pivot": pivot.asArray(), "verticalFov": fov, "orthoHeight": height, "width": viewport.width, "height": viewport.height, "orthographic": ortho})
+    _put(_outgoing, {"t": "scene", "session": _session, "eye": eye.asArray(), "target": target.asArray(), "up": up.asArray(), "pivot": pivot.asArray(), "zoomPivot": zoom_pivot.asArray(), "verticalFov": fov, "orthoHeight": height, "width": viewport.width, "height": viewport.height, "orthographic": ortho})
 
 def _apply(command):
     if command.get("session") != _session or not _app.activeViewport:
