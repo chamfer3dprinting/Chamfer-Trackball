@@ -28,7 +28,7 @@ internal sealed class Controller:IDisposable{
     }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
-    public bool IsCad=>!calibration.Active&&profile!=null&&nativeFocusAllowed&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
+    public bool IsCad=>!calibration.Receiving&&profile!=null&&nativeFocusAllowed&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
     public Controller(ConfigStore store,InputDriver input,NativeServer server){
         this.store=store;this.input=input;this.server=server;cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);
         input.IsCad=()=>IsCad;input.IsCapture=()=>mode!=NavMode.Idle||PointerCapture;input.SelectedDevice=()=>ConfigStore.S(cfg,"selectedDevice");
@@ -50,7 +50,6 @@ public string AppName{get;private set;}="";
             calibration.Cancel();calibrationMotion.Reset();Log("Calibration stopped because the program or trackball changed.","err");
         }
         if(calibration.Receiving&&!input.Ready){calibration.Interrupt("Trackball disconnected or reconnecting. Roll it once, then record this movement again.");calibrationMotion.Reset();}
-        if(calibration.Receiving){var sample=calibrationMotion.Peek();calibrationMotion.Reset();calibration.Tick(sample.X,sample.Y,sample.Wheel,Environment.TickCount64);}
         var w=Win32.GetForegroundWindow();
         if(w!=foregroundWindow){
             End();latched=NavMode.Idle;combos.Clear();pressed.Clear();intercepted.Clear();comboUsed.Clear();foregroundWindow=w;
@@ -65,6 +64,8 @@ public string AppName{get;private set;}="";
         }else if(profile!=null&&ConfigStore.S(profile,"id")=="demo"){
             if(!padVisible||!Win32.GetCursorPos(out var cursor2)||!new Rectangle(padOrigin.X+pad.X,padOrigin.Y+pad.Y,pad.Width,pad.Height).Contains(cursor2.X,cursor2.Y)){End();profile=null;}
         }
+        UpdateCalibrationForeground();
+        if(calibration.Receiving){var sample=calibrationMotion.Peek();calibrationMotion.Reset();calibration.Tick(sample.X,sample.Y,sample.Wheel,Environment.TickCount64);}
         nativeFocusAllowed=profile==null||ConfigStore.S(profile,"id")=="demo"||server.AllowsNavigation(ConfigStore.S(profile,"id"),foregroundPid);
         if(mode==NavMode.Idle&&input.Ready&&ConfigStore.B(cfg,"enabled")&&PointerCapture){
             var movement=pointer.Tick(Environment.TickCount64,GlideSeconds,ConfigStore.B(cfg,"smooth",true)&&pressed.Count==0,PointerGain);
@@ -126,8 +127,15 @@ public string AppName{get;private set;}="";
     float PanGain=>MotionPolicy.Gain(ConfigStore.D(cfg,"panSens",50));
     float ZoomGain=>MotionPolicy.Gain(ConfigStore.D(cfg,"zoomSens",50));
     float GlideSeconds=>(float)(.05+Math.Clamp(ConfigStore.D(cfg,"glide",5),1,100)/100*1.45);
+    void UpdateCalibrationForeground(){
+        if(!calibration.Receiving)return;
+        Win32.GetWindowThreadProcessId(Win32.GetForegroundWindow(),out var pid);
+        calibration.Foreground(pid==Environment.ProcessId);
+        if(!calibration.Receiving)calibrationMotion.Reset();
+    }
     void Motion(int x,int y,string device,bool captured){
         rawX+=x;rawY+=y;
+        UpdateCalibrationForeground();
         if(calibration.Receiving){calibrationMotion.Move(x,y);timer.Interval=16;}
         if(!captured)return;
         if(mode==NavMode.Idle&&IsCad&&input.Ready){
@@ -210,6 +218,7 @@ public string AppName{get;private set;}="";
         }
     }
     bool MouseEvent(int msg,int data){
+        UpdateCalibrationForeground();
         bool wheel=msg is 0x20a or 0x20e;
         if(wheel&&calibration.Receiving){if(msg==0x20a)calibrationMotion.Wheel(data);timer.Interval=16;return true;}
         if(wheel&&mode!=NavMode.Idle){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);else pending.Wheel(data);return true;}
@@ -312,8 +321,21 @@ public string AppName{get;private set;}="";
     public JsonObject Status(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
         var result=new JsonObject{["mode"]=Mode,["rollLog"]=rollLog,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["twistGain"]=TwistGain,["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["navigationMode"]=Mode,["keys"]=KeysState(),["pointerGain"]=PointerGain,["orbitGain"]=OrbitGain,["panGain"]=PanGain,["zoomGain"]=ZoomGain,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?(input.Ready?"cad":"setup"):"mouse",["deviceReady"]=input.Ready,["identifying"]=input.Identifying,["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
+        result["inputSignal"]=input.SignalState();
         if(calibration.Active)result["twistCalibration"]=CalibrationState();
         ox=oy=px=py=zoom=zoomLog=rawX=rawY=rollLog=0;fit=false;return result;
+    }
+    internal void VerifyCalibrationNavigation(){
+        var previousProfile=profile;var previousWindow=foregroundWindow;bool previousFocus=nativeFocusAllowed;
+        try{
+            profile=new(){["id"]="demo"};foregroundWindow=Win32.GetForegroundWindow();nativeFocusAllowed=true;
+            calibration.Open();
+            if(!IsCad)throw new InvalidOperationException("An idle calibration wizard disabled application navigation.");
+            calibration.Record("faces",Environment.TickCount64);
+            if(IsCad)throw new InvalidOperationException("Calibration recording did not reserve its input.");
+            calibration.Foreground(false);
+            if(!IsCad||calibration.Receiving)throw new InvalidOperationException("Leaving calibration did not restore navigation.");
+        }finally{calibration.Cancel();calibrationMotion.Reset();profile=previousProfile;foregroundWindow=previousWindow;nativeFocusAllowed=previousFocus;}
     }
     public JsonObject CalibrationOpen(){
         cfg=store.Snapshot();

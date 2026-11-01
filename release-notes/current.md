@@ -1,3 +1,13 @@
+## Restore navigation outside calibration and recover input after UI pauses
+
+- An open calibration review no longer disables navigation in every 3D app.
+- Switching from a calibration recording or Test to another app releases input and keeps completed samples.
+- Recover automatically after a brief UI pause once the input loop, device and registration are healthy.
+- Show actual ball input received in Home and calibration, including waiting, other-mouse movement, idle and recovery.
+- Verify selected sensor delivery through the input driver and controller, alongside native camera and interface checks.
+- Preserve existing shortcuts, buttons, wheels, programs, presets and speed values.
+- M512 twist remains an experimental estimate; software calibration does not add SlimBlade dual-sensor hardware.
+
 ## Calibration startup and reconnect
 
 - Initialize the saved calibration summary and direction controls on startup and program changes.

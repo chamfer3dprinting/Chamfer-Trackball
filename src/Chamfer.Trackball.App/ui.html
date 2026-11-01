@@ -281,7 +281,7 @@ details .ver{margin-top:10px;font-weight:600}
       </div>
       <p class="sub">In 3D apps, choose the <b>3D modelling</b> program and hold a navigation key while rolling. Release the keys to point normally. The default controls are shown below.</p>
       <div class="grid g3" style="margin-bottom:16px">
-        <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="6"/><path d="M5 6h4M15 6h4"/></svg></div><div style="min-width:0"><small>Trackball</small><b id="stDevice">Looking…</b></div></div>
+        <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="6"/><path d="M5 6h4M15 6h4"/></svg></div><div style="min-width:0"><small>Trackball</small><b id="stDevice">Looking…</b><small id="stSignal" style="display:block;white-space:normal;font-size:11px;line-height:1.4"></small></div></div>
         <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg></div><div style="min-width:0"><small>App in front</small><b id="stApp">—</b></div></div>
         <div class="card stat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 4v5h-5"/></svg></div><div style="min-width:0"><small>Right now</small><b id="stMode">Idle</b><small id="stProg" style="display:block;margin-top:2px"></small></div></div>
       </div>
@@ -581,6 +581,7 @@ details .ver{margin-top:10px;font-weight:600}
     <button class="btn" data-cal-record="clockwise">2 · Clockwise <span id="twistCalCountCw"></span></button>
     <button class="btn" data-cal-record="anticlockwise">3 · Anticlockwise <span id="twistCalCountCcw"></span></button>
   </div>
+  <p id="twistCalSignal" class="mu" style="font-size:12px"></p>
   <p id="twistCalPrompt" aria-live="polite">Start with normal up/down/left/right rolls.</p>
   <progress id="twistCalProgress" value="0" max="1" hidden></progress>
   <p id="twistCalResult" class="mu" aria-live="polite"></p>
@@ -1091,6 +1092,18 @@ function reportPad(){const p=$("#pad"),vis=page==="home"&&!document.hidden;if(!v
 addEventListener("resize",()=>{padColors=null;reportPad()});$("#main").addEventListener("scroll",()=>page==="home"&&reportPad(),{passive:true});
 document.addEventListener("visibilitychange",reportPad);
 
+function inputSignalText(signal){
+ if(!signal)return "";
+ const n=Number(signal.selectedMoves)||0;
+ if(n>0&&!signal.ready)return "Ball movement detected · input recovering";
+ if(n>0)return "Ball input: "+n+" movements received"+(signal.lastMoveAgeMs<=1500?" · receiving":" · idle");
+ if((Number(signal.otherMoves)||0)>0)return "Another mouse is moving. Identify the trackball if its ball does not register.";
+ return "No ball movement received yet. Roll your trackball to check.";
+}
+function updateInputSignal(signal){
+ const text=inputSignalText(signal);liveText("#stSignal",text);if(twistCalOpen)liveText("#twistCalSignal",text);
+}
+
 /* ---------- live status ---------- */
 const MODEN={Idle:"Mouse",Orbit:"Orbiting",PanZoom:"Panning + wheel zoom",Pan:"Panning + wheel zoom",Zoom:"Zooming",Roll:"Twisting",Snap:"Snap to angle",Navigate:"Navigating",Gestures:"Gesture"};
 function liveText(selector,value){const el=$(selector),text=String(value??"");if(el&&el.textContent!==text)el.textContent=text}
@@ -1103,6 +1116,7 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   if(s.rollLog){rotRoll(-s.rollLog);changed=true}
   const amount=s.zoomLog===undefined?(s.zoom||0)/700:s.zoomLog;
   if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
+  updateInputSignal(s.inputSignal);
   if(twistCalOpen)updateCalibration(s.twistCalibration);
   const focused=!document.hidden&&document.hasFocus();
   if(page==="home"&&!document.hidden)updateKeyboard(s);

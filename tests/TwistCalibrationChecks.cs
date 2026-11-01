@@ -48,6 +48,8 @@ static class TwistCalibrationChecks{
 
   var session=new TwistCalibrationSession();session.Open();session.Record("faces",1000);session.Tick(999,999,0,1100);
   check(session.Recording&&session.State(1100)["samples"]!["faces"]!.GetValue<int>()==0,"Recording ignores the warm-up movement caused by clicking Start");
+  session.Foreground(false);
+  check(session.Active&&!session.Receiving&&session.State(1200)["samples"]!["faces"]!.GetValue<int>()==0&&session.State(1200)["error"]!.GetValue<string>().Contains("switched apps"),"Leaving Admin stops a partial recording and allows application navigation");
   session.Interrupt("Reconnect");
   check(session.Active&&!session.Receiving&&session.State(1200)["samples"]!["faces"]!.GetValue<int>()==0,"A reconnect stops an incomplete sample while leaving the calibration wizard open");
   void Record(string kind,TwistSample[] values,long now){session.Record(kind,now);foreach(var item in values)session.Tick(item.X,item.Y,item.Wheel,now+600+item.Time-1000);session.Tick(0,0,0,now+5600);}
@@ -55,9 +57,14 @@ static class TwistCalibrationChecks{
   check(session.Model==null&&!session.Recording,"Two recordings cannot be applied as a complete calibration");
   Record("anticlockwise",Knob(-1),14000);
   check(session.Model!=null&&session.Active&&!session.Receiving&&session.State(20000)["hasModel"]!.GetValue<bool>(),"All three bounded recordings produce a reviewable model");
-  session.Test();check(session.Receiving&&session.State(20000)["testing"]!.GetValue<bool>(),"The learned result can be tested before saving");
+  check(!session.Receiving,"Reviewing a calibration does not reserve navigation input");
+  session.Test();session.Foreground(true);
+  check(session.Receiving,"Testing inside Admin retains the input reservation");
+  check(session.Receiving&&session.State(20000)["testing"]!.GetValue<bool>(),"The learned result can be tested before saving");
   for(int n=0;n<150;n++)session.Tick(31,15.5f,0,21000+n*16);
   check(session.State(24000)["testTurns"]!.GetValue<int>()>0,"Preview reports clockwise quarter turns from the learned pattern");
+  session.Foreground(false);
+  check(session.Active&&!session.Receiving&&session.Model!=null,"Leaving the calibration preview preserves the model and restores application navigation");
   session.Interrupt("Reconnect");
   check(session.Active&&!session.Receiving&&session.Model!=null,"A reconnect during preview preserves the completed unsaved model");
   session.Record("clockwise",25000);check(session.Model==null&&session.Recording,"Re-recording invalidates the previous uncommitted result");
