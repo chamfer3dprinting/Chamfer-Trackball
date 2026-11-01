@@ -46,9 +46,10 @@ public string AppName{get;private set;}="";
         int interval=mode==NavMode.Idle&&!pointer.Active&&!calibration.Receiving?idleInterval:16;
         if(timer.Interval!=interval)timer.Interval=interval;
         if(revision!=store.Revision){End();cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);revision=store.Revision;foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
-        if(calibration.Active&&(calibrationProgram!=ConfigStore.I(cfg,"activeProgram")||calibrationProgramName!=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name")||calibrationDevice!=ConfigStore.S(cfg,"selectedDevice")||!input.Ready||!ConfigStore.B(cfg,"enabled"))){
+        if(calibration.Active&&(calibrationProgram!=ConfigStore.I(cfg,"activeProgram")||calibrationProgramName!=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name")||calibrationDevice!=ConfigStore.S(cfg,"selectedDevice")||!ConfigStore.B(cfg,"enabled"))){
             calibration.Cancel();calibrationMotion.Reset();Log("Calibration stopped because the program or trackball changed.","err");
         }
+        if(calibration.Receiving&&!input.Ready){calibration.Interrupt("Trackball disconnected or reconnecting. Roll it once, then record this movement again.");calibrationMotion.Reset();}
         if(calibration.Receiving){var sample=calibrationMotion.Peek();calibrationMotion.Reset();calibration.Tick(sample.X,sample.Y,sample.Wheel,Environment.TickCount64);}
         var w=Win32.GetForegroundWindow();
         if(w!=foregroundWindow){
@@ -311,17 +312,20 @@ public string AppName{get;private set;}="";
     public JsonObject Status(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
         var result=new JsonObject{["mode"]=Mode,["rollLog"]=rollLog,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["twistGain"]=TwistGain,["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["navigationMode"]=Mode,["keys"]=KeysState(),["pointerGain"]=PointerGain,["orbitGain"]=OrbitGain,["panGain"]=PanGain,["zoomGain"]=ZoomGain,["cfgRev"]=store.Revision,["enabled"]=ConfigStore.B(cfg,"enabled"),["app"]=profile==null?AppName:ConfigStore.S(profile,"name"),["appState"]=IsCad?(input.Ready?"cad":"setup"):"mouse",["deviceReady"]=input.Ready,["identifying"]=input.Identifying,["device"]=input.Ready?"Trackball identified":input.DeviceStatus,["integration"]=Integration,["lastBtnSeq"]=lastBtnSeq,["lastBtn"]=lastBtn,["lastBtnAge"]=(DateTime.UtcNow-lastBtnTime).TotalMilliseconds,["lastAction"]=lastAction,["ox"]=ox,["oy"]=oy,["px"]=px,["py"]=py,["zoomLog"]=zoomLog,["zoom"]=zoom,["rawX"]=rawX,["rawY"]=rawY,["fit"]=fit,["lock3d"]=latched!=NavMode.Idle,["ballDir"]="",["sense"]="",["buttons"]=new JsonArray(pressed.Select(x=>JsonValue.Create(x)).ToArray())};
-        if(calibration.Active)result["twistCalibration"]=calibration.State(Environment.TickCount64);
+        if(calibration.Active)result["twistCalibration"]=CalibrationState();
         ox=oy=px=py=zoom=zoomLog=rawX=rawY=rollLog=0;fit=false;return result;
     }
     public JsonObject CalibrationOpen(){
         cfg=store.Snapshot();
-        if(!input.Ready||!ConfigStore.B(cfg,"enabled"))throw new InvalidOperationException("Identify and enable your trackball first.");
+        if(!ConfigStore.B(cfg,"enabled"))throw new InvalidOperationException("Enable 3D controls before calibrating.");
+        if(ConfigStore.S(cfg,"selectedDevice").Length==0)throw new InvalidOperationException("Identify your trackball before calibrating.");
         End();calibrationProgram=ConfigStore.I(cfg,"activeProgram");calibrationProgramName=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name");calibrationDevice=ConfigStore.S(cfg,"selectedDevice");
-        calibrationMotion.Reset();calibration.Open();return calibration.State(Environment.TickCount64);
+        calibrationMotion.Reset();calibration.Open();return CalibrationState();
     }
-    public JsonObject CalibrationRecord(string kind){if(!calibration.Active)throw new InvalidOperationException("Open calibration first.");calibrationMotion.Reset();calibration.Record(kind,Environment.TickCount64);timer.Interval=16;return calibration.State(Environment.TickCount64);}
-    public JsonObject CalibrationTest(){calibrationMotion.Reset();calibration.Test();timer.Interval=16;return calibration.State(Environment.TickCount64);}
+    JsonObject CalibrationState(){var state=calibration.State(Environment.TickCount64);state["deviceReady"]=input.Ready;state["deviceMessage"]=input.Ready?"Trackball connected":input.DeviceStatus;return state;}
+    void RequireCalibrationInput(){if(!input.Ready)throw new InvalidOperationException("Roll your selected trackball once to reconnect, then try recording again.");}
+    public JsonObject CalibrationRecord(string kind){RequireCalibrationInput();if(!calibration.Active)throw new InvalidOperationException("Open calibration first.");calibrationMotion.Reset();calibration.Record(kind,Environment.TickCount64);timer.Interval=16;return CalibrationState();}
+    public JsonObject CalibrationTest(){RequireCalibrationInput();calibrationMotion.Reset();calibration.Test();timer.Interval=16;return CalibrationState();}
     public void CalibrationCancel(){calibration.Cancel();calibrationMotion.Reset();}
     public JsonObject CalibrationApply(){
         cfg=store.Snapshot();

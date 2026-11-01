@@ -236,6 +236,10 @@ console.log('Bounded calibration receives selected-device raw roll/scroll withou
  vm.runInNewContext(html.slice(start,end),context);
  await node('#twistCalOpen').onclick();
  assert.ok(node('#twistCalProgram').textContent.includes('3D modelling'));
+ context.updateCalibration({active:true,deviceReady:false,samples:{}});
+ assert.ok(recordButtons.every(b=>b.disabled)&&node('#twistCalPrompt').textContent.includes('reconnect'));
+ context.updateCalibration({active:true,deviceReady:true,samples:{}});
+ assert.ok(recordButtons.every(b=>!b.disabled));
  await recordButtons[1].onclick();
  assert.ok(node('#twistCalPrompt').textContent.includes('CLOCKWISE'));
  assert.ok(node('#twistCalApply').disabled&&!node('#twistCalProgress').hidden);
@@ -254,3 +258,10 @@ console.log('Bounded calibration receives selected-device raw roll/scroll withou
  assert.ok(calls.some(c=>c[0]==='ctTwistCalApply')&&calls.some(c=>c[0]==='ctTwistCalClear'));
  console.log('Calibration recording, overlap review, live 90° preview, cancel, apply and clear work through the interface.');
 })().catch(err=>{console.error(err);process.exitCode=1});
+
+const renderAllSource=html.slice(html.indexOf('function renderAll()'),html.indexOf('async function boot()'));
+let calibrationRenders=0;
+const renderContext={S:{pointerAccel:false,settingsPath:'test',startup:false},cfg:{welcomeDone:true},$:()=>({}),applyTheme(){},renderEnabled(){},renderPrograms(){},renderBinds(){},renderCalibration(){calibrationRenders++},renderGestures(){},renderMacros(){},renderCheat(){},renderApps(){},renderNotes(){}};
+vm.runInNewContext(renderAllSource,renderContext);renderContext.renderAll();
+assert.equal(calibrationRenders,1,'Startup and program reload must render the saved calibration summary and axis controls');
+console.log('Calibration summary initializes with the full page and reconnecting input keeps the wizard usable.');

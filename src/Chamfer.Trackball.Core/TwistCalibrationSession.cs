@@ -40,5 +40,9 @@ public sealed class TwistCalibrationSession{
    ["summary"]=Model==null?"":Model.Source=="wheel"?"A scroll signal was detected during the knob turns.":"Your X/Y roll patterns were learned. Similar motions can still overlap.",
    ["error"]=error,["testing"]=testing,["testIntent"]=testing?(Model?.Source=="wheel"&&testInput.EstimatedTwist?"Twist 90°":SnapLabels.For(testInput.State)):"",["testTurns"]=signedTurns,["testProgress"]=Math.Round(testInput.Progress*100)};
  }
+ public void Interrupt(string message){
+  if(Recording&&samples.ContainsKey(phase))samples[phase].Clear();
+  Recording=testing=false;phase="review";error=message;testInput.Reset();signedTurns=lastTurns=0;
+ }
  public void Cancel(){active=testing=Recording=false;phase="";Model=null;error="";foreach(var list in samples.Values)list.Clear();testInput.Reset();signedTurns=lastTurns=0;}
 }

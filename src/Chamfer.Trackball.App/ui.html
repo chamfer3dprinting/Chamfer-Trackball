@@ -691,17 +691,17 @@ function renderCalibration(){
 function updateCalibration(s){
  if(!twistCalOpen)return;
  if(!s?.active){closeCalibration();toast("Calibration stopped. Open it again to record.",true);return}
- const record=!!s.recording;
- $$("#twistCalModal [data-cal-record]").forEach(b=>b.disabled=record||twistCalBusy);
+ const record=!!s.recording,ready=s.deviceReady!==false;
+ $$("#twistCalModal [data-cal-record]").forEach(b=>b.disabled=record||twistCalBusy||!ready);
  const counts=s.samples||{};
  liveText("#twistCalCountFaces",counts.faces?"✓ "+counts.faces:"");
  liveText("#twistCalCountCw",counts.clockwise?"✓ "+counts.clockwise:"");
  liveText("#twistCalCountCcw",counts.anticlockwise?"✓ "+counts.anticlockwise:"");
- liveText("#twistCalPrompt",record?(s.starting?"Get ready… ":CAL_PROMPTS[s.phase]+" ")+Math.ceil((s.remainingMs||0)/1000)+"s":s.testing?"Try a knob turn in each direction, then normal up/down/left/right rolls. No keys needed.":s.hasModel?"Ready to test. If a normal roll is mistaken for twist, re-record the samples.":"Record each of the three movements. You can repeat a sample.");
+ liveText("#twistCalPrompt",!ready?"Roll your selected trackball once to reconnect. If it stays disconnected, close this window and identify the trackball again.":record?(s.starting?"Get ready… ":CAL_PROMPTS[s.phase]+" ")+Math.ceil((s.remainingMs||0)/1000)+"s":s.testing?"Try a knob turn in each direction, then normal up/down/left/right rolls. No keys needed.":s.hasModel?"Ready to test. If a normal roll is mistaken for twist, re-record the samples.":"Record each of the three movements. You can repeat a sample.");
  $("#twistCalProgress").hidden=!record;$("#twistCalProgress").value=s.progress||0;
  liveText("#twistCalResult",s.error||((s.quality?s.quality+". ":"")+(s.summary||"")));
  $("#twistCalResult").classList.toggle("err",!!s.error);
- $("#twistCalTest").disabled=!s.hasModel||record||twistCalBusy;
+ $("#twistCalTest").disabled=!s.hasModel||record||twistCalBusy||!ready;
  $("#twistCalApply").disabled=!s.hasModel||record||twistCalBusy;
  $("#twistCalPreview").hidden=!s.testing;
  liveText("#twistCalIntent",s.testIntent||"");
@@ -1317,7 +1317,7 @@ document.addEventListener("change",e=>{const t=e.target;if(!t.closest||!t.closes
 
 /* ---------- start ---------- */
 $("#openMouse").onclick=()=>call("ctOpenMouseSettings");
-function renderAll(){$("#accelNote").hidden=!S.pointerAccel;applyTheme();renderEnabled();renderPrograms();renderBinds();renderGestures();renderMacros();renderCheat();renderApps();renderNotes();
+function renderAll(){$("#accelNote").hidden=!S.pointerAccel;applyTheme();renderEnabled();renderPrograms();renderBinds();renderCalibration();renderGestures();renderMacros();renderCheat();renderApps();renderNotes();
   $("#setPath").textContent=S.settingsPath;$("#startup").checked=S.startup;$("#welcome").hidden=!!cfg.welcomeDone}
 async function boot(){S=await call("ctState");cfg=JSON.parse(JSON.stringify(S.config));
   if(S.edition==="admin"){$("#navAdmin").hidden=false;$("#edPill").hidden=false;$("#adIntro").textContent="Admin v"+S.version+". Choose any unused public version below and click Release for public. Click Update in About & updates for newer Admin versions."}
