@@ -102,3 +102,6 @@ Calibration saves per program and preset, works with Alt Snap or a separate Twis
 
 
 Calibration only reserves input during recording or the local Test preview. Switching to another app stops that capture, keeps completed samples, and restores navigation. Home and calibration now show actual received ball movement separately from device presence. Temporary UI-pause recovery requires a stable healthy input loop before resuming; native mouse input remains available while recovering.
+
+
+A slight clockwise or anticlockwise knob nudge now triggers a **complete 90° cube rotation**. You do not need to physically turn the ball through 90°. Pause briefly (about a quarter second), reverse deliberately, or release/rehold the key for another step. Continuing the same stroke emits one step. This applies to Alt's experimental estimate, an optional Twist hold and calibration Test; older saved calibration distances do not force a large physical turn. Twist sensitivity and Reverse remain available.

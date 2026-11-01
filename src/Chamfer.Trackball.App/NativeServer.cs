@@ -47,7 +47,7 @@ internal sealed class NativeServer:IDisposable {
         lock(c.Gate){
             if(c.EstimateTwist){
                 if(c.Pose==null)return new(){["state"]="waiting",["label"]="Waiting for 3D view",["message"]="Waiting for the 3D view…"};
-                var input=c.EstimatedSnap;bool wheelSignal=c.TwistCalibration?.Source=="wheel";string estimateMessage=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?"Estimated twist · "+(input.LastDirection<0?"anticlockwise":"clockwise")+" · next "+Math.Round(input.Progress*100)+"%":"Faces · roll up/down/left/right";
+                var input=c.EstimatedSnap;bool wheelSignal=c.TwistCalibration?.Source=="wheel";string estimateMessage=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?(input.Nudged?"Twist registered · pause briefly or reverse for another 90° turn":"Estimated twist · small nudge · trigger "+Math.Round(input.Progress*100)+"%"):"Faces · roll up/down/left/right";
                 if(input.LastTurnAt!=0&&Environment.TickCount64-input.LastTurnAt<1400)estimateMessage=(input.LastEstimatedTurn?"Estimated ":"")+(input.LastDirection>0?"clockwise":"anticlockwise")+" 90°";
                 return new(){["state"]=input.State,["label"]=wheelSignal&&input.EstimatedTwist?"Twist 90°":SnapLabels.For(input.State),["message"]=wheelSignal?estimateMessage.Replace("Estimated ","Scroll signal ").Replace("Estimated twist","Twist"):estimateMessage,["samples"]=input.Samples,["turns"]=input.QuarterTurns,["direction"]=input.LastDirection};
             }

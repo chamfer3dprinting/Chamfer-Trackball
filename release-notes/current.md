@@ -1,3 +1,11 @@
+## Small knob nudges trigger complete 90° cube rotations
+
+- Use a slight clockwise or anticlockwise knob nudge to trigger one full cube quarter turn.
+- A large physical ball rotation is no longer required, including with older saved calibrations.
+- Pause briefly, reverse direction or release/rehold the key for another step. Continuing one stroke does not repeatedly spin the cube.
+- Keep exact cube-face alignment and distance, with the same trigger in Alt Snap, an optional Twist hold and calibration Test.
+- Preserve your existing controls, calibration, programs, presets, wheels and speed settings.
+
 ## Restore navigation outside calibration and recover input after UI pauses
 
 - An open calibration review no longer disables navigation in every 3D app.

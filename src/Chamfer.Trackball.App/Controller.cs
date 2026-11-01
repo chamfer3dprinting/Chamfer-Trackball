@@ -185,8 +185,8 @@ public string AppName{get;private set;}="";
         // Snap receives unscaled X/Y so dial recognition is independent of Orbit speed.
         float nativeGain=output==NavMode.Snap?MotionPolicy.SnapGain(ConfigStore.D(cfg,"orbitSens",50)):1;
         if(output==NavMode.Roll&&knobHoldActive){
-            float delta=learnedTwist?.CameraDelta(x,y,w,TwistGain,ConfigStore.B(cfg,"invertTwist"))??KnobTwist.CameraDelta(x,y,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),TwistGain);
-            twistSteps=knobSteps.Add(delta);x=(twistSteps%4)*KnobSteps.QuarterDelta;y=0;w=learnedTwist?.Source=="wheel"?0:scaled.Wheel;
+            float delta=learnedTwist?.NudgeDelta(x,y,w,TwistGain,ConfigStore.B(cfg,"invertTwist"))??KnobTwist.CameraDelta(x,y,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),TwistGain);
+            twistSteps=knobSteps.AddNudge(delta,Environment.TickCount64);x=(twistSteps%4)*KnobSteps.QuarterDelta;y=0;w=learnedTwist?.Source=="wheel"?0:scaled.Wheel;
         }else if(output!=NavMode.Snap){x=scaled.X;y=scaled.Y;w=scaled.Wheel;}
         bool demo=ConfigStore.S(profile,"id")=="demo";
         if(native!=null)try{if(!server.Move(native,output,x,y,w,input.Keys.Contains(18),nativeGain))return false;}

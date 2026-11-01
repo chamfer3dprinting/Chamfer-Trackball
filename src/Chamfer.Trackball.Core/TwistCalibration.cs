@@ -34,6 +34,12 @@ public sealed class TwistCalibrationModel{
   catch(Exception ex)when(ex is JsonException or NotSupportedException or InvalidOperationException or NullReferenceException){throw new InvalidDataException("Invalid twist calibration.",ex);}
  }
  public float Project(float x,float y,float wheel)=>Source=="wheel"?wheel*WheelSign:x*AxisX+y*AxisY;
+ public float NudgeDelta(float x,float y,float wheel,float gain,bool reverse){
+  float value=Project(x,y,wheel);if(!float.IsFinite(value)||!float.IsFinite(gain))throw new ArgumentException("Invalid calibrated motion.");
+  // Calibration supplies axis/sign and intent. Recorded turn distance does
+  // not force the user to repeat a full physical turn to trigger a cube snap.
+  return Math.Clamp(value*(reverse?.2f:-.2f)*Math.Clamp(gain,0,4),-1000,1000);
+ }
  public float CameraDelta(float x,float y,float wheel,float gain,bool reverse){
   float value=Project(x,y,wheel);if(!float.IsFinite(value)||!float.IsFinite(gain))throw new ArgumentException("Invalid calibrated motion.");
   return Math.Clamp(-value/QuarterCounts*KnobSteps.QuarterDelta*Math.Clamp(gain,0,4)*(reverse?-1:1),-1000,1000);

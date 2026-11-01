@@ -533,7 +533,7 @@ foreach(var stroke in new[]{new Vector2(60,12),new Vector2(-60,-12),new Vector2(
 var fallbackEstimate=new EstimatedFaceSnap();fallbackEstimate.Reset(studioView);var fallbackView=studioView;
 for(int frame=0;frame<8;frame++)fallbackView=fallbackEstimate.Step(studioView,70,0,0,.2f,1,"x",false,1000+frame*16);
 for(int frame=8;frame<14;frame++)fallbackView=fallbackEstimate.Step(studioView,70,30,0,.2f,1,"x",false,1000+frame*16);
-Check(!fallbackEstimate.EstimatedTwist&&fallbackEstimate.QuarterTurns==0,"An initially knob-like normal roll falls back to faces before issuing a false 90-degree turn");
+Check(!fallbackEstimate.EstimatedTwist&&fallbackEstimate.QuarterTurns==1,"After a recognized short nudge, later cross-axis movement returns to face selection without additional twist snaps");
 var quietEstimate=new EstimatedFaceSnap();quietEstimate.Reset(studioView);quietEstimate.Step(studioView,5,0,0,.2f,1,"x",false,1000);
 quietEstimate.Step(studioView,0,0,0,.2f,1,"x",false,1200);
 Check(!quietEstimate.Pending&&!quietEstimate.EstimatedTwist,"A short unfinished motion resolves without staying frozen in a pending estimate");
@@ -558,8 +558,9 @@ Check(obliqueEstimate.QuarterTurns==1&&IsFace(obliqueTurn),"Alt estimated twist 
 
 var estimatedWheelInput=new EstimatedFaceSnap();estimatedWheelInput.Reset(studioView);var estimatedWheelPose=studioView;
 for(int frame=0;frame<12;frame++)estimatedWheelPose=estimatedWheelInput.Step(studioView,100,0,0,.2f,1,"x",false,1000+frame*16);
+var beforeEstimatedWheel=estimatedWheelPose;
 estimatedWheelPose=estimatedWheelInput.Step(studioView,0,0,120,.2f,1,"x",false,1300);
-Check(Vector3.Dot(estimatedWheelPose.Up,Vector3.UnitX)>.999f&&Math.Abs(Vector3.Distance(estimatedWheelPose.Eye,estimatedWheelPose.Target)-10)<.0001&&!estimatedWheelInput.LastEstimatedTurn,"Alt plus wheel remains an exact face quarter turn after an estimated knob candidate; it never becomes zoom");
+Check(Math.Abs(Vector3.Dot(estimatedWheelPose.Up,beforeEstimatedWheel.Up))<.001f&&Math.Abs(Vector3.Distance(estimatedWheelPose.Eye,estimatedWheelPose.Target)-10)<.0001&&!estimatedWheelInput.LastEstimatedTurn,"Alt plus wheel remains an exact face quarter turn after an estimated knob candidate; it never becomes zoom");
 
 
 var heldTransitionInput=new EstimatedFaceSnap();heldTransitionInput.Reset(studioView);var heldTransitionPose=studioView;
@@ -588,4 +589,5 @@ Check(SnapLabels.For("twist")=="Estimated twist 90°"&&SnapLabels.For("faces")==
 
 TwistCalibrationChecks.Run(Check);
 InputRecoveryChecks.Run(Check);
+KnobNudgeChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

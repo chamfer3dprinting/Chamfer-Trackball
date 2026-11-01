@@ -14,6 +14,7 @@ public sealed class EstimatedFaceSnap{
  public bool LastEstimatedTurn{get;private set;}
  public long Samples{get;private set;}
  public float Progress=>turns.Progress;
+ public bool Nudged=>turns.Nudged;
  public string State=>stage switch{1=>"estimating",3=>"twist",_=>"faces"};
  public void Reset(CameraPose? initial=null){
   faces.Reset(initial);pose=initial==null?null:faces.Step(initial,0,0);turns.Reset();pending.Clear();stage=0;began=lastMotion=faceDecisionAt=lastWheel=0;recent.Clear();
@@ -28,7 +29,7 @@ public sealed class EstimatedFaceSnap{
   return pose;
  }
  void Twist(CameraPose start,float x,float y,float gain,string axis,bool reverse,long now,TwistCalibrationModel? calibration=null,float wheel=0){
-  float delta=calibration?.CameraDelta(x,y,wheel,gain,reverse)??KnobTwist.CameraDelta(x,y,axis,reverse,gain);if(delta!=0)LastDirection=-Math.Sign(delta);int steps=turns.Add(delta);
+  float delta=calibration?.NudgeDelta(x,y,wheel,gain,reverse)??KnobTwist.CameraDelta(x,y,axis,reverse,gain);if(delta!=0)LastDirection=-Math.Sign(delta);int steps=turns.AddNudge(delta,now);
   if(steps==0)return;
   pose=CameraMath.Move(pose??start,NavMode.Roll,(steps%4)*KnobSteps.QuarterDelta,0);
   turnedInBurst=true;LastEstimatedTurn=true;QuarterTurns+=Math.Abs(steps);LastDirection=-Math.Sign(steps);LastTurnAt=now;
