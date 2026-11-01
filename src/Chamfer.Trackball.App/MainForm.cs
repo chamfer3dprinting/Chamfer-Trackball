@@ -274,6 +274,7 @@ internal sealed class MainForm:Form{
             controller.Status();input.VerifyMotionDelivery();
             var rawDelivery=controller.Status();if(ConfigStore.D(rawDelivery,"rawX")!=24||ConfigStore.D(rawDelivery,"rawY")!=-12)throw new Exception("Raw selected sensor did not reach Controller.Motion.");
             controller.VerifyCalibrationNavigation();
+            controller.VerifyKnobHandshake();
             await NativeSmokeTest();
             await ReleaseSmoke.Run();
             if(BuildInfo.Admin){var state=admin.State();if(state==null)throw new Exception("Admin state unavailable.");}
@@ -293,7 +294,7 @@ internal sealed class MainForm:Form{
             if(passed!="true"||ready!="true"||store.Snapshot()["programs"]?[0]?["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, short knob nudges producing exact 90-degree steps, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, short knob nudges producing exact 90-degree steps, first-nudge handshake retention and one camera update per stroke, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }
