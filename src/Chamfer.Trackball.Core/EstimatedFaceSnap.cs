@@ -15,7 +15,7 @@ public sealed class EstimatedFaceSnap{
  public float Progress=>turns.Progress;
  public string State=>stage switch{1=>"estimating",3=>"twist",_=>"faces"};
  public void Reset(CameraPose? initial=null){
-  pose=initial;faces.Reset(initial);turns.Reset();pending.Clear();stage=0;began=lastMotion=0;
+  faces.Reset(initial);pose=initial==null?null:faces.Step(initial,0,0);turns.Reset();pending.Clear();stage=0;began=lastMotion=0;
   along=cross=alongEnergy=crossEnergy=travel=0;QuarterTurns=0;LastDirection=0;LastTurnAt=0;Samples=0;
  }
  void Start(long now){

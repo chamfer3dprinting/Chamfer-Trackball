@@ -549,4 +549,10 @@ Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate"),"Normal mouse does not
 ConfigStore.LoadProgram(estimateDefaults,1);
 Check(ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="alt","The 3D default uses Alt for experimental faces and 90-degree knob turns without a switch or Shift");
 
+
+var obliqueEstimate=new EstimatedFaceSnap();var obliqueStart=studioView with{Eye=new Vector3(4,6,10)};
+obliqueEstimate.Reset(obliqueStart);var obliqueTurn=obliqueStart;
+for(int frame=0;frame<40;frame++)obliqueTurn=obliqueEstimate.Step(obliqueStart,60,0,0,.2f,1,"x",false,1000+frame*16);
+Check(obliqueEstimate.QuarterTurns==1&&IsFace(obliqueTurn),"Alt estimated twist first aligns an oblique starting view to a cube face before its 90-degree turn");
+
 Console.WriteLine(count+" regression checks passed.");
