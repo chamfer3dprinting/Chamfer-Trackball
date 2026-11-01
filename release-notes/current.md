@@ -1,3 +1,12 @@
+## Alt-only faces and experimental 90° knob snaps
+
+- Hold Alt for directional face changes and estimated knob turns. No Alt-tap switch or Shift requirement is added.
+- Up/down/left/right moves through adjacent cube faces at a bounded repeat rate. Continued strokes keep their world axis through Top and Bottom instead of bouncing.
+- Knob turns snap orientation in 90° steps instead of rotating freely. The guide reports estimated twist and progress toward the next step.
+- The experimental estimator uses a brief X/Y path observation. Uncertain or cross-axis motion falls back to faces; normal horizontal rolling can still resemble a twist.
+- Turn off “Estimate 90° knob turns with Snap” for directional-only control. A separate custom Twist hold remains optional.
+- Preserve existing programs, presets, speed, clicks and wheels. Keep Normal mouse controls unchanged.
+
 ## Knob-style Twist hold
 
 - Hold Alt+Shift in a supported native 3D view and turn the ball in place like a volume knob to turn its orientation. Release to point normally.

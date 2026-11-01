@@ -13,7 +13,7 @@ internal sealed class NativeServer:IDisposable {
     internal sealed class Client {
         public string Id=Guid.NewGuid().ToString("N"),App="",Session="";
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
-        public bool Focus=true;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();
+        public bool Focus=true,SnapTwist,EstimateTwist;public float TwistGain=1;public string TwistAxis="x";public bool ReverseTwist;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
         public readonly SemaphoreSlim OutSignal=new(0,1);
         public object Gate=new();
@@ -28,7 +28,7 @@ internal sealed class NativeServer:IDisposable {
     public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
     public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
-    public void Begin(Client c,NavMode mode,int x,int y){lock(c.Gate){c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.Snap.Reset();Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
+    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false){lock(c.Gate){c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.Snap.Reset();Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
     public bool Move(Client c,NavMode mode,float dx,float dy,float wheel,bool vertical,float gain){
         lock(c.Gate){
             if(c.Version==1){
@@ -36,29 +36,34 @@ internal sealed class NativeServer:IDisposable {
                 return true;
             }
             if(c.Pose==null)return false;
-            if(mode==NavMode.Snap)c.Pose=c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
+            if(mode==NavMode.Snap)c.Pose=c.EstimateTwist?c.EstimatedSnap.Step(c.BasePose!,dx,dy,wheel,gain,c.TwistGain,c.TwistAxis,c.ReverseTwist,Environment.TickCount64):c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
             else c.Pose=CameraMath.Move(c.Pose,mode,dx,dy,wheel,vertical,gain);
             Queue(c,PoseMessage(c));return true;
         }
     }
+    public bool PendingSnap(Client? c){if(c==null)return false;lock(c.Gate)return c.EstimateTwist&&c.EstimatedSnap.Pending;}
     public JsonObject SnapState(Client? c){
         if(c==null)return new(){["state"]="unavailable",["message"]="Face turns need a native 3D connection."};
         lock(c.Gate){
+            if(c.EstimateTwist){
+                var input=c.EstimatedSnap;string message=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?"Estimated twist · "+(input.LastDirection<0?"anticlockwise":"clockwise")+" · next "+Math.Round(input.Progress*100)+"%":"Faces · roll up/down/left/right";
+                if(input.LastTurnAt!=0&&Environment.TickCount64-input.LastTurnAt<1400)message="Estimated "+(input.LastDirection>0?"clockwise":"anticlockwise")+" 90°";
+                return new(){["state"]=input.State,["message"]=message,["samples"]=input.Samples,["turns"]=input.QuarterTurns,["direction"]=input.LastDirection};
+            }
             var snap=c.Snap;bool recent=snap.TurnCount>0&&Environment.TickCount64-snap.LastTurnAt<1400;
-            string state=c.Pose==null?"waiting":recent?"turned":snap.Turning?"curving":snap.Samples==0?"ready":"rolling";
+            string state=c.Pose==null?"waiting":recent?"turned":snap.Samples==0?"ready":"rolling";
             string message=state switch{
                 "waiting"=>"Waiting for the 3D view…",
                 "turned"=>snap.LastTurnDirection>0?"Clockwise 90°":"Counterclockwise 90°",
-                "curving"=>"Curve detected — keep curling",
-                "ready"=>"Roll straight for faces; curl to turn",
-                _=>"Ball received — curl to turn"
+                "ready"=>"Roll up/down/left/right to switch faces",
+                _=>"Switching cube faces"
             };
             return new(){["state"]=state,["message"]=message,["samples"]=snap.Samples,["turns"]=snap.TurnCount,["direction"]=snap.LastTurnDirection};
         }
     }
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
     static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
-    public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";}}
+    public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.SnapTwist=c.EstimateTwist=false;}}
     static void Queue(Client c,JsonObject msg){
         lock(c.Gate){
             if(ConfigStore.S(msg,"t")=="camera"){
@@ -79,7 +84,10 @@ internal sealed class NativeServer:IDisposable {
             Vector3 vec(string key){var a=m[key]!.AsArray();if(a.Count!=3)throw new FormatException();return new(a[0]!.GetValue<float>(),a[1]!.GetValue<float>(),a[2]!.GetValue<float>());}
             var p=new CameraPose(vec("eye"),vec("target"),vec("up"),vec("pivot"),(float)ConfigStore.D(m,"verticalFov",.785398),(float)ConfigStore.D(m,"orthoHeight",10),ConfigStore.I(m,"width",800),ConfigStore.I(m,"height",600),ConfigStore.B(m,"orthographic"));
             p=p with{WorldUp=m["worldUp"] is JsonArray?vec("worldUp"):c.App=="chamfer3d"?Vector3.UnitY:Vector3.UnitZ};
-            if(p.Valid&&CameraPose.Finite(p.WorldUp)&&p.WorldUp.LengthSquared()>1e-12f)lock(c.Gate){c.Pose=c.BasePose=p;c.Snap.Reset(p);}
+            if(p.Valid&&CameraPose.Finite(p.WorldUp)&&p.WorldUp.LengthSquared()>1e-12f)lock(c.Gate){
+                c.Pose=c.BasePose=p;c.Snap.Reset(p);c.EstimatedSnap.Reset(p);
+                if(c.SnapTwist){c.Pose=c.BasePose=c.Snap.Step(p,0,0);Queue(c,PoseMessage(c));}
+            }
         }catch(Exception ex)when(ex is FormatException or InvalidOperationException or ArgumentException or NullReferenceException){ }
     }
     async Task Accept(){
