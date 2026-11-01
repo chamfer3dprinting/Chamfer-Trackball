@@ -216,6 +216,41 @@ console.log('Alt only selects neighboring faces; held Twist reports 90-degree st
 assert.ok(html.includes('data-k="altTwistEstimate"')&&html.includes("Uncertain motion selects faces"));
 console.log("Experimental Alt-only estimation is configurable independently from the optional dedicated Twist hold.");
 
-assert.ok(controller.includes('["snapLabel"]=snap==null?"":SnapLabels.For('));
+assert.ok(controller.includes('["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For('));
 assert.ok(html.includes('s.snapLabel||MODEN[s.mode]'));
 console.log('Home and the floating guide receive a distinct prominent label for face snapping versus estimated twist.');
+
+for(const key of ['ctTwistCalOpen','ctTwistCalRecord','ctTwistCalTest','ctTwistCalApply','ctTwistCalCancel','ctTwistCalClear'])assert.ok(html.includes(key));
+assert.ok(controller.indexOf('if(calibration.Receiving){calibrationMotion.Move(x,y)')<controller.indexOf('if(!captured)return;'),'selected-device calibration must see raw motion without requiring navigation capture');
+assert.ok(controller.includes('if(msg==0x20a)calibrationMotion.Wheel(data)'),'calibration must collect the reported vertical scroll channel');
+console.log('Bounded calibration receives selected-device raw roll/scroll without requiring held keys.');
+(async()=>{
+ const nodes=new Map(),messages=[],calls=[];
+ const recordButtons=['faces','clockwise','anticlockwise'].map(kind=>({dataset:{calRecord:kind},disabled:false}));
+ function node(id){if(!nodes.has(id))nodes.set(id,{textContent:'',disabled:false,hidden:false,value:0,style:{},focus(){},classList:{add(){},remove(){},toggle(){}}});return nodes.get(id)}
+ const model={source:'xy',separation:.5};
+ const config={activeProgram:1,programs:[{name:'Normal mouse'},{name:'3D modelling'}],twistCalibration:null};
+ const context={cfg:config,Math,JSON,Boolean,$:node,$$:()=>recordButtons,liveText:(id,value)=>node(id).textContent=String(value),toast:value=>messages.push(value),doSave:async()=>{},renderAll:()=>{},modal:async()=>true,
+ call:async(name,...args)=>{calls.push([name,...args]);if(name==='ctTwistCalOpen')return{active:true,samples:{}};if(name==='ctTwistCalRecord')return{active:true,recording:true,phase:args[0],remainingMs:5000,samples:{}};if(name==='ctTwistCalCancel')return true;if(name==='ctTwistCalApply')return{...config,twistCalibration:model};if(name==='ctTwistCalClear')return{...config,twistCalibration:null};return{active:true,hasModel:true,samples:{},testing:true}}};
+ const start=html.indexOf('/* ---------- twist calibration ---------- */'),end=html.indexOf('/* ---------- controls page ---------- */',start);
+ vm.runInNewContext(html.slice(start,end),context);
+ await node('#twistCalOpen').onclick();
+ assert.ok(node('#twistCalProgram').textContent.includes('3D modelling'));
+ await recordButtons[1].onclick();
+ assert.ok(node('#twistCalPrompt').textContent.includes('CLOCKWISE'));
+ assert.ok(node('#twistCalApply').disabled&&!node('#twistCalProgress').hidden);
+ context.updateCalibration({active:true,hasModel:false,error:'Not enough movement.',samples:{}});
+ assert.ok(node('#twistCalApply').disabled&&node('#twistCalResult').textContent.includes('Not enough'));
+ context.updateCalibration({active:true,hasModel:true,quality:'Overlapping patterns',summary:'Similar movements overlap.',samples:{faces:20,clockwise:30,anticlockwise:30}});
+ assert.equal(node('#twistCalApply').disabled,false);assert.ok(node('#twistCalResult').textContent.includes('Overlapping'));
+ await node('#twistCalTest').onclick();
+ context.updateCalibration({active:true,hasModel:true,testing:true,testIntent:'Estimated twist 90°',testTurns:-2,testProgress:40,samples:{}});
+ assert.equal(node('#twistCalPreview').hidden,false);assert.equal(node('#twistCalNeedle').style.transform,'rotate(-180deg)');
+ assert.ok(node('#twistCalTurns').textContent.includes('40%'));
+ await node('#twistCalCancel').onclick();assert.equal(context.cfg.twistCalibration,null,'Cancel must not apply the draft');
+ await node('#twistCalOpen').onclick();await node('#twistCalApply').onclick();assert.equal(context.cfg.twistCalibration,model);
+ context.renderCalibration();assert.ok(node('#twistCalSummary').textContent.includes('overlap'));
+ await node('#twistCalClear').onclick();assert.equal(context.cfg.twistCalibration,null);
+ assert.ok(calls.some(c=>c[0]==='ctTwistCalApply')&&calls.some(c=>c[0]==='ctTwistCalClear'));
+ console.log('Calibration recording, overlap review, live 90° preview, cancel, apply and clear work through the interface.');
+})().catch(err=>{console.error(err);process.exitCode=1});

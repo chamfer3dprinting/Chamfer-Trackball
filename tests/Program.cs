@@ -125,7 +125,7 @@ try{
  Check(ConfigStore.I(repaired,"orbitSens")==82&&ConfigStore.I(repaired,"panSens")==50&&ConfigStore.I(repaired,"pointerSpeed")==10,"An incomplete added program gets its own full motion defaults instead of leaking the previous program");
  store.Select(0);
  var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==27,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==28,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
@@ -459,7 +459,7 @@ try{
  foreach(var node in old["programs"]!.AsArray()){node!.AsObject().Remove("twistKeys");node["feel"]!.AsObject().Remove("twistSens");node["feel"]!.AsObject().Remove("twistAxis");node["feel"]!.AsObject().Remove("invertTwist");}
  old["programs"]![1]!["feel"]!["orbitSens"]=4;old["programs"]![0]!["pointerSpeed"]=3;File.WriteAllText(twistPath,old.ToJsonString());
  var store=new ConfigStore(twistPath);var migrated=store.Snapshot();
- Check(ConfigStore.I(migrated,"configVersion")==27&&ConfigStore.S(migrated,"twistKeys")=="none"&&ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program gains approved Alt-only estimation without a Shift requirement");
+ Check(ConfigStore.I(migrated,"configVersion")==28&&ConfigStore.S(migrated,"twistKeys")=="none"&&ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program gains approved Alt-only estimation without a Shift requirement");
  Check(ConfigStore.S(migrated,"selectedDevice")=="twist-device"&&ConfigStore.I(migrated,"orbitSens")==4&&ConfigStore.I(migrated["programs"]![0],"pointerSpeed")==3,"Twist migration preserves trackball identity and existing speed settings");
  Check(ConfigStore.S(migrated["programs"]![0],"twistKeys")=="none","Twist migration leaves Normal mouse shortcuts off");
  migrated["twistKeys"]="alt+t";migrated["twistSens"]=23;migrated["twistAxis"]="y";migrated["invertTwist"]=true;store.Save(migrated);store.SavePreset("Knob");
@@ -586,4 +586,5 @@ for(int transitionFrame=20;transitionFrame<80;transitionFrame++)jitterTransition
 Check(!jitterTransitionInput.Pending&&!jitterTransitionInput.EstimatedTwist,"Sub-count directional noise does not repeatedly reopen twist observation");
 Check(SnapLabels.For("twist")=="Estimated twist 90°"&&SnapLabels.For("faces")=="Snap faces"&&SnapLabels.For("estimating")=="Reading Alt motion","The guide prominently distinguishes estimated twist, face snapping and observation");
 
+TwistCalibrationChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

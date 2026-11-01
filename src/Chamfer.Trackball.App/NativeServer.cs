@@ -13,7 +13,7 @@ internal sealed class NativeServer:IDisposable {
     internal sealed class Client {
         public string Id=Guid.NewGuid().ToString("N"),App="",Session="";
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
-        public bool Focus=true,SnapTwist,EstimateTwist;public float TwistGain=1;public string TwistAxis="x";public bool ReverseTwist;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
+        public bool Focus=true,SnapTwist,EstimateTwist;public float TwistGain=1;public string TwistAxis="x";public bool ReverseTwist;public TwistCalibrationModel? TwistCalibration;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
         public readonly SemaphoreSlim OutSignal=new(0,1);
         public object Gate=new();
@@ -28,7 +28,7 @@ internal sealed class NativeServer:IDisposable {
     public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
     public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
-    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false){lock(c.Gate){c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.Snap.Reset();Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
+    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null){lock(c.Gate){c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.Snap.Reset();Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
     public bool Move(Client c,NavMode mode,float dx,float dy,float wheel,bool vertical,float gain){
         lock(c.Gate){
             if(c.Version==1){
@@ -36,7 +36,7 @@ internal sealed class NativeServer:IDisposable {
                 return true;
             }
             if(c.Pose==null)return false;
-            if(mode==NavMode.Snap)c.Pose=c.EstimateTwist?c.EstimatedSnap.Step(c.BasePose!,dx,dy,wheel,gain,c.TwistGain,c.TwistAxis,c.ReverseTwist,Environment.TickCount64):c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
+            if(mode==NavMode.Snap)c.Pose=c.EstimateTwist?c.EstimatedSnap.Step(c.BasePose!,dx,dy,wheel,gain,c.TwistGain,c.TwistAxis,c.ReverseTwist,Environment.TickCount64,c.TwistCalibration):c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
             else c.Pose=CameraMath.Move(c.Pose,mode,dx,dy,wheel,vertical,gain);
             Queue(c,PoseMessage(c));return true;
         }
@@ -46,9 +46,10 @@ internal sealed class NativeServer:IDisposable {
         if(c==null)return new(){["state"]="unavailable",["message"]="Face turns need a native 3D connection."};
         lock(c.Gate){
             if(c.EstimateTwist){
-                var input=c.EstimatedSnap;string estimateMessage=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?"Estimated twist · "+(input.LastDirection<0?"anticlockwise":"clockwise")+" · next "+Math.Round(input.Progress*100)+"%":"Faces · roll up/down/left/right";
+                if(c.Pose==null)return new(){["state"]="waiting",["label"]="Waiting for 3D view",["message"]="Waiting for the 3D view…"};
+                var input=c.EstimatedSnap;bool wheelSignal=c.TwistCalibration?.Source=="wheel";string estimateMessage=input.State=="estimating"?"Estimating motion…":input.EstimatedTwist?"Estimated twist · "+(input.LastDirection<0?"anticlockwise":"clockwise")+" · next "+Math.Round(input.Progress*100)+"%":"Faces · roll up/down/left/right";
                 if(input.LastTurnAt!=0&&Environment.TickCount64-input.LastTurnAt<1400)estimateMessage=(input.LastEstimatedTurn?"Estimated ":"")+(input.LastDirection>0?"clockwise":"anticlockwise")+" 90°";
-                return new(){["state"]=input.State,["message"]=estimateMessage,["samples"]=input.Samples,["turns"]=input.QuarterTurns,["direction"]=input.LastDirection};
+                return new(){["state"]=input.State,["label"]=wheelSignal&&input.EstimatedTwist?"Twist 90°":SnapLabels.For(input.State),["message"]=wheelSignal?estimateMessage.Replace("Estimated ","Scroll signal ").Replace("Estimated twist","Twist"):estimateMessage,["samples"]=input.Samples,["turns"]=input.QuarterTurns,["direction"]=input.LastDirection};
             }
             var snap=c.Snap;bool recent=snap.TurnCount>0&&Environment.TickCount64-snap.LastTurnAt<1400;
             string state=c.Pose==null?"waiting":recent?"turned":snap.Samples==0?"ready":"rolling";
@@ -63,7 +64,7 @@ internal sealed class NativeServer:IDisposable {
     }
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
     static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
-    public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.SnapTwist=c.EstimateTwist=false;}}
+    public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.SnapTwist=c.EstimateTwist=false;c.TwistCalibration=null;}}
     static void Queue(Client c,JsonObject msg){
         lock(c.Gate){
             if(ConfigStore.S(msg,"t")=="camera"){

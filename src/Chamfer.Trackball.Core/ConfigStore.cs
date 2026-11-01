@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Chamfer.Trackball.Core;
 
 public sealed class ConfigStore {
-    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","altTwistEstimate","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","altTwistEstimate","twistCalibration","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
     private readonly object gate=new();
     private readonly string path;
     private JsonObject config;
@@ -66,7 +66,7 @@ public sealed class ConfigStore {
             }
             LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=27;
         }
-        Validate(config);
+        config["configVersion"]=28;Validate(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
     public void Save(JsonObject incoming) {
@@ -79,6 +79,9 @@ public sealed class ConfigStore {
             var i=Math.Clamp(I(next,"activeProgram",0),0,next["programs"]!.AsArray().Count-1);
             next["activeProgram"]=i;
             var p=next["programs"]![i]!.AsObject();
+            // Calibration has a dedicated Apply/Clear transaction; an older UI save cannot undo it.
+            int current=I(config,"activeProgram");
+            if(i==current&&S(p,"name")==S(config["programs"]![current],"name"))next["twistCalibration"]=config["twistCalibration"]?.DeepClone();
             foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
             p["feel"]??=new JsonObject();
             foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
@@ -86,6 +89,11 @@ public sealed class ConfigStore {
             Validate(next);Write(next);config=next;Revision++;
         }
     }
+    public JsonObject SetTwistCalibration(TwistCalibrationModel? model){lock(gate){
+        var next=(JsonObject)config.DeepClone();int index=I(next,"activeProgram");
+        next["twistCalibration"]=model?.ToNode();next["programs"]![index]!["twistCalibration"]=next["twistCalibration"]?.DeepClone();
+        return PersistPresetChange(next);
+    }}
     public void IdentifyDevice(string device){
         if(string.IsNullOrWhiteSpace(device)||device.Length>4095)throw new ArgumentException("Invalid trackball identity.",nameof(device));
         lock(gate){
@@ -179,7 +187,7 @@ public sealed class ConfigStore {
             if(p["feel"] is not JsonObject)p["feel"]=d["programs"]![0]!["feel"]!.DeepClone();
             foreach(var entry in d["programs"]![0]!["feel"]!.AsObject())if(!p["feel"]!.AsObject().ContainsKey(entry.Key))p["feel"]![entry.Key]=entry.Value?.DeepClone();
         }
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=27;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=28;
     }
     public static void Validate(JsonObject c){
         var programs=c["programs"]!.AsArray().Select(n=>n!.AsObject()).ToList();
@@ -198,6 +206,7 @@ public sealed class ConfigStore {
                 if(binding.IsCtrlAlone&&key!="zoomKeys")throw new InvalidDataException("Ctrl by itself is available for Zoom. Choose another key for this navigation command.");
                 if(!used.Add(binding.Canonical))throw new InvalidDataException("Two navigation modes cannot use the same held keys. Pan and zoom share the Pan + zoom mode.");
             }
+            _=TwistCalibrationModel.FromNode(p["twistCalibration"]);
             if(S(p["feel"],"twistAxis","x") is not "x" and not "y")throw new InvalidDataException("Twist axis must be X or Y.");
             if(p["combos"] is JsonArray combos && combos.Count>64)throw new InvalidDataException("A program supports up to 64 combinations.");
         }
