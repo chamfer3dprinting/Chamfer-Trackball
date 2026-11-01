@@ -6,6 +6,10 @@ In the 3D modelling program, hold **Alt + ball** to change cube faces. Hold **Al
 
 Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds and verifies the single-file executables; no development folder is needed on the owner's PC.
 
+## Zoom toward the cursor
+
+Native zoom uses the visible surface under your pointer. In empty space it uses the cursor ray at the current view depth, so both inward and outward zoom keep the point under your pointer fixed on screen. Orbit keeps its existing pivot. This works with the updated Chamfer Studio bridge and the included Blender/Fusion adapters; reinstall those adapters from Integrations after updating. Mouse emulation follows the target application's own zoom behaviour.
+
 ## Editions and release channels
 
 - **Admin versions advance for each delivered update**, for example v1.5.7 → v1.5.8. The sidebar, About and update notifications display the real executable version. About & updates follows `admin-vX.Y.Z` owner prereleases. Internal build/source metadata stays available for diagnostics.

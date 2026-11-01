@@ -1,8 +1,8 @@
 using System.Numerics;
 namespace Chamfer.Trackball.Core;
-public sealed record CameraPose(Vector3 Eye,Vector3 Target,Vector3 Up,Vector3 Pivot,float VerticalFov,float OrthoHeight,int Width,int Height,bool Orthographic,Vector3 WorldUp=default){
+public sealed record CameraPose(Vector3 Eye,Vector3 Target,Vector3 Up,Vector3 Pivot,float VerticalFov,float OrthoHeight,int Width,int Height,bool Orthographic,Vector3 WorldUp=default,Vector3? ZoomPivot=null){
     public Vector3 WorldUpAxis=>WorldUp.LengthSquared()>1e-12f?Vector3.Normalize(WorldUp):Vector3.UnitZ;
-    public bool Valid=>Finite(Eye)&&Finite(Target)&&Finite(Up)&&Finite(Pivot)&&Vector3.DistanceSquared(Eye,Target)>1e-12f&&Up.LengthSquared()>1e-12f&&Vector3.Cross(Target-Eye,Up).LengthSquared()>1e-12f&&Height>0&&Width>0&&float.IsFinite(VerticalFov)&&VerticalFov>0&&VerticalFov<3.13f&&float.IsFinite(OrthoHeight)&&OrthoHeight>0;
+    public bool Valid=>Finite(Eye)&&Finite(Target)&&Finite(Up)&&Finite(Pivot)&&(ZoomPivot is not Vector3 anchor||Finite(anchor))&&Vector3.DistanceSquared(Eye,Target)>1e-12f&&Up.LengthSquared()>1e-12f&&Vector3.Cross(Target-Eye,Up).LengthSquared()>1e-12f&&Height>0&&Width>0&&float.IsFinite(VerticalFov)&&VerticalFov>0&&VerticalFov<3.13f&&float.IsFinite(OrthoHeight)&&OrthoHeight>0;
     public static bool Finite(Vector3 v)=>float.IsFinite(v.X)&&float.IsFinite(v.Y)&&float.IsFinite(v.Z);
 }
 public static class CameraMath {
@@ -16,13 +16,13 @@ public static class CameraMath {
         var pixel=(c.Orthographic?c.OrthoHeight:2*depth*MathF.Tan(c.VerticalFov/2))/c.Height;
         if(mode==NavMode.Roll){
             var twist=Quaternion.CreateFromAxisAngle(back,-dx*.005f);
-            var pose=c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,twist),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,twist),Up=Unit(Vector3.Transform(up,twist))};
+            var pose=c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,twist),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,twist),Up=Unit(Vector3.Transform(up,twist)),ZoomPivot=RotateZoomPivot(c,twist)};
             return Zoom(pose,wheel*.0015f);
         }
         if(mode==NavMode.Orbit){
             var q=mode==NavMode.Roll?Quaternion.Identity:Quaternion.Normalize(Quaternion.CreateFromAxisAngle(up,-dx*.005f)*Quaternion.CreateFromAxisAngle(right,-dy*.005f));
             q=Quaternion.Normalize(Quaternion.CreateFromAxisAngle(back,-wheel*.0015f)*q);
-            return c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,q),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,q),Up=Unit(Vector3.Transform(up,q))};
+            return c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,q),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,q),Up=Unit(Vector3.Transform(up,q)),ZoomPivot=RotateZoomPivot(c,q)};
         }
         if(mode==NavMode.Snap){
             var proposed=Move(c,NavMode.Orbit,dx*4,dy*4,0);
@@ -30,16 +30,17 @@ public static class CameraMath {
         }
         if(mode==NavMode.Navigate){
             var step=(-right*dx+(vertical?up:back)*dy)*pixel;
-            var e=c.Eye+step;var t=c.Target+step;
-            if(wheel!=0){var q=Quaternion.CreateFromAxisAngle(c.WorldUpAxis,-wheel*.0015f);t=e+Vector3.Transform(t-e,q);up=Vector3.Transform(up,q);}
-            return c with{Eye=e,Target=t,Up=up,Pivot=c.Pivot+step};
+            var e=c.Eye+step;var t=c.Target+step;var anchor=c.ZoomPivot+step;
+            if(wheel!=0){var q=Quaternion.CreateFromAxisAngle(c.WorldUpAxis,-wheel*.0015f);t=e+Vector3.Transform(t-e,q);up=Vector3.Transform(up,q);if(anchor is Vector3 point)anchor=e+Vector3.Transform(point-e,q);}
+            return c with{Eye=e,Target=t,Up=up,Pivot=c.Pivot+step,ZoomPivot=anchor};
         }
         if(mode==NavMode.PanZoom){
             var move=(-right*dx+up*dy)*pixel;
-            c=c with{Eye=c.Eye+move,Target=c.Target+move,Pivot=c.Pivot+move};return Zoom(c,wheel*.0015f);
+            c=c with{Eye=c.Eye+move,Target=c.Target+move,Pivot=c.Pivot+move,ZoomPivot=c.ZoomPivot+move};return Zoom(c,wheel*.0015f);
         }
         return mode==NavMode.Zoom?Zoom(c,-dy*.008f+wheel*.0015f):c;
     }
+    internal static Vector3? RotateZoomPivot(CameraPose c,Quaternion q)=>c.ZoomPivot is Vector3 p?c.Pivot+Vector3.Transform(p-c.Pivot,q):null;
     public static Vector3 NearestFace(Vector3 direction)=>FaceDirections.MaxBy(face=>Vector3.Dot(face,direction));
     public static CameraPose AlignFace(CameraPose c,Vector3 face,int quarterTurns=0){
         var back=Unit(c.Eye-c.Target);var right=Unit(Vector3.Cross(c.Up,back));var up=Unit(Vector3.Cross(back,right));
@@ -54,21 +55,23 @@ public static class CameraMath {
             return Quaternion.CreateFromRotationMatrix(new Matrix4x4(r.X,r.Y,r.Z,0,u.X,u.Y,u.Z,0,b.X,b.Y,b.Z,0,0,0,0,1));
         }
         var q=Quaternion.Normalize(Basis(face,wantedUp)*Quaternion.Conjugate(Basis(back,up)));
-        return c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,q),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,q),Up=wantedUp};
+        return c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,q),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,q),Up=wantedUp,ZoomPivot=RotateZoomPivot(c,q)};
     }
     static CameraPose Zoom(CameraPose c,float amount){
+        // Zoom follows the cursor; orbit retains its independent model/surface pivot.
+        var pivot=c.ZoomPivot??c.Pivot;
         var factor=MathF.Exp(Math.Clamp(-amount,-2,2));
         if(c.Orthographic){
             float height=Math.Clamp(c.OrthoHeight*factor,1e-6f,1e12f);factor=height/c.OrthoHeight;
-            var back=Unit(c.Eye-c.Target);var offset=c.Target-c.Pivot;
+            var back=Unit(c.Eye-c.Target);var offset=c.Target-pivot;
             var move=(offset-back*Vector3.Dot(offset,back))*(factor-1);
             return c with{Eye=c.Eye+move,Target=c.Target+move,OrthoHeight=height};
         }
         // Keep view-space separation representable after prolonged close-up zoom.
-        float magnitude=MathF.Max(c.Eye.Length(),MathF.Max(c.Target.Length(),c.Pivot.Length()));
+        float magnitude=MathF.Max(c.Eye.Length(),MathF.Max(c.Target.Length(),pivot.Length()));
         float distance=Vector3.Distance(c.Eye,c.Target),minimum=MathF.Max(1e-4f,magnitude*1e-6f);
         factor=Math.Clamp(factor,minimum/distance,MathF.Max(minimum/distance,1e12f/distance));
-        return c with{Eye=c.Pivot+(c.Eye-c.Pivot)*factor,Target=c.Pivot+(c.Target-c.Pivot)*factor};
+        return c with{Eye=pivot+(c.Eye-pivot)*factor,Target=pivot+(c.Target-pivot)*factor};
     }
 }
 
@@ -115,7 +118,7 @@ public sealed class FaceSnap{
     // Retain the stroke's world rotation axis across upright cube faces.
     // Recomputing it at a pole would reverse the continued roll and bounce.
     var rotation=Quaternion.CreateFromAxisAngle(strokeAxis,-heading*MathF.PI/2);
-    var proposed=view with{Eye=view.Pivot+Vector3.Transform(view.Eye-view.Pivot,rotation),Target=view.Pivot+Vector3.Transform(view.Target-view.Pivot,rotation),Up=Vector3.Normalize(Vector3.Transform(view.Up,rotation))};
+    var proposed=view with{Eye=view.Pivot+Vector3.Transform(view.Eye-view.Pivot,rotation),Target=view.Pivot+Vector3.Transform(view.Target-view.Pivot,rotation),Up=Vector3.Normalize(Vector3.Transform(view.Up,rotation)),ZoomPivot=CameraMath.RotateZoomPivot(view,rotation)};
     face=CameraMath.NearestFace(Vector3.Normalize(proposed.Eye-proposed.Target));
     quarterTurns=0;view=CameraMath.AlignFace(proposed,face);travel=0;lastFace=time;
    }

@@ -592,4 +592,5 @@ InputRecoveryChecks.Run(Check);
 KnobNudgeChecks.Run(Check);
 TinyKnobChecks.Run(Check);
 AltSnapWheelChecks.Run(Check);
+CursorZoomChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");
