@@ -160,7 +160,17 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         if(!failed&&!learning)DeviceStatus=ActiveDeviceName+" connected";
         if(changed)DeviceChanged?.Invoke();
     }
-    internal void VerifyRecovery(){
+    void WithIsolatedDevices(Action check){
+        var entries=roster.Snapshot().Select(row=>row.Device).ToArray();string preferred=SelectedDevice(),active=roster.ActiveId;
+        roster.Configure([],"");
+        try{check();}
+        finally{
+            roster.Configure(entries,preferred);if(active.Length>0)roster.Observe(active,true);
+            RefreshPresence();
+        }
+    }
+    internal void VerifyRecovery()=>WithIsolatedDevices(VerifyRecoveryFixture);
+    void VerifyRecoveryFixture(){
         hooks?.VerifyResponsive();VerifyKeyDispatch();
         var original=SelectedDevice;var originalEnabled=Enabled;var originalButtons=SwapButtons;var originalWheels=SwapWheels;bool originalConnected=connected,originalFailed=failed,originalRecover=recoverOnInput;string originalStatus=DeviceStatus;
         try{
@@ -400,7 +410,8 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         }
         Console.WriteLine("Remembered trackballs verified: two raw sensors, automatic switching, ordinary-mouse isolation, held-drag lock, separate corrections and disconnect fallback.");
     }
-    internal void VerifyMotionDelivery(){
+    internal void VerifyMotionDelivery()=>WithIsolatedDevices(VerifyMotionDeliveryFixture);
+    void VerifyMotionDeliveryFixture(){
         var selected=SelectedDevice;var enabled=Enabled;var capture=IsCapture;var cad=IsCad;
         bool wasConnected=connected,wasFailed=failed,wasRecover=recoverOnInput,wasLearning=learning;
         string status=DeviceStatus,lastDevice=LastDevice;long selectedCount=selectedMovementReports,delivered=deliveredMovementReports,others=otherMovementReports,lastAt=lastMovementAt;
