@@ -1,13 +1,13 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using Chamfer.Trackball.Core;
 namespace Chamfer.Trackball.App;
 internal sealed class Controller:IDisposable{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer server;
     readonly System.Windows.Forms.Timer timer=new(){Interval=MotionPolicy.FrameIntervalMs};
     volatile JsonObject cfg;volatile JsonObject? profile;NativeServer.Client? native;
+    readonly ForegroundApps foregroundApps=new();string foregroundExe="";
     readonly ComboTracker combos=new();readonly HashSet<int> pressed=[];readonly HashSet<int> comboUsed=[];
     readonly Dictionary<int,JsonObject> intercepted=[];
     readonly Queue<JsonObject> logs=new();long seq;long revision=-1;
@@ -47,19 +47,19 @@ public string AppName{get;private set;}="";
         const int idleInterval=50;
         int interval=mode==NavMode.Idle&&!pointer.Active&&!calibration.Receiving?idleInterval:MotionPolicy.FrameIntervalMs;
         if(timer.Interval!=interval)timer.Interval=interval;
-        if(revision!=store.Revision){End();cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);input.ConfigureDevices(cfg);revision=store.Revision;foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
+        if(revision!=store.Revision){End();cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);input.ConfigureDevices(cfg);revision=store.Revision;foregroundApps.Invalidate();foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
         if(calibration.Active&&(calibrationProgram!=ConfigStore.I(cfg,"activeProgram")||calibrationProgramName!=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name")||calibrationDevice!=input.ActiveDevice||!ConfigStore.B(cfg,"enabled"))){
             calibration.Cancel();calibrationMotion.Reset();Log("Calibration stopped because the program or trackball changed.","err");
         }
         if(calibration.Receiving&&!input.Ready){calibration.Interrupt("Trackball disconnected or reconnecting. Roll it once, then record this movement again.");calibrationMotion.Reset();}
         var w=Win32.GetForegroundWindow();
-        if(w!=foregroundWindow){
-            End();latched=NavMode.Idle;combos.Clear();pressed.Clear();intercepted.Clear();comboUsed.Clear();foregroundWindow=w;
-            Win32.GetWindowThreadProcessId(w,out var pid);foregroundPid=(int)pid;AppName="";
-            string exe="";try{exe=Process.GetProcessById(foregroundPid).ProcessName+".exe";AppName=exe;}catch(ArgumentException){ }catch(System.ComponentModel.Win32Exception){ }
+        if(foregroundApps.ProbeDue(w,Environment.TickCount64)){
+            if(w!=foregroundWindow){
+                Win32.GetWindowThreadProcessId(w,out var pid);foregroundPid=(int)pid;foregroundExe="";
+                try{foregroundExe=Process.GetProcessById(foregroundPid).ProcessName+".exe";}catch(ArgumentException){ }catch(System.ComponentModel.Win32Exception){ }
+            }
             var title=new StringBuilder(1024);Win32.GetWindowText(w,title,title.Capacity);
-            profile=cfg["profiles"]!.AsArray().Select(x=>x?.AsObject()).FirstOrDefault(p=>p!=null&&ConfigStore.B(p,"enabled")&&
-                (p["exe"]?.AsArray().Any(x=>Match(exe,x?.GetValue<string>()??""))==true||p["title"]?.AsArray().Any(x=>title.ToString().Contains(x?.GetValue<string>()??"\0",StringComparison.OrdinalIgnoreCase))==true));
+            RefreshForeground(w,foregroundPid,foregroundExe,title.ToString());
         }
         if(profile==null&&padVisible&&Win32.GetCursorPos(out var cursor)&&new Rectangle(padOrigin.X+pad.X,padOrigin.Y+pad.Y,pad.Width,pad.Height).Contains(cursor.X,cursor.Y)){
             Win32.GetWindowThreadProcessId(w,out var pid);if(pid==Environment.ProcessId)profile=new(){["id"]="demo",["name"]="Try it here",["enabled"]=true};
@@ -85,7 +85,17 @@ public string AppName{get;private set;}="";
         }
         if(mode!=NavMode.Idle)Flush();
     }
-    static bool Match(string text,string pattern)=>pattern.Length>0&&pattern.Length<200&&Regex.IsMatch(text,"^"+Regex.Escape(pattern).Replace("\\*",".*")+"$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(10));
+    void RefreshForeground(nint window,int pid,string exe,string title){
+        var next=ForegroundApps.Match(cfg["profiles"]!.AsArray(),exe,title);
+        // The preview is a temporary profile over an otherwise ordinary Admin
+        // window. A title probe must not end that active preview every 50 ms.
+        var previous=ConfigStore.S(profile,"id")=="demo"?null:profile;
+        if(window!=foregroundWindow||!ForegroundApps.Same(previous,next)){
+            End();latched=NavMode.Idle;combos.Clear();pressed.Clear();intercepted.Clear();comboUsed.Clear();stoppedByClick=false;
+            foregroundWindow=window;profile=next;
+        }else if(ConfigStore.S(profile,"id")!="demo")profile=next;
+        foregroundPid=pid;foregroundExe=exe;AppName=exe;
+    }
     NavMode Resolve(){
         var keyboard=ModeResolver.Resolve(cfg,input.Keys);if(keyboard!=NavMode.Idle)return keyboard;
         if(gestureButton.Length>0)return NavMode.Gestures;
@@ -329,6 +339,34 @@ public string AppName{get;private set;}="";
         result["inputSignal"]=input.SignalState();
         if(calibration.Active)result["twistCalibration"]=CalibrationState();
         ox=oy=px=py=zoom=zoomLog=rawX=rawY=rollLog=0;fit=false;return result;
+    }
+    internal void VerifyForegroundTitles(){
+        var oldCfg=cfg;var oldProfile=profile;var oldNative=native;var oldWindow=foregroundWindow;int oldPid=foregroundPid;string oldExe=foregroundExe,oldName=AppName;var oldMode=mode;var oldLatched=latched;
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["profiles"]=new JsonArray(new JsonObject{["id"]="chamfer3d",["name"]="Studio fixture",["enabled"]=true,["title"]=new JsonArray("Chamfer Studio")});
+            profile=null;native=null;mode=latched=NavMode.Idle;foregroundWindow=0;
+            nint browser=2468;
+            RefreshForeground(browser,123,"chrome.exe","YouTube - Google Chrome");
+            if(profile!=null)throw new InvalidOperationException("A normal browser tab was treated as CAD.");
+            RefreshForeground(browser,123,"chrome.exe","Chamfer Studio - Google Chrome");
+            if(ConfigStore.S(profile,"id")!="chamfer3d")throw new InvalidOperationException("A title-only switch on the same HWND did not activate Studio.");
+            mode=NavMode.Snap;latched=NavMode.Orbit;pending.Wheel(120);pressed.Add(2);
+            RefreshForeground(browser,123,"chrome.exe","Part 2 * - Chamfer Studio - Google Chrome");
+            if(mode!=NavMode.Snap||latched!=NavMode.Orbit||!pending.Peek().HasPrimary||!pressed.Contains(2))throw new InvalidOperationException("A cosmetic project-title change interrupted navigation.");
+            RefreshForeground(browser,123,"chrome.exe","YouTube - Google Chrome");
+            if(profile!=null||mode!=NavMode.Idle||latched!=NavMode.Idle||pending.Peek().HasPrimary||pressed.Count!=0)throw new InvalidOperationException("Leaving the CAD tab retained its gesture or intercepted buttons.");
+            RefreshForeground(browser,123,"chrome.exe","Chamfer Studio - Google Chrome");
+            if(ConfigStore.S(profile,"id")!="chamfer3d")throw new InvalidOperationException("Returning to Studio required switching application windows.");
+            RefreshForeground(2469,124,"ChamferTrackball-Admin.exe","Chamfer Trackball Admin");
+            profile=new JsonObject{["id"]="demo"};mode=NavMode.Orbit;pending.Move(4,2);
+            RefreshForeground(2469,124,"ChamferTrackball-Admin.exe","Chamfer Trackball Admin");
+            if(ConfigStore.S(profile,"id")!="demo"||mode!=NavMode.Orbit||!pending.Peek().HasPrimary)throw new InvalidOperationException("The periodic title probe stopped the built-in navigation preview.");
+            RefreshForeground(browser,123,"chrome.exe","Chamfer Studio - Google Chrome");
+            if(ConfigStore.S(profile,"id")!="chamfer3d"||mode!=NavMode.Idle||pending.Peek().HasPrimary)throw new InvalidOperationException("The preview stayed active after entering the real host.");
+        }finally{
+            pending.Reset();motionSamples.Reset();profile=oldProfile;native=oldNative;cfg=oldCfg;foregroundWindow=oldWindow;foregroundPid=oldPid;foregroundExe=oldExe;AppName=oldName;mode=oldMode;latched=oldLatched;pressed.Clear();foregroundApps.Invalidate();
+        }
+        Console.WriteLine("Foreground browser tabs verified: same HWND entry/exit, title rename continuity, gesture release, re-entry and preview isolation.");
     }
     internal void VerifySnapWheelRouting(){
         var previousCfg=cfg;var previousNative=native;var previousMode=mode;var previousProfile=profile;bool previousKnob=knobHoldActive;double previousZoom=zoom,previousZoomLog=zoomLog;
