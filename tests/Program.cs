@@ -594,4 +594,5 @@ TinyKnobChecks.Run(Check);
 AltSnapWheelChecks.Run(Check);
 CursorZoomChecks.Run(Check);
 TrackballDeviceChecks.Run(Check);
+ForegroundAppChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

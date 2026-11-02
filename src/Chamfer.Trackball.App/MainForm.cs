@@ -298,6 +298,7 @@ internal sealed class MainForm:Form{
             controller.Status();input.VerifyMotionDelivery();
             var rawDelivery=controller.Status();if(ConfigStore.D(rawDelivery,"rawX")!=24||ConfigStore.D(rawDelivery,"rawY")!=-12)throw new Exception("Raw selected sensor did not reach Controller.Motion.");
             input.VerifyMultipleTrackballs();controller.Status();
+            controller.VerifyForegroundTitles();
             controller.VerifyCalibrationNavigation();
             controller.VerifySnapWheelRouting();
             controller.VerifyKnobHandshake();

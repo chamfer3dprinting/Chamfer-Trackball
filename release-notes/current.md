@@ -1,3 +1,11 @@
+## Detect Studio when changing browser tabs
+
+- Detect a supported 3D app when switching to its browser tab, even when the browser window stays the same.
+- Release navigation when returning to an ordinary tab. Keep an active gesture when only the CAD project title changes.
+- Check titles at 20 Hz while preserving the navigation cadence and built-in preview.
+- Keep remembered M512 and SlimBlade devices, native clicks/wheel axes, held controls, presets, calibration and speed settings.
+- In a native 3D view, Alt plus SlimBlade twist scrolling uses the existing exact 90° face turns; ordinary Alt ball rolls still select neighboring faces.
+
 ## Remembered trackballs and smoother navigation timing
 
 - Remember each identified trackball instead of replacing the previous one. Add or identify the new trackball once; the M512 stays saved.
