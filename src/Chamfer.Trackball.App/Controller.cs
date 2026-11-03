@@ -15,6 +15,7 @@ internal sealed class Controller:IDisposable{
     volatile NavMode mode=NavMode.Idle;NavMode latched=NavMode.Idle;string gestureButton="";
     TwistCalibrationModel? learnedTwist;
     readonly TwistCalibrationSession calibration=new();readonly MotionFrames calibrationMotion=new();int calibrationProgram;string calibrationProgramName="",calibrationDevice="";
+    readonly SlimBladeTwist slimBladeTwist=new();
     readonly KnobSteps knobSteps=new();readonly CircleZoom circle=new();readonly MotionGlide glide=new();readonly PointerMotion pointer=new();
     double gx,gy;readonly MotionFrames pending=new(),motionSamples=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
     bool stoppedByClick,emulating,knobHoldActive;float knobAngle;double rollLog;volatile bool nativeFocusAllowed=true;int foregroundPid;volatile nint foregroundWindow;
@@ -122,7 +123,7 @@ public string AppName{get;private set;}="";
         if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist);}
     }
     void End(){
-        server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();
+        server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
     }
     void ReleaseEmulation(){
@@ -177,8 +178,10 @@ public string AppName{get;private set;}="";
         var frame=pending.Peek();
         float seconds=GlideSeconds;
         var smooth=glide.Step(frame.X,frame.Y,Environment.TickCount64,seconds,mode!=NavMode.Snap&&!knobHoldActive&&ConfigStore.B(cfg,"smooth",true));
-        if(frame.HasPrimary||smooth.X!=0||smooth.Y!=0||mode==NavMode.Snap&&server.PendingSnap(native)){
-            if(!SendMotion(mode,smooth.X,smooth.Y,frame.Wheel))return;
+        // Wait for the host pose before taking motion out of the twist buffer.
+        float twistWheel=native?.Pose!=null?slimBladeTwist.Step():0;
+        if(frame.HasPrimary||twistWheel!=0||smooth.X!=0||smooth.Y!=0||mode==NavMode.Snap&&server.PendingSnap(native)){
+            if(!SendMotion(mode,smooth.X,smooth.Y,frame.Wheel+twistWheel))return;
             pending.ClearPrimary();
         }
         if(frame.HasDial){
@@ -236,6 +239,11 @@ public string AppName{get;private set;}="";
         UpdateCalibrationForeground();
         bool wheel=msg is 0x20a or 0x20e;
         if(wheel&&calibration.Receiving){if(msg==0x20a)calibrationMotion.Wheel(data);timer.Interval=MotionPolicy.FrameIntervalMs;return true;}
+        if(ConfigStore.B(cfg,"slimBladeSmoothTwist")&&native?.Version>=2&&
+           SlimBladeTwist.Applies(input.ActiveDevice,mode,msg)&&ModeResolver.Resolve(cfg,input.Keys)==mode&&
+           (mode!=NavMode.Orbit||ConfigStore.B(cfg,"twist",true))){
+            slimBladeTwist.Add(data,mode);return true;
+        }
         if(wheel&&SnapWheelPolicy.Captures(mode,msg)){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);else pending.Wheel(data);return true;}
         if(wheel){
             var prefix=msg==0x20a?"right":"left";var wheelAction=ConfigStore.S(cfg,prefix+"Wheel","normal");

@@ -4,6 +4,21 @@ using Chamfer.Trackball.Core;
 
 static class AltSnapWheelChecks{
  public static void Run(Action<bool,string> check){
+  const string slimDevice=@"\\?\HID#VID_047D&PID_80D6&MI_00#fixture";
+  check(SlimBladeTwist.Applies(slimDevice,NavMode.Orbit,0x20a)&&SlimBladeTwist.Applies(slimDevice,NavMode.PanZoom,0x20a),"SlimBlade vertical twist is eligible during orbit and pan");
+  check(!SlimBladeTwist.Applies(slimDevice,NavMode.Snap,0x20a)&&!SlimBladeTwist.Applies(slimDevice,NavMode.Orbit,0x20e)&&!SlimBladeTwist.Applies("HID#VID_25A7&PID_FA61&",NavMode.Orbit,0x20a),"Snap, horizontal wheel and the M512 bypass the twist trial");
+  var dial=new SlimBladeTwist();
+  foreach(var (mode,expected) in new[]{(NavMode.Orbit,60f),(NavMode.PanZoom,90f)}){
+   dial.Add(120,mode);float first=dial.Step(),total=first;
+   for(int i=0;i<12;i++)total+=dial.Step();
+   check(first>0&&first<expected&&Math.Abs(total-expected)<.001f&&dial.Step()==0,"SlimBlade twist starts immediately and delivers a bounded smooth "+mode+" step");
+   dial.Add(-120,mode);
+   check(dial.Step()<0,"Reverse twist reverses "+mode);
+   dial.Reset();
+   check(dial.Step()==0,"Releasing the held gesture clears the remaining "+mode+" twist");
+  }
+  check(!ConfigStore.B(ConfigStore.Defaults(),"slimBladeSmoothTwist"),"SlimBlade twist trial defaults off and can be reverted");
+
   check(SnapWheelPolicy.Captures(NavMode.Snap,0x20a)&&!SnapWheelPolicy.Captures(NavMode.Snap,0x20e),"Snap captures the confirmed left wheel and leaves the right wheel on its normal path");
   check(!SnapWheelPolicy.Captures(NavMode.Idle,0x20a)&&!SnapWheelPolicy.Captures(NavMode.Idle,0x20e),"Normal mouse retains both native wheels");
   foreach(var mode in new[]{NavMode.Orbit,NavMode.PanZoom,NavMode.Zoom,NavMode.Navigate,NavMode.Roll})
