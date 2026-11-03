@@ -33,6 +33,30 @@ public sealed class MotionGlide{
  }
  public void Reset(){velocityX=velocityY=0;lastTime=0;}
 }
+// Three frames of measured input, with no velocity extrapolation.
+public sealed class CameraMotionFilter
+{
+    private float nextX, nextY, lastX, lastY;
+
+    public (float X, float Y) Step(float x, float y, bool finish = false)
+    {
+        if (finish)
+        {
+            var remainder = (x + nextX + lastX, y + nextY + lastY);
+            Reset();
+            return remainder;
+        }
+
+        var motion = (x * .70f + nextX, y * .70f + nextY);
+        nextX = x * .22f + lastX;
+        nextY = y * .22f + lastY;
+        lastX = x * .08f;
+        lastY = y * .08f;
+        return motion;
+    }
+
+    public void Reset() => nextX = nextY = lastX = lastY = 0;
+}
 public sealed class FractionalInput{
  float x,y,wheel;
  static int Take(ref float remainder,float value){remainder+=value;int whole=(int)MathF.Round(remainder);remainder-=whole;return whole;}

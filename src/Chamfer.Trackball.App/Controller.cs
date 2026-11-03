@@ -16,6 +16,7 @@ internal sealed class Controller:IDisposable{
     TwistCalibrationModel? learnedTwist;
     readonly TwistCalibrationSession calibration=new();readonly MotionFrames calibrationMotion=new();int calibrationProgram;string calibrationProgramName="",calibrationDevice="";
     readonly SlimBladeTwist slimBladeTwist=new();
+    readonly CameraMotionFilter cameraMotion=new();
     readonly KnobSteps knobSteps=new();readonly CircleZoom circle=new();readonly MotionGlide glide=new();readonly PointerMotion pointer=new();
     double gx,gy;readonly MotionFrames pending=new(),motionSamples=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
     bool stoppedByClick,emulating,knobHoldActive;float knobAngle;double rollLog;volatile bool nativeFocusAllowed=true;int foregroundPid;volatile nint foregroundWindow;
@@ -109,7 +110,7 @@ public string AppName{get;private set;}="";
     bool WantsKnob(NavMode next)=>next==NavMode.Roll&&ModeResolver.Resolve(cfg,input.Keys)==NavMode.Roll;
     void Change(NavMode next){
         bool nextKnob=WantsKnob(next);
-        if(mode!=NavMode.Idle&&IsCad&&input.Ready)Flush();
+        if(mode!=NavMode.Idle&&IsCad&&input.Ready)Flush(finish:true);
         End();if(next==NavMode.Idle||!IsCad||!input.Ready)return;
         if(next==NavMode.Gestures){mode=next;timer.Interval=MotionPolicy.FrameIntervalMs;return;}
         native=server.Find(ConfigStore.S(profile,"id"),foregroundPid);
@@ -123,7 +124,7 @@ public string AppName{get;private set;}="";
         if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist);}
     }
     void End(){
-        server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();
+        server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
     }
     void ReleaseEmulation(){
@@ -164,7 +165,7 @@ public string AppName{get;private set;}="";
         if(mode==NavMode.Gestures){gx+=x;gy+=y;return;}
         motionSamples.Move(x,y);
     }
-    void Flush(){
+    void Flush(bool finish=false){
         // Classify each newly sampled path once, even if a camera handshake delays delivery.
         var sample=motionSamples.Peek();motionSamples.ClearMove();bool consumed=false;
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
@@ -172,12 +173,15 @@ public string AppName{get;private set;}="";
         else{
             var dial=circle.Add(sample.X,sample.Y,Environment.TickCount64,(float)ConfigStore.D(cfg,"circleSize",160));
             consumed=dial.Consumed;
-            if(consumed){glide.Reset();pending.ClearMove();pending.Dial(dial.Wheel);}
+            if(consumed){glide.Reset();cameraMotion.Reset();pending.ClearMove();pending.Dial(dial.Wheel);}
         }
         if(!consumed)pending.Move(sample.X,sample.Y);
         var frame=pending.Peek();
-        float seconds=GlideSeconds;
-        var smooth=glide.Step(frame.X,frame.Y,Environment.TickCount64,seconds,mode!=NavMode.Snap&&!knobHoldActive&&ConfigStore.B(cfg,"smooth",true));
+        bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom);
+        if(steady&&native is {Version:>=2,Pose:null})return;
+        var smooth=steady
+            ?cameraMotion.Step(frame.X,frame.Y,finish)
+            :glide.Step(frame.X,frame.Y,Environment.TickCount64,GlideSeconds,mode!=NavMode.Snap&&!knobHoldActive&&ConfigStore.B(cfg,"smooth",true));
         // Wait for the host pose before taking motion out of the twist buffer.
         float twistWheel=native?.Pose!=null?slimBladeTwist.Step():0;
         if(frame.HasPrimary||twistWheel!=0||smooth.X!=0||smooth.Y!=0||mode==NavMode.Snap&&server.PendingSnap(native)){

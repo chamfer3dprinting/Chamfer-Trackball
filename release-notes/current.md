@@ -1,3 +1,8 @@
+## Steady 3D motion
+
+- Turn on **Buttons & keys → Extras → Steady 3D motion** for steadier orbit, pan and zoom without extra glide. Turn it off to return to your existing settings.
+- The Fusion add-in skips camera positions superseded while Fusion was busy.
+
 ## Optional smoother SlimBlade twist
 
 - Use **Buttons & keys → Extras → Smoother SlimBlade twist (trial)** for gentler camera roll while orbiting and smaller cursor zoom steps while panning.
