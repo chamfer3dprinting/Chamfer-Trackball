@@ -220,7 +220,7 @@ internal sealed class MainForm:Form{
                 }throw new Exception("Missing browser camera message: "+type);
             }
             await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=1});
-            var offer=await BrowserRead("ready");if(ConfigStore.I(offer,"v")!=2)throw new Exception("Studio protocol upgrade missing.");
+            var offer=await BrowserRead("ready");if(ConfigStore.I(offer,"v")!=2||!ConfigStore.B(offer,"cursorFollow"))throw new Exception("Studio cursor-follow protocol upgrade missing.");
             await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=2});
             NativeServer.Client? studio=null;
             for(int tries=0;tries<50;tries++){studio=native.Find("chamfer3d",Environment.ProcessId);if(studio?.Version==2)break;await Task.Delay(10);}
@@ -233,6 +233,33 @@ internal sealed class MainForm:Form{
                 if(studio.Pose==null||!native.Move(studio,command,30,20,120,command==NavMode.Navigate,1))throw new Exception("Studio camera command did not run: "+command);
                 if(command==NavMode.Snap&&studio.Pose!.WorldUp!=System.Numerics.Vector3.UnitY)throw new Exception("Studio snap did not use the host cube's Y-up convention.");
                 var result=await BrowserRead("camera");if(ConfigStore.S(result,"session")!=studio.Session)throw new Exception("Studio camera session mismatch.");
+                if(command is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate){
+                    string oldSession=studio.Session;
+                    await BrowserSend(new(){["t"]="reanchor",["session"]="stale"});
+                    await Task.Delay(20);
+                    if(studio.Session!=oldSession)throw new Exception("A stale cursor request restarted navigation.");
+                    await BrowserSend(new(){["t"]="reanchor",["session"]=oldSession});
+                    var oldEnd=await BrowserRead("end");
+                    var replacement=await BrowserRead("begin");
+                    if(ConfigStore.S(oldEnd,"session")!=oldSession||ConfigStore.S(replacement,"session")==oldSession||
+                       ConfigStore.S(replacement,"mode")!=command.ToString()||studio.Pose!=null)
+                        throw new Exception("Cursor follow did not finish the old view before requesting its new anchor.");
+                    await BrowserSend(browserScene);
+                    await Task.Delay(20);
+                    if(studio.Pose!=null)throw new Exception("An old scene replaced a following cursor gesture.");
+                    var followed=(JsonObject)browserScene.DeepClone();
+                    followed["session"]=ConfigStore.S(replacement,"session");
+                    foreach(var key in new[]{"eye","target","up"})followed[key]=result[key]!.DeepClone();
+                    followed["pivot"]=new JsonArray(3,2,0);followed["zoomPivot"]=new JsonArray(3,2,0);
+                    await BrowserSend(followed);
+                    for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
+                    var followedPose=studio.Pose;
+                    if(followedPose==null||followedPose.Pivot!=new Vector3(3,2,0)||followedPose.ZoomPivot!=new Vector3(3,2,0)||
+                       !native.Move(studio,command,5,3,0,false,1))
+                        throw new Exception("Navigation did not resume about the new cursor point.");
+                    var followedFrame=await BrowserRead("camera");
+                    if(ConfigStore.S(followedFrame,"session")!=studio.Session)throw new Exception("An old camera frame escaped cursor retargeting.");
+                }
                 native.End(studio);await BrowserRead("end");
             }
     

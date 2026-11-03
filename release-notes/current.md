@@ -1,3 +1,7 @@
+## Follow the cursor during a held gesture
+- Move the cursor while holding orbit, pan/zoom or zoom to choose a new navigation point in compatible Studio builds.
+- Finish the previous camera frame before reading the new cursor point, and reject delayed frames from earlier anchors.
+
 ## Time-based 3D camera response
 - Smooth ball movement and held twist/wheel zoom with one elapsed-time response, including scene navigation.
 - Keep speed consistent when camera timer intervals vary, with no change to your sensitivity values.
