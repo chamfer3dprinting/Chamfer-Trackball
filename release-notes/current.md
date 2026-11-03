@@ -1,3 +1,8 @@
+## Prevent program-detection interruptions
+- Replace timed regular expressions in foreground executable matching with bounded wildcard matching.
+- Preserve custom executable patterns, browser title detection and saved controls.
+- Keep the optional Steady 3D motion and Fusion camera queue improvements.
+
 ## Steady 3D motion
 
 - Turn on **Buttons & keys → Extras → Steady 3D motion** for steadier orbit, pan and zoom without extra glide. Turn it off to return to your existing settings.

@@ -26,6 +26,17 @@ static class ForegroundAppChecks{
   check(ForegroundApps.Match(custom,"customXcad2026.exe","")==null,"Executable dots are matched literally rather than as regular-expression wildcards");
   check(ConfigStore.S(ForegroundApps.Match(custom,"browser.exe","Design - my cad"),"id")=="title","Added browser CAD profiles respond to title-only changes too");
   check(!ForegroundApps.Same(studio,new JsonObject{["id"]="other"}),"Switching between different CAD profiles releases the previous navigation context");
+  bool MatchExecutable(string value,string pattern)=>ForegroundApps.Match(new JsonArray(new JsonObject{
+   ["id"]="pattern",["enabled"]=true,["exe"]=new JsonArray(pattern)}),value,"")!=null;
+  check(MatchExecutable("STUDIO.EXE","studio.exe")&&!MatchExecutable("mystudio.exe","studio.exe"),"Exact executable matching stays case-insensitive and anchored");
+  check(MatchExecutable("custom.part.2026.exe","custom*.exe")&&MatchExecutable("custom.exe","custom*.exe"),"A star matches both an empty and a longer filename segment");
+  check(MatchExecutable("Custom.part.2026.exe","*PART*2026.EXE")&&!MatchExecutable("custom.part.2026.exe.tmp","*part*2026.exe"),"Multiple wildcard segments preserve ordering and suffix anchoring");
+  check(!MatchExecutable("a","a*a")&&!MatchExecutable("part.exe","*part*part.exe"),"Wildcard prefix and suffix cannot consume overlapping characters");
+  check(MatchExecutable("custom.part.exe","custom***part**.exe")&&!MatchExecutable("custom.part.exe","custom*missing*.exe"),"Consecutive stars and missing middle segments remain deterministic");
+  check(MatchExecutable("cad+[x](1)?.exe","cad+[x](1)?.exe")&&!MatchExecutable("cadx1.exe","cad+[x](1)?.exe"),"Regex punctuation stays literal in executable patterns");
+  check(!MatchExecutable("studio.exe","")&&!MatchExecutable(new string('a',200),new string('a',200))&&MatchExecutable(new string('a',199),new string('a',199)),"Empty and oversized patterns keep the existing bounds");
+  var ambiguousPattern=string.Concat(Enumerable.Repeat("a*",60))+"z.exe";
+  check(!MatchExecutable(new string('a',4000)+"y.exe",ambiguousPattern)&&MatchExecutable(new string('a',4000)+"z.exe",ambiguousPattern),"Adversarial wildcard input resolves without regex backtracking or timeout");
   ConfigStore.LoadProgram(cfg,1);
   check(ConfigStore.S(cfg,"orbitKeys")=="shift"&&ConfigStore.S(cfg,"panKeys")=="ctrl+shift"&&ConfigStore.S(cfg,"zoomKeys")=="ctrl"&&ConfigStore.S(cfg,"snapKeys")=="alt","Foreground detection never rewrites the saved held controls");
  }
