@@ -332,3 +332,8 @@ Full cloud Windows workflows, the next Admin-only release/install and a fresh ph
 # 2026-11-02 — Optional smoother SlimBlade twist trial
 
 The owner requests a reversible trial after physically confirming orbit and Alt snap in the installed Studio app. Offer a toggle, off by default, for the observed SlimBlade Pro USB HID identity. Use reduced vertical scroll deltas over a short series of native camera frames while the orbit or pan shortcut is held. Orbit keeps its wheel-roll preference and pan keeps native cursor-anchored zoom. Reset the twist buffer at gesture/device/focus changes. Preserve exact Alt quarter turns, normal scrolling, the M512 and all existing settings. This interpolates measured scroll steps. Physical evaluation is pending. Validate the routing and frame response in the Windows build workflow before an Admin update.
+
+
+# 2026-11-02 — Steadier held 3D movement in Studio and Fusion
+
+The owner wants a smoother camera in both apps. Add a reversible, default-off Steady 3D motion option that distributes measured X/Y over three frames without inventing velocity on empty frames. The first frame carries 70%, the rest follows over two frames, and normal release finishes the measured remainder. Clear state when focus, device, or gesture changes. Leave snap, pointer and separate twist behavior on their existing paths. Coalesce queued consecutive Fusion poses per session before touching its viewport. Both Windows workflows and physical evaluation are pending. The stock HID device and SpaceMouse supply different input; this change targets camera motion consistency.

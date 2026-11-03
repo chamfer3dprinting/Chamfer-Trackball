@@ -130,14 +130,32 @@ def _apply(command):
     viewport.camera = camera
     viewport.refresh()
 
+def _latest_camera_commands(commands):
+    """Keep session boundaries and skip camera poses superseded in this batch."""
+    pending = None
+    for command in commands:
+        if command.get("t") == "camera":
+            if pending is not None and pending.get("session") != command.get("session"):
+                yield pending
+            pending = command
+        else:
+            if pending is not None:
+                yield pending
+                pending = None
+            yield command
+    if pending is not None:
+        yield pending
+
 class _Handler(adsk.core.CustomEventHandler):
     def notify(self, args):
         global _session
+        batch = []
         for _ in range(128):
             try:
-                command = _incoming.get_nowait()
+                batch.append(_incoming.get_nowait())
             except queue.Empty:
                 break
+        for command in _latest_camera_commands(batch):
             try:
                 if command.get("t") == "begin":
                     _begin(command)

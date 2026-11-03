@@ -1,6 +1,7 @@
 {
   "configVersion": 30,
   "slimBladeSmoothTwist": false,
+  "steadyCamera": false,
   "enabled": true,
   "buttons": {
     "middle": {
