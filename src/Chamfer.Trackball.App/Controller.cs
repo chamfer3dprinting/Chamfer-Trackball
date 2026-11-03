@@ -165,7 +165,7 @@ public string AppName{get;private set;}="";
         if(mode==NavMode.Gestures){gx+=x;gy+=y;return;}
         motionSamples.Move(x,y);
     }
-    void Flush(bool finish=false){
+    void Flush(bool finish=false,double? timeMilliseconds=null){
         // Classify each newly sampled path once, even if a camera handshake delays delivery.
         var sample=motionSamples.Peek();motionSamples.ClearMove();bool consumed=false;
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
@@ -177,15 +177,22 @@ public string AppName{get;private set;}="";
         }
         if(!consumed)pending.Move(sample.X,sample.Y);
         var frame=pending.Peek();
-        bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom);
+        bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate);
         if(steady&&native is {Version:>=2,Pose:null})return;
-        var smooth=steady
-            ?cameraMotion.Step(frame.X,frame.Y,finish)
-            :glide.Step(frame.X,frame.Y,Environment.TickCount64,GlideSeconds,mode!=NavMode.Snap&&!knobHoldActive&&ConfigStore.B(cfg,"smooth",true));
-        // Wait for the host pose before taking motion out of the twist buffer.
-        float twistWheel=native?.Pose!=null?slimBladeTwist.Step():0;
-        if(frame.HasPrimary||twistWheel!=0||smooth.X!=0||smooth.Y!=0||mode==NavMode.Snap&&server.PendingSnap(native)){
-            if(!SendMotion(mode,smooth.X,smooth.Y,frame.Wheel+twistWheel))return;
+        MotionFrame output;
+        if(steady){
+            // Use one clock and response for ball movement and smooth twist.
+            float twist=native?.Pose!=null?slimBladeTwist.Take():0;
+            output=cameraMotion.Step(frame.X,frame.Y,frame.Wheel+twist,
+                (timeMilliseconds??(Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency)),
+                (float)ConfigStore.D(cfg,"cameraResponseMs",18),finish);
+        }else{
+            var smooth=glide.Step(frame.X,frame.Y,Environment.TickCount64,GlideSeconds,mode!=NavMode.Snap&&!knobHoldActive&&ConfigStore.B(cfg,"smooth",true));
+            float twist=native?.Pose!=null?(finish?slimBladeTwist.Take():slimBladeTwist.Step()):0;
+            output=new(smooth.X,smooth.Y,frame.Wheel+twist,0);
+        }
+        if(frame.HasPrimary||output.HasPrimary||mode==NavMode.Snap&&server.PendingSnap(native)){
+            if(!SendMotion(mode,output.X,output.Y,output.Wheel))return;
             pending.ClearPrimary();
         }
         if(frame.HasDial){
@@ -380,10 +387,37 @@ public string AppName{get;private set;}="";
         }
         Console.WriteLine("Foreground browser tabs verified: same HWND entry/exit, title rename continuity, gesture release, re-entry and preview isolation.");
     }
+    internal void VerifyCameraResponse(){
+        var oldCfg=cfg;var oldNative=native;var oldMode=mode;var oldProfile=profile;bool oldKnob=knobHoldActive;double oldZoom=zoom,oldZoomLog=zoomLog;
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["steadyCamera"]=true;cfg["cameraResponseMs"]=18;cfg["circleZoom"]=false;
+            cfg["orbitSens"]=50;cfg["panSens"]=50;cfg["zoomSens"]=50;cfg["invertZoom"]=false;
+            profile=new(){["id"]="demo"};mode=NavMode.Zoom;knobHoldActive=false;
+            pending.Reset();motionSamples.Reset();cameraMotion.Reset();slimBladeTwist.Reset();zoom=zoomLog=0;
+            var pose=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
+            var client=new NativeServer.Client{Version=2,Pose=pose,BasePose=pose};native=client;
+            pending.Move(0,12);pending.Wheel(120);Flush(timeMilliseconds:1000);
+            if(zoomLog<=0||zoomLog>=.084||!client.Pose!.Valid)throw new InvalidOperationException("Shared ball/wheel response did not ease the first native zoom frame.");
+            Flush(finish:true,timeMilliseconds:1008);
+            if(Math.Abs(zoomLog-.084)>.0001||pending.Peek().HasPrimary)throw new InvalidOperationException("The native response lost or repeated measured ball/wheel input on release.");
+            mode=NavMode.PanZoom;client.Pose=pose;cameraMotion.Reset();zoom=zoomLog=0;
+            slimBladeTwist.Add(120,NavMode.PanZoom);Flush(timeMilliseconds:2000);
+            if(zoomLog<=0||zoomLog>=.135)throw new InvalidOperationException("SlimBlade twist did not enter the shared native zoom response.");
+            Flush(finish:true,timeMilliseconds:2008);Flush(timeMilliseconds:2024);
+            if(Math.Abs(zoomLog-.135)>.0001||slimBladeTwist.Step()!=0)throw new InvalidOperationException("SlimBlade twist was double-smoothed, lost, or continued after release.");
+            mode=NavMode.Navigate;client.Pose=pose;cameraMotion.Reset();pending.Move(20,10);Flush(timeMilliseconds:3000);Flush(finish:true,timeMilliseconds:3008);
+            var expected=CameraMath.Move(pose,NavMode.Navigate,20,10,0,input.Keys.Contains(18));
+            if(System.Numerics.Vector3.Distance(client.Pose!.Eye,expected.Eye)>.001f)throw new InvalidOperationException("Scene navigation did not retain its configured travel through the response.");
+        }finally{
+            pending.Reset();motionSamples.Reset();cameraMotion.Reset();slimBladeTwist.Reset();glide.Reset();
+            cfg=oldCfg;native=oldNative;mode=oldMode;profile=oldProfile;knobHoldActive=oldKnob;zoom=oldZoom;zoomLog=oldZoomLog;
+        }
+        Console.WriteLine("Elapsed-time native response verified: ball and wheel zoom, full release travel, single SlimBlade filtering, navigation and clean stop.");
+    }
     internal void VerifySnapWheelRouting(){
         var previousCfg=cfg;var previousNative=native;var previousMode=mode;var previousProfile=profile;bool previousKnob=knobHoldActive;double previousZoom=zoom,previousZoomLog=zoomLog;
         try{
-            cfg=(JsonObject)cfg.DeepClone();cfg["altTwistEstimate"]=false;cfg["leftWheel"]="normal";cfg["rightWheel"]="normal";cfg["orbitSens"]=50;
+            cfg=(JsonObject)cfg.DeepClone();cfg["altTwistEstimate"]=false;cfg["steadyCamera"]=true;cfg["leftWheel"]="normal";cfg["rightWheel"]="normal";cfg["orbitSens"]=50;
             profile=new(){["id"]="demo"};mode=NavMode.Snap;knobHoldActive=false;pending.Reset();motionSamples.Reset();
             var pose=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
             var client=new NativeServer.Client{Version=2,Pose=pose,BasePose=pose,EstimateTwist=false};client.Snap.Reset(pose);native=client;

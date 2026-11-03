@@ -1,3 +1,9 @@
+## Time-based 3D camera response
+- Smooth ball movement and held twist/wheel zoom with one elapsed-time response, including scene navigation.
+- Keep speed consistent when camera timer intervals vary, with no change to your sensitivity values.
+- Tune Buttons & keys → Extras → 3D motion response from 6 to 40 ms while Steady 3D motion is on.
+- Keep exact Alt snaps, normal clicks/wheels, saved devices, programs and presets.
+
 ## Prevent program-detection interruptions
 - Replace timed regular expressions in foreground executable matching with bounded wildcard matching.
 - Preserve custom executable patterns, browser title detection and saved controls.

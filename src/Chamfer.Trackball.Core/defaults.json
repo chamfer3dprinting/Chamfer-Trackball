@@ -2,6 +2,7 @@
   "configVersion": 30,
   "slimBladeSmoothTwist": false,
   "steadyCamera": false,
+  "cameraResponseMs": 18,
   "enabled": true,
   "buttons": {
     "middle": {
