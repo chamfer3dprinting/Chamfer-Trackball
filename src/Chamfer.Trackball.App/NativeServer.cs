@@ -13,6 +13,7 @@ internal sealed class NativeServer:IDisposable {
     internal sealed class Client {
         public string Id=Guid.NewGuid().ToString("N"),App="",Session="";
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
+        public NavMode Mode=NavMode.Idle;
         public bool Focus=true,SnapTwist,EstimateTwist;public float TwistGain=1;public string TwistAxis="x";public bool ReverseTwist;public TwistCalibrationModel? TwistCalibration;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
         public readonly SemaphoreSlim OutSignal=new(0,1);
@@ -28,7 +29,30 @@ internal sealed class NativeServer:IDisposable {
     public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
     public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
-    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null){lock(c.Gate){c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");c.Pose=c.BasePose=null;c.Snap.Reset();Queue(c,new(){["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["x"]=x,["y"]=y});}}
+    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null){
+        lock(c.Gate){
+            c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;
+            c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();
+            StartSession(c,mode,x,y);
+        }
+    }
+    void StartSession(Client c,NavMode mode,int? x=null,int? y=null){
+        c.Mode=mode;c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");
+        c.Pose=c.BasePose=null;c.Snap.Reset();
+        var message=new JsonObject{["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString()};
+        if(x.HasValue&&y.HasValue){message["x"]=x.Value;message["y"]=y.Value;}
+        Queue(c,message);
+    }
+    void FollowCursor(Client c,string session){
+        lock(c.Gate){
+            if(c.App!="chamfer3d"||c.Version<2||!c.Focus||c.Pose==null||session!=c.Session||
+               c.Mode is not (NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate))return;
+            // Deliver the final old pose before asking for a new cursor
+            // anchor. The new session rejects delayed replies and frames.
+            Queue(c,new(){["t"]="end",["session"]=c.Session});
+            StartSession(c,c.Mode);
+        }
+    }
     public bool Move(Client c,NavMode mode,float dx,float dy,float wheel,bool vertical,float gain){
         lock(c.Gate){
             if(c.Version==1){
@@ -64,7 +88,7 @@ internal sealed class NativeServer:IDisposable {
     }
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
     static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
-    public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.SnapTwist=c.EstimateTwist=false;c.TwistCalibration=null;}}
+    public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.Mode=NavMode.Idle;c.SnapTwist=c.EstimateTwist=false;c.TwistCalibration=null;}}
     static void Queue(Client c,JsonObject msg){
         lock(c.Gate){
             if(ConfigStore.S(msg,"t")=="camera"){
@@ -80,6 +104,7 @@ internal sealed class NativeServer:IDisposable {
     void Receive(Client c,JsonObject m){
         c.Seen=DateTime.UtcNow;
         if(ConfigStore.S(m,"t")=="focus"){c.Focus=ConfigStore.B(m,"on");return;}
+        if(ConfigStore.S(m,"t")=="reanchor"){FollowCursor(c,ConfigStore.S(m,"session"));return;}
         if(ConfigStore.S(m,"t")!="scene"||ConfigStore.S(m,"session")!=c.Session||c.Session.Length==0)return;
         try{
             Vector3 vec(string key){var a=m[key]!.AsArray();if(a.Count!=3)throw new FormatException();return new(a[0]!.GetValue<float>(),a[1]!.GetValue<float>(),a[2]!.GetValue<float>());}
@@ -161,7 +186,7 @@ internal sealed class NativeServer:IDisposable {
                 var m=JsonNode.Parse(buffer.AsSpan(0,count))!.AsObject();
                 if(ConfigStore.S(m,"t")=="hello"){
                     c.App=ConfigStore.S(m,"app");c.Version=ConfigStore.I(m,"v",1);c.Pid=ConfigStore.I(m,"pid");clients[c.Id]=c;
-                    if(c.App=="chamfer3d"&&c.Version==1)Queue(c,new(){["t"]="ready",["v"]=2});
+                    if(c.App=="chamfer3d"&&c.Version==1)Queue(c,new(){["t"]="ready",["v"]=2,["cursorFollow"]=true});
                 }else Receive(c,m);
             }
         }catch(Exception ex)when(ex is WebSocketException or OperationCanceledException or IOException or JsonException or InvalidOperationException){ }
