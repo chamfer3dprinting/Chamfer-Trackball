@@ -196,100 +196,106 @@ internal sealed class MainForm:Form{
         native.End(connection);
         using(var response=await client.PostAsync("http://127.0.0.1:47613/native/scene",new StringContent(scene.ToJsonString(),Encoding.UTF8,"application/json")))response.EnsureSuccessStatusCode();
         if(connection.Pose!=null)throw new Exception("An ended gesture accepted a stale camera reply.");
-        using var forbidden=new HttpRequestMessage(HttpMethod.Get,"http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId);
-        forbidden.Headers.Add("Origin","https://untrusted.example");
-        using var denied=await client.SendAsync(forbidden);
-        if(denied.StatusCode!=System.Net.HttpStatusCode.Forbidden)throw new Exception("Native origin restriction failed.");
-
-        // Real WebSocket negotiation from a focused Studio browser tab. Its
-        // process ID is not exposed to web JavaScript, unlike native adapters.
-        using var browser=new ClientWebSocket();
-        browser.Options.SetRequestHeader("Origin","https://studio.chamfer3dprinting.com");
-        using var browserTimeout=new CancellationTokenSource(TimeSpan.FromSeconds(12));
-        await browser.ConnectAsync(new Uri("ws://127.0.0.1:47613"),browserTimeout.Token);
-        async Task BrowserSend(JsonObject value)=>await browser.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(value.ToJsonString())),WebSocketMessageType.Text,true,browserTimeout.Token);
-        async Task<JsonObject> BrowserRead(string type){
-            var bytes=new byte[16384];
-            for(int tries=0;tries<128;tries++){int length=0;WebSocketReceiveResult received;
-                do{received=await browser.ReceiveAsync(new ArraySegment<byte>(bytes,length,bytes.Length-length),browserTimeout.Token);length+=received.Count;}while(!received.EndOfMessage);
-                var message=JsonNode.Parse(bytes.AsSpan(0,length))!.AsObject();if(ConfigStore.S(message,"t")==type)return message;
-            }throw new Exception("Missing browser camera message: "+type);
+        foreach(var origin in new[]{"https://untrusted.example","http://chamfer3d.local","https://chamfer3d.local.untrusted.example","https://chamfer3d.local:1234"}){
+            using var forbidden=new HttpRequestMessage(HttpMethod.Get,"http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId);
+            forbidden.Headers.Add("Origin",origin);
+            using var denied=await client.SendAsync(forbidden);
+            if(denied.StatusCode!=System.Net.HttpStatusCode.Forbidden)throw new Exception("Native origin restriction failed: "+origin);
         }
-        await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=1});
-        var offer=await BrowserRead("ready");if(ConfigStore.I(offer,"v")!=2)throw new Exception("Studio protocol upgrade missing.");
-        await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=2});
-        NativeServer.Client? studio=null;
-        for(int tries=0;tries<50;tries++){studio=native.Find("chamfer3d",Environment.ProcessId);if(studio?.Version==2)break;await Task.Delay(10);}
-        if(studio?.Version!=2||!native.Supports(studio,NavMode.Snap)||!native.Supports(studio,NavMode.Navigate))throw new Exception("Focused Studio browser did not support snap/navigation.");
-        foreach(var command in new[]{NavMode.Snap,NavMode.Navigate,NavMode.PanZoom,NavMode.Zoom}){
-            native.Begin(studio,command,240,120);var request=await BrowserRead("begin");
-            var browserScene=(JsonObject)scene.DeepClone();browserScene["session"]=ConfigStore.S(request,"session");
-            await BrowserSend(browserScene);
+
+        // Run the full native camera handshake for both the browser and the
+        // Windows WebView's fixed virtual origin. The desktop does not serve
+        // its embedded files from the public website's address.
+        foreach(var studioOrigin in new[]{"https://studio.chamfer3dprinting.com","https://chamfer3d.local"}){
+            using var browser=new ClientWebSocket();
+            browser.Options.SetRequestHeader("Origin",studioOrigin);
+            using var browserTimeout=new CancellationTokenSource(TimeSpan.FromSeconds(12));
+            await browser.ConnectAsync(new Uri("ws://127.0.0.1:47613"),browserTimeout.Token);
+            async Task BrowserSend(JsonObject value)=>await browser.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(value.ToJsonString())),WebSocketMessageType.Text,true,browserTimeout.Token);
+            async Task<JsonObject> BrowserRead(string type){
+                var bytes=new byte[16384];
+                for(int tries=0;tries<128;tries++){int length=0;WebSocketReceiveResult received;
+                    do{received=await browser.ReceiveAsync(new ArraySegment<byte>(bytes,length,bytes.Length-length),browserTimeout.Token);length+=received.Count;}while(!received.EndOfMessage);
+                    var message=JsonNode.Parse(bytes.AsSpan(0,length))!.AsObject();if(ConfigStore.S(message,"t")==type)return message;
+                }throw new Exception("Missing browser camera message: "+type);
+            }
+            await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=1});
+            var offer=await BrowserRead("ready");if(ConfigStore.I(offer,"v")!=2)throw new Exception("Studio protocol upgrade missing.");
+            await BrowserSend(new(){["t"]="hello",["app"]="chamfer3d",["v"]=2});
+            NativeServer.Client? studio=null;
+            for(int tries=0;tries<50;tries++){studio=native.Find("chamfer3d",Environment.ProcessId);if(studio?.Version==2)break;await Task.Delay(10);}
+            if(studio?.Version!=2||!native.Supports(studio,NavMode.Snap)||!native.Supports(studio,NavMode.Navigate))throw new Exception("Focused Studio browser did not support snap/navigation.");
+            foreach(var command in new[]{NavMode.Orbit,NavMode.Snap,NavMode.Navigate,NavMode.PanZoom,NavMode.Zoom}){
+                native.Begin(studio,command,240,120);var request=await BrowserRead("begin");
+                var browserScene=(JsonObject)scene.DeepClone();browserScene["session"]=ConfigStore.S(request,"session");
+                await BrowserSend(browserScene);
+                for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
+                if(studio.Pose==null||!native.Move(studio,command,30,20,120,command==NavMode.Navigate,1))throw new Exception("Studio camera command did not run: "+command);
+                if(command==NavMode.Snap&&studio.Pose!.WorldUp!=System.Numerics.Vector3.UnitY)throw new Exception("Studio snap did not use the host cube's Y-up convention.");
+                var result=await BrowserRead("camera");if(ConfigStore.S(result,"session")!=studio.Session)throw new Exception("Studio camera session mismatch.");
+                native.End(studio);await BrowserRead("end");
+            }
+    
+    
+            foreach(var direction in new[]{new System.Numerics.Vector2(1000,0),new System.Numerics.Vector2(-1000,0),new System.Numerics.Vector2(0,1000),new System.Numerics.Vector2(0,-1000)}){
+                native.Begin(studio,NavMode.Snap,240,120);var faceRequest=await BrowserRead("begin");
+                var faceScene=(JsonObject)scene.DeepClone();faceScene["session"]=ConfigStore.S(faceRequest,"session");
+                faceScene["eye"]=new JsonArray(0,0,10);faceScene["target"]=new JsonArray(0,0,0);faceScene["pivot"]=new JsonArray(0,0,0);
+                await BrowserSend(faceScene);
+                for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
+                if(studio.Pose==null||!native.Move(studio,NavMode.Snap,direction.X,direction.Y,0,false,.2f))throw new Exception("Directional face command did not run.");
+                var result=await BrowserRead("camera");var eye=result["eye"]!;var target=result["target"]!;
+                var back=System.Numerics.Vector3.Normalize(new System.Numerics.Vector3(eye[0]!.GetValue<float>()-target[0]!.GetValue<float>(),eye[1]!.GetValue<float>()-target[1]!.GetValue<float>(),eye[2]!.GetValue<float>()-target[2]!.GetValue<float>()));
+                if(Math.Abs(back.Z)>.001||native.SnapState(studio)["state"]!.GetValue<string>()=="curving")throw new Exception("Alt did not select a neighboring face or reserved a turn curve.");
+                native.End(studio);await BrowserRead("end");
+            }
+    
+            // The held knob path selects an existing X/Y axis, then rolls only
+            // camera orientation. Exercise the real Studio protocol in both directions.
+            native.Begin(studio,NavMode.Roll,240,120,true);var knobRequest=await BrowserRead("begin");
+            var knobScene=(JsonObject)scene.DeepClone();knobScene["eye"]=new JsonArray(0,0,10);knobScene["target"]=new JsonArray(0,0,0);knobScene["pivot"]=new JsonArray(0,0,0);knobScene["session"]=ConfigStore.S(knobRequest,"session");
+            await BrowserSend(knobScene);
             for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
-            if(studio.Pose==null||!native.Move(studio,command,30,20,120,command==NavMode.Navigate,1))throw new Exception("Studio camera command did not run: "+command);
-            if(command==NavMode.Snap&&studio.Pose!.WorldUp!=System.Numerics.Vector3.UnitY)throw new Exception("Studio snap did not use the host cube's Y-up convention.");
-            var result=await BrowserRead("camera");if(ConfigStore.S(result,"session")!=studio.Session)throw new Exception("Studio camera session mismatch.");
+            if(studio.Pose==null)throw new Exception("Knob camera handshake missing.");
+            await BrowserRead("camera");var knobStart=studio.Pose;var knobSteps=new KnobSteps();
+            const float shortNudgeCounts=8;
+            foreach(int sign in new[]{1,-1}){
+                float delta=KnobTwist.CameraDelta(sign*shortNudgeCounts,0,"x",false,1);int steps=knobSteps.AddNudge(delta,Environment.TickCount64);delta=(steps%4)*KnobSteps.QuarterDelta;
+                if(!native.Move(studio,NavMode.Roll,delta,0,0,false,1))throw new Exception("Held knob rotation was not delivered.");
+                var result=await BrowserRead("camera");var up=result["up"]!;
+                var actualUp=new System.Numerics.Vector3(up[0]!.GetValue<float>(),up[1]!.GetValue<float>(),up[2]!.GetValue<float>());
+                var expectedUp=sign>0?-System.Numerics.Vector3.UnitX:System.Numerics.Vector3.UnitY;
+                if(System.Numerics.Vector3.Distance(actualUp,expectedUp)>.0001f||System.Numerics.Vector3.Distance(studio.Pose!.Eye,knobStart.Eye)>.0001f||System.Numerics.Vector3.Distance(studio.Pose.Target,knobStart.Target)>.0001f)throw new Exception("Knob rotation changed faces, position or turn direction.");
+            }
             native.End(studio);await BrowserRead("end");
-        }
-
-
-        foreach(var direction in new[]{new System.Numerics.Vector2(1000,0),new System.Numerics.Vector2(-1000,0),new System.Numerics.Vector2(0,1000),new System.Numerics.Vector2(0,-1000)}){
-            native.Begin(studio,NavMode.Snap,240,120);var faceRequest=await BrowserRead("begin");
-            var faceScene=(JsonObject)scene.DeepClone();faceScene["session"]=ConfigStore.S(faceRequest,"session");
-            faceScene["eye"]=new JsonArray(0,0,10);faceScene["target"]=new JsonArray(0,0,0);faceScene["pivot"]=new JsonArray(0,0,0);
-            await BrowserSend(faceScene);
+    
+    
+            native.Begin(studio,NavMode.Snap,240,120,false,true,1);
+            var estimateRequest=await BrowserRead("begin");var estimateScene=(JsonObject)knobScene.DeepClone();estimateScene["session"]=ConfigStore.S(estimateRequest,"session");await BrowserSend(estimateScene);
             for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
-            if(studio.Pose==null||!native.Move(studio,NavMode.Snap,direction.X,direction.Y,0,false,.2f))throw new Exception("Directional face command did not run.");
-            var result=await BrowserRead("camera");var eye=result["eye"]!;var target=result["target"]!;
-            var back=System.Numerics.Vector3.Normalize(new System.Numerics.Vector3(eye[0]!.GetValue<float>()-target[0]!.GetValue<float>(),eye[1]!.GetValue<float>()-target[1]!.GetValue<float>(),eye[2]!.GetValue<float>()-target[2]!.GetValue<float>()));
-            if(Math.Abs(back.Z)>.001||native.SnapState(studio)["state"]!.GetValue<string>()=="curving")throw new Exception("Alt did not select a neighboring face or reserved a turn curve.");
+            if(studio.Pose==null)throw new Exception("Alt-only estimate handshake missing.");
+            if(!native.Move(studio,NavMode.Snap,8,0,0,false,.2f))throw new Exception("Tiny one-packet Alt nudge input not delivered.");
+            await Task.Delay(60);
+            native.Move(studio,NavMode.Snap,0,0,0,false,.2f);
+            var estimated=native.SnapState(studio);
+            if(ConfigStore.S(estimated,"state")!="twist"||ConfigStore.I(estimated,"turns")!=1||System.Numerics.Vector3.Distance(studio.Pose!.Up,-System.Numerics.Vector3.UnitX)>.001f)throw new Exception("Alt-only estimation did not produce exactly one clockwise 90-degree camera turn.");
+            native.Move(studio,NavMode.Snap,-8,0,0,false,.2f);
+            var reversedEstimate=native.SnapState(studio);
+            if(ConfigStore.I(reversedEstimate,"turns")!=2||ConfigStore.I(reversedEstimate,"direction")!=-1||System.Numerics.Vector3.Distance(studio.Pose!.Up,System.Numerics.Vector3.UnitY)>.001f)throw new Exception("Tiny reverse Alt nudge did not turn the native camera back.");
+            native.Move(studio,NavMode.Snap,-8,0,0,false,.2f);
+            if(ConfigStore.I(native.SnapState(studio),"turns")!=2)throw new Exception("One tiny Alt stroke emitted more than one quarter turn.");
+            int beforeTransitionTurns=ConfigStore.I(reversedEstimate,"turns");
+            for(int frame=0;frame<24;frame++){native.Move(studio,NavMode.Snap,0,60,0,false,.2f);await Task.Delay(16);}
+            var transitionFace=System.Numerics.Vector3.Normalize(studio.Pose!.Eye-studio.Pose.Target);
+            for(int frame=0;frame<32;frame++){native.Move(studio,NavMode.Snap,60,0,0,false,.2f);await Task.Delay(16);}
+            var transitioned=native.SnapState(studio);
+            if(ConfigStore.S(transitioned,"state")!="twist"||ConfigStore.I(transitioned,"turns")<=beforeTransitionTurns||System.Numerics.Vector3.Dot(System.Numerics.Vector3.Normalize(studio.Pose!.Eye-studio.Pose.Target),transitionFace)<.999f)throw new Exception("Held Alt could not return from faces to estimated twist on the native camera.");
             native.End(studio);await BrowserRead("end");
+            await BrowserSend(new(){["t"]="focus",["on"]=false});
+            for(int tries=0;tries<50&&native.Find("chamfer3d",Environment.ProcessId)!=null;tries++)await Task.Delay(10);
+            if(native.Find("chamfer3d",Environment.ProcessId)!=null||native.AllowsNavigation("chamfer3d",Environment.ProcessId))throw new Exception("Unfocused Studio browser retained navigation or mouse emulation.");
+            Console.WriteLine("Studio WebSocket camera controls verified for "+studioOrigin);
         }
-
-        // The held knob path selects an existing X/Y axis, then rolls only
-        // camera orientation. Exercise the real Studio protocol in both directions.
-        native.Begin(studio,NavMode.Roll,240,120,true);var knobRequest=await BrowserRead("begin");
-        var knobScene=(JsonObject)scene.DeepClone();knobScene["eye"]=new JsonArray(0,0,10);knobScene["target"]=new JsonArray(0,0,0);knobScene["pivot"]=new JsonArray(0,0,0);knobScene["session"]=ConfigStore.S(knobRequest,"session");
-        await BrowserSend(knobScene);
-        for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
-        if(studio.Pose==null)throw new Exception("Knob camera handshake missing.");
-        await BrowserRead("camera");var knobStart=studio.Pose;var knobSteps=new KnobSteps();
-        const float shortNudgeCounts=8;
-        foreach(int sign in new[]{1,-1}){
-            float delta=KnobTwist.CameraDelta(sign*shortNudgeCounts,0,"x",false,1);int steps=knobSteps.AddNudge(delta,Environment.TickCount64);delta=(steps%4)*KnobSteps.QuarterDelta;
-            if(!native.Move(studio,NavMode.Roll,delta,0,0,false,1))throw new Exception("Held knob rotation was not delivered.");
-            var result=await BrowserRead("camera");var up=result["up"]!;
-            var actualUp=new System.Numerics.Vector3(up[0]!.GetValue<float>(),up[1]!.GetValue<float>(),up[2]!.GetValue<float>());
-            var expectedUp=sign>0?-System.Numerics.Vector3.UnitX:System.Numerics.Vector3.UnitY;
-            if(System.Numerics.Vector3.Distance(actualUp,expectedUp)>.0001f||System.Numerics.Vector3.Distance(studio.Pose!.Eye,knobStart.Eye)>.0001f||System.Numerics.Vector3.Distance(studio.Pose.Target,knobStart.Target)>.0001f)throw new Exception("Knob rotation changed faces, position or turn direction.");
-        }
-        native.End(studio);await BrowserRead("end");
-
-
-        native.Begin(studio,NavMode.Snap,240,120,false,true,1);
-        var estimateRequest=await BrowserRead("begin");var estimateScene=(JsonObject)knobScene.DeepClone();estimateScene["session"]=ConfigStore.S(estimateRequest,"session");await BrowserSend(estimateScene);
-        for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
-        if(studio.Pose==null)throw new Exception("Alt-only estimate handshake missing.");
-        if(!native.Move(studio,NavMode.Snap,8,0,0,false,.2f))throw new Exception("Tiny one-packet Alt nudge input not delivered.");
-        await Task.Delay(60);
-        native.Move(studio,NavMode.Snap,0,0,0,false,.2f);
-        var estimated=native.SnapState(studio);
-        if(ConfigStore.S(estimated,"state")!="twist"||ConfigStore.I(estimated,"turns")!=1||System.Numerics.Vector3.Distance(studio.Pose!.Up,-System.Numerics.Vector3.UnitX)>.001f)throw new Exception("Alt-only estimation did not produce exactly one clockwise 90-degree camera turn.");
-        native.Move(studio,NavMode.Snap,-8,0,0,false,.2f);
-        var reversedEstimate=native.SnapState(studio);
-        if(ConfigStore.I(reversedEstimate,"turns")!=2||ConfigStore.I(reversedEstimate,"direction")!=-1||System.Numerics.Vector3.Distance(studio.Pose!.Up,System.Numerics.Vector3.UnitY)>.001f)throw new Exception("Tiny reverse Alt nudge did not turn the native camera back.");
-        native.Move(studio,NavMode.Snap,-8,0,0,false,.2f);
-        if(ConfigStore.I(native.SnapState(studio),"turns")!=2)throw new Exception("One tiny Alt stroke emitted more than one quarter turn.");
-        int beforeTransitionTurns=ConfigStore.I(reversedEstimate,"turns");
-        for(int frame=0;frame<24;frame++){native.Move(studio,NavMode.Snap,0,60,0,false,.2f);await Task.Delay(16);}
-        var transitionFace=System.Numerics.Vector3.Normalize(studio.Pose!.Eye-studio.Pose.Target);
-        for(int frame=0;frame<32;frame++){native.Move(studio,NavMode.Snap,60,0,0,false,.2f);await Task.Delay(16);}
-        var transitioned=native.SnapState(studio);
-        if(ConfigStore.S(transitioned,"state")!="twist"||ConfigStore.I(transitioned,"turns")<=beforeTransitionTurns||System.Numerics.Vector3.Dot(System.Numerics.Vector3.Normalize(studio.Pose!.Eye-studio.Pose.Target),transitionFace)<.999f)throw new Exception("Held Alt could not return from faces to estimated twist on the native camera.");
-        native.End(studio);await BrowserRead("end");
-        await BrowserSend(new(){["t"]="focus",["on"]=false});
-        for(int tries=0;tries<50&&native.Find("chamfer3d",Environment.ProcessId)!=null;tries++)await Task.Delay(10);
-        if(native.Find("chamfer3d",Environment.ProcessId)!=null||native.AllowsNavigation("chamfer3d",Environment.ProcessId))throw new Exception("Unfocused Studio browser retained navigation or mouse emulation.");
     }
     async Task SmokeTest(){
         try{

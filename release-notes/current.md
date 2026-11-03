@@ -1,3 +1,10 @@
+## Connect to the installed Chamfer Studio Windows app
+
+- Allow the installed Studio app's exact embedded address, https://chamfer3d.local, to connect to the local camera bridge.
+- Fix the connection rejection that prevented held orbit, pan, zoom and face controls in the desktop app.
+- Verify native camera handshakes from both desktop and hosted Studio. Keep unrelated websites and lookalike addresses rejected.
+- Preserve your trackballs, native clicks/scrolling, shortcuts, presets, programs and motion settings.
+
 ## Detect Studio when changing browser tabs
 
 - Detect a supported 3D app when switching to its browser tab, even when the browser window stays the same.
