@@ -94,7 +94,7 @@ internal sealed class NativeServer:IDisposable {
     async Task Accept(){
         while(!stop.IsCancellationRequested)try{var tcp=await listener.AcceptTcpClientAsync(stop.Token);_ = Handle(tcp);}catch(OperationCanceledException){break;}catch(SocketException)when(stop.IsCancellationRequested){break;}
     }
-    static bool OriginAllowed(string? origin)=>string.IsNullOrEmpty(origin)||origin=="null"||origin=="https://studio.chamfer3dprinting.com"||origin=="https://preview.chamfer3dprinting.com";
+    static bool OriginAllowed(string? origin)=>string.IsNullOrEmpty(origin)||origin=="null"||origin=="https://studio.chamfer3dprinting.com"||origin=="https://preview.chamfer3dprinting.com"||origin=="https://chamfer3d.local";
     async Task Handle(TcpClient tcp){
         using(tcp)try{
             tcp.ReceiveTimeout=1500;tcp.SendTimeout=1500;
