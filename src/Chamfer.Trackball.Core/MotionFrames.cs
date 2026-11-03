@@ -33,29 +33,72 @@ public sealed class MotionGlide{
  }
  public void Reset(){velocityX=velocityY=0;lastTime=0;}
 }
-// Three frames of measured input, with no velocity extrapolation.
+// Integrate a two-stage velocity response over elapsed time. Frame-sized
+// input is treated as motion during that interval, rather than an impulse at
+// an arbitrary timer tick. Each axis conserves measured travel; no prediction.
 public sealed class CameraMotionFilter
 {
-    private float nextX, nextY, lastX, lastY;
+    private Axis xAxis, yAxis, wheelAxis;
+    private double previousTime = double.NaN;
+    private double tau = .009;
 
-    public (float X, float Y) Step(float x, float y, bool finish = false)
+    private struct Axis
     {
-        if (finish)
+        public double First, Second;
+        public readonly double Remainder(double seconds) => seconds * (First + Second);
+        public float Step(double movement, double dt, double seconds)
         {
-            var remainder = (x + nextX + lastX, y + nextY + lastY);
-            Reset();
-            return remainder;
+            double rate = movement / dt, a = First - rate, b = Second - rate;
+            double h = dt / seconds, decay = Math.Exp(-h);
+            double travel = movement + seconds * b * (1 - decay)
+                + seconds * a * (1 - (1 + h) * decay);
+            First = rate + a * decay;
+            Second = rate + (b + a * h) * decay;
+            if (Math.Abs(First * seconds) + Math.Abs(Second * seconds) < .00001)
+            {
+                travel += Remainder(seconds);
+                First = Second = 0;
+            }
+            return (float)travel;
         }
-
-        var motion = (x * .70f + nextX, y * .70f + nextY);
-        nextX = x * .22f + lastX;
-        nextY = y * .22f + lastY;
-        lastX = x * .08f;
-        lastY = y * .08f;
-        return motion;
     }
 
-    public void Reset() => nextX = nextY = lastX = lastY = 0;
+    public MotionFrame Step(float x, float y, float wheel, double nowMilliseconds,
+        float responseMilliseconds = 18, bool finish = false)
+    {
+        if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(wheel) ||
+            !double.IsFinite(nowMilliseconds) || !float.IsFinite(responseMilliseconds))
+            throw new ArgumentException("Invalid camera response input.");
+        if (finish)
+        {
+            var result = new MotionFrame(x + (float)xAxis.Remainder(tau),
+                y + (float)yAxis.Remainder(tau), wheel + (float)wheelAxis.Remainder(tau), 0);
+            Reset();
+            return result;
+        }
+        double nextTau = Math.Clamp(responseMilliseconds, 6, 40) / 2000.0;
+        double dt = double.IsNaN(previousTime) ? 1.0 / 60 : (nowMilliseconds - previousTime) / 1000;
+        // A stalled UI or changed clock must not replay an old velocity tail.
+        if (dt <= 0 || dt > .1)
+        {
+            xAxis = yAxis = wheelAxis = default;
+            dt = 1.0 / 60;
+        }
+        if (nextTau != tau && !double.IsNaN(previousTime))
+        {
+            xAxis = yAxis = wheelAxis = default;
+        }
+        tau = nextTau;
+        previousTime = nowMilliseconds;
+        return new MotionFrame(xAxis.Step(x, dt, tau), yAxis.Step(y, dt, tau),
+            wheelAxis.Step(wheel, dt, tau), 0);
+    }
+
+    public void Reset()
+    {
+        xAxis = yAxis = wheelAxis = default;
+        previousTime = double.NaN;
+    }
 }
 public sealed class FractionalInput{
  float x,y,wheel;

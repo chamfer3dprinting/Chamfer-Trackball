@@ -17,18 +17,7 @@ static class AltSnapWheelChecks{
    dial.Reset();
    check(dial.Step()==0,"Releasing the held gesture clears the remaining "+mode+" twist");
   }
-  var filter=new CameraMotionFilter();
-  var firstMotion=filter.Step(100,-50);
-  var secondMotion=filter.Step(0,0);
-  var thirdMotion=filter.Step(0,0);
-  check(firstMotion.X==70&&firstMotion.Y==-35&&secondMotion.X>thirdMotion.X&&thirdMotion.X>0,"Steady 3D responds immediately and distributes a short movement over three frames");
-  check(Math.Abs(firstMotion.X+secondMotion.X+thirdMotion.X-100)<.001f&&Math.Abs(firstMotion.Y+secondMotion.Y+thirdMotion.Y+50)<.001f&&filter.Step(0,0)==(0f,0f),"Steady 3D preserves measured input without adding coast");
-  filter.Step(100,-50);
-  var finish=filter.Step(-10,5,true);
-  check(Math.Abs(finish.X-20)<.001f&&Math.Abs(finish.Y+10)<.001f&&filter.Step(0,0)==(0f,0f),"Release delivers buffered counts and stops the filter");
-  filter.Step(100,100);
-  filter.Reset();
-  check(filter.Step(0,0)==(0f,0f)&&!ConfigStore.B(ConfigStore.Defaults(),"steadyCamera"),"A new gesture starts clean and older settings keep their prior motion feel");
+  CameraResponseChecks.Run(check);
   check(!ConfigStore.B(ConfigStore.Defaults(),"slimBladeSmoothTwist"),"SlimBlade twist trial defaults off and can be reverted");
 
   check(SnapWheelPolicy.Captures(NavMode.Snap,0x20a)&&!SnapWheelPolicy.Captures(NavMode.Snap,0x20e),"Snap captures the confirmed left wheel and leaves the right wheel on its normal path");

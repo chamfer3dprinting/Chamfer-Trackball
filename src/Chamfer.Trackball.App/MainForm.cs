@@ -306,6 +306,7 @@ internal sealed class MainForm:Form{
             input.VerifyMultipleTrackballs();controller.Status();
             controller.VerifyForegroundTitles();
             controller.VerifyCalibrationNavigation();
+            controller.VerifyCameraResponse();
             controller.VerifySnapWheelRouting();
             controller.VerifyKnobHandshake();
             await NativeSmokeTest();

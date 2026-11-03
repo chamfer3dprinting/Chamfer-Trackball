@@ -23,5 +23,7 @@ public sealed class SlimBladeTwist
         return delta;
     }
 
+    public float Take() { float value = remaining; remaining = 0; return value; }
+
     public void Reset() => remaining = 0;
 }
