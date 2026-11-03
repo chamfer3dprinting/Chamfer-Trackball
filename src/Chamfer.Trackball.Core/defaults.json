@@ -1,5 +1,6 @@
 {
   "configVersion": 30,
+  "slimBladeSmoothTwist": false,
   "enabled": true,
   "buttons": {
     "middle": {

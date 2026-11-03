@@ -1,3 +1,8 @@
+## Optional smoother SlimBlade twist
+
+- Use **Buttons & keys → Extras → Smoother SlimBlade twist (trial)** for gentler camera roll while orbiting and smaller cursor zoom steps while panning.
+- Alt twist still makes exact 90° turns. Switch the trial off to restore the previous feel.
+
 ## Connect to the installed Chamfer Studio Windows app
 
 - Allow the installed Studio app's exact embedded address, https://chamfer3d.local, to connect to the local camera bridge.
