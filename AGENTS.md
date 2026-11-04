@@ -360,3 +360,12 @@ An in-memory run of the actual C# filter on a constant-speed, uneven-timer repla
 The owner explicitly chooses immediate retargeting when the cursor moves while Shift/Ctrl remains held. Advertise cursor-follow support to Studio. On a valid focused Studio request, deliver the final old camera before starting a fresh session for the same navigation mode. Wait for the new cursor scene and reject delayed replies/frames from the old session. Keep snap sessions outside cursor retargeting. Studio resolves desktop client coordinates through its trusted host and handles browser pointer events. No model geometry is changed.
 
 The real WebSocket smoke checks retargeted orbit, pan/zoom, zoom and navigation from both Studio origins, stale requests, stale scenes and new camera session IDs. Windows workflows, the next Admin build and physical evaluation are pending. Preserve existing speeds, devices, buttons, wheels, programs and presets.
+
+
+# 2026-11-04 — Held cruise and refresh-rate camera presentation
+
+The owner reports stutter, delayed/drifting motion, wrong pivots and wants the option of gentle continuing motion with the Kensington. Add a reversible, program/preset-scoped Hold to cruise setting (off by default). Ball displacement sets a bounded nonlinear velocity with a fine centre; an explicit native navigation hold is required. Release, click, focus/device change and a timer stall reset every axis without a catch-up step. Do not apply cruise to ordinary pointing, latched modes, emulation or exact Alt snaps.
+
+Advertise a short display response in the begin handshake when Steady motion or cruise is enabled, and include current pivot anchors in absolute camera messages. A compatible Studio build can then interpolate camera orientation and anchor-relative offsets on each display frame. Keep existing sensitivity, shortcuts, clicks, wheel axes, remembered M512/SlimBlade and presets. The new setting is retained with programs and presets. Include the existing CameraResponseChecks in the core runner; it was present but not called there.
+
+Windows workflows, Admin-only delivery, compatible private Studio installation and physical evaluation are pending. Synthetic tests cannot establish SpaceMouse-equivalent feel. Stock Kensington wheel reports are not Rotatrix's custom-firmware full-resolution third axis. Source stays on GitHub; no local Trackball development folder and no public stable promotion.

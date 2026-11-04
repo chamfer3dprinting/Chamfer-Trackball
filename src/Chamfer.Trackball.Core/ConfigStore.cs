@@ -96,7 +96,7 @@ public sealed class ConfigStore {
             if(i==current&&S(p,"name")==S(config["programs"]![current],"name"))next["twistCalibration"]=config["twistCalibration"]?.DeepClone();
             foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
             p["feel"]??=new JsonObject();
-            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
+            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
             next["feel"]=p["feel"]!.DeepClone();
             Validate(next);Write(next);config=next;Revision++;
         }
