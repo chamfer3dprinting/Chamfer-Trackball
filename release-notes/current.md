@@ -1,3 +1,9 @@
+## Gentle held cruise and smoother Studio presentation
+- Optional **Buttons & keys → Extras → Hold to cruise (trial)**: a small roll sets a gentle camera speed while a native navigation key is held. Release the key or click to stop.
+- Keep a fine centre, bounded faster movement, immediate release/reset, configured sensitivity and program/preset persistence.
+- Compatible Studio builds smooth camera orientation, zoom and cursor anchors at the display refresh rate while Steady motion or cruise is enabled.
+- Keep exact Alt face/90° turns, normal pointing, buttons, wheels, saved programs, presets and both trackballs.
+
 ## Follow the cursor during a held gesture
 - Move the cursor while holding orbit, pan/zoom or zoom to choose a new navigation point in compatible Studio builds.
 - Finish the previous camera frame before reading the new cursor point, and reject delayed frames from earlier anchors.

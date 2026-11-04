@@ -16,7 +16,7 @@ internal sealed class Controller:IDisposable{
     TwistCalibrationModel? learnedTwist;
     readonly TwistCalibrationSession calibration=new();readonly MotionFrames calibrationMotion=new();int calibrationProgram;string calibrationProgramName="",calibrationDevice="";
     readonly SlimBladeTwist slimBladeTwist=new();
-    readonly CameraMotionFilter cameraMotion=new();
+    readonly CameraMotionFilter cameraMotion=new();readonly HeldRateMotion heldRate=new();
     readonly KnobSteps knobSteps=new();readonly CircleZoom circle=new();readonly MotionGlide glide=new();readonly PointerMotion pointer=new();
     double gx,gy;readonly MotionFrames pending=new(),motionSamples=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
     bool stoppedByClick,emulating,knobHoldActive;float knobAngle;double rollLog;volatile bool nativeFocusAllowed=true;int foregroundPid;volatile nint foregroundWindow;
@@ -121,10 +121,10 @@ public string AppName{get;private set;}="";
         }
         if(native==null&&!demo&&!ConfigStore.B(cfg,"allowEmulation",true)){Integration="Native integration required";return;}
         mode=next;knobHoldActive=nextKnob;timer.Interval=MotionPolicy.FrameIntervalMs;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
-        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist);}
+        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist,ConfigStore.B(cfg,"steadyCamera")||ConfigStore.B(cfg,"spaceMouseCruise"));}
     }
     void End(){
-        server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();
+        server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
     }
     void ReleaseEmulation(){
@@ -165,11 +165,13 @@ public string AppName{get;private set;}="";
         if(mode==NavMode.Gestures){gx+=x;gy+=y;return;}
         motionSamples.Move(x,y);
     }
+    bool CruiseActive=>native?.Version>=2&&HeldNavigation&&ConfigStore.B(cfg,"spaceMouseCruise")&&mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate;
     void Flush(bool finish=false,double? timeMilliseconds=null){
         // Classify each newly sampled path once, even if a camera handshake delays delivery.
         var sample=motionSamples.Peek();motionSamples.ClearMove();bool consumed=false;
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
-        if(!MotionPolicy.Circle(mode,ConfigStore.B(cfg,"circleZoom"),!freeBall))circle.Reset();
+        bool cruise=CruiseActive;
+        if(cruise||!MotionPolicy.Circle(mode,ConfigStore.B(cfg,"circleZoom"),!freeBall))circle.Reset();
         else{
             var dial=circle.Add(sample.X,sample.Y,Environment.TickCount64,(float)ConfigStore.D(cfg,"circleSize",160));
             consumed=dial.Consumed;
@@ -178,15 +180,22 @@ public string AppName{get;private set;}="";
         if(!consumed)pending.Move(sample.X,sample.Y);
         var frame=pending.Peek();
         bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate);
-        if(steady&&native is {Version:>=2,Pose:null})return;
+        if((steady||cruise)&&native is {Version:>=2,Pose:null})return;
         MotionFrame output;
-        if(steady){
+        if(cruise){
+            cameraMotion.Reset();glide.Reset();
+            float twist=slimBladeTwist.Take();
+            output=heldRate.Step(frame.X,frame.Y,frame.Wheel+twist,
+                timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency,mode,finish);
+        }else if(steady){
+            heldRate.Reset();
             // Use one clock and response for ball movement and smooth twist.
             float twist=native?.Pose!=null?slimBladeTwist.Take():0;
             output=cameraMotion.Step(frame.X,frame.Y,frame.Wheel+twist,
                 (timeMilliseconds??(Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency)),
                 (float)ConfigStore.D(cfg,"cameraResponseMs",18),finish);
         }else{
+            heldRate.Reset();
             var smooth=glide.Step(frame.X,frame.Y,Environment.TickCount64,GlideSeconds,mode!=NavMode.Snap&&!knobHoldActive&&ConfigStore.B(cfg,"smooth",true));
             float twist=native?.Pose!=null?(finish?slimBladeTwist.Take():slimBladeTwist.Step()):0;
             output=new(smooth.X,smooth.Y,frame.Wheel+twist,0);

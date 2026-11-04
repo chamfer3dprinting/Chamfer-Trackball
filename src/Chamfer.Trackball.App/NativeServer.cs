@@ -14,7 +14,7 @@ internal sealed class NativeServer:IDisposable {
         public string Id=Guid.NewGuid().ToString("N"),App="",Session="";
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
         public NavMode Mode=NavMode.Idle;
-        public bool Focus=true,SnapTwist,EstimateTwist;public float TwistGain=1;public string TwistAxis="x";public bool ReverseTwist;public TwistCalibrationModel? TwistCalibration;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
+        public bool Focus=true,SnapTwist,EstimateTwist,SmoothPresentation;public float TwistGain=1;public string TwistAxis="x";public bool ReverseTwist;public TwistCalibrationModel? TwistCalibration;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
         public readonly SemaphoreSlim OutSignal=new(0,1);
         public object Gate=new();
@@ -29,9 +29,9 @@ internal sealed class NativeServer:IDisposable {
     public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
     public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
-    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null){
+    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null,bool smoothPresentation=false){
         lock(c.Gate){
-            c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;
+            c.SmoothPresentation=smoothPresentation;c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;
             c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();
             StartSession(c,mode,x,y);
         }
@@ -39,7 +39,7 @@ internal sealed class NativeServer:IDisposable {
     void StartSession(Client c,NavMode mode,int? x=null,int? y=null){
         c.Mode=mode;c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");
         c.Pose=c.BasePose=null;c.Snap.Reset();
-        var message=new JsonObject{["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString()};
+        var message=new JsonObject{["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["responseMs"]=c.SmoothPresentation?12:0};
         if(x.HasValue&&y.HasValue){message["x"]=x.Value;message["y"]=y.Value;}
         Queue(c,message);
     }
@@ -87,7 +87,7 @@ internal sealed class NativeServer:IDisposable {
         }
     }
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
-    static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
+    static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["pivot"]=V(p.Pivot),["zoomPivot"]=V(p.ZoomPivot??p.Pivot),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
     public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.Mode=NavMode.Idle;c.SnapTwist=c.EstimateTwist=false;c.TwistCalibration=null;}}
     static void Queue(Client c,JsonObject msg){
         lock(c.Gate){
