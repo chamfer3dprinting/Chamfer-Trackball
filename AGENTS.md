@@ -34,6 +34,14 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Deliver and verify immediate Studio response
+
+Admin v1.5.44 is installed and its SHA-256 matches the release asset: 863b7d2de9b2a03f87104c4095e23fb807bc85632592ab40365f102b0148407d. Runtime source 7da6f78dde6f187092756d446a55f1f023efa8ac, main workflow 41945041997 passes 862 core checks, syntax and both actual-executable/native interface tests. The bridge reports 1.5.44 and Admin responds after restart. The corresponding public executable remains an unpublished candidate; no public stable promotion occurred.
+
+Owner desktop Studio and private web Preview now both use 3.3.5. All 530 private web assets verify, and a disposable hosted-browser replay passes 224 actual C# poses across orbit/pan/zoom, all six faces and all 24 orientations, exact flat projection and stable release. Cursor zoom checks pass visible surfaces and empty space in both projections; geometry/History/Undo remain unchanged. All account/project writes are blocked during these tests. Preserve newer Studio AI/modeling work. Public Studio remains 2.1.4; its matching 2.1.5-r6 owner candidate is staged but inactive.
+
+On this PC the 8 ms requested WinForms interval measured median 15.81 ms. The new held SlimBlade Studio path removes that wait and driver filtering. Set one 12 ms display response after comparing synthetic 125 Hz input at a 144 Hz display: speed variation 30.7% at 6 ms versus 18.0% at 12 ms. This is not a physical hardware benchmark. Deep comparisons before/after restart preserve all other settings, controls, speeds, programs, three presets and remembered trackballs. Cruise stays off. Both installed apps are reopened and responsive. Physical Kensington feel after this update remains unverified; do not claim exact SpaceMouse/modified-Rotatrix sensing. Owner should reload private Preview before comparing web.
+
 # 2026-11-04 — Remove duplicate Kensington camera delays
 
 The owner still reports delayed, uneven navigation in both desktop and private web Studio. For held continuous SlimBlade native Studio modes with Steady motion enabled and cruise off, deliver measured motion directly from each raw report and smooth only in Studio on its display clock. Keep the timer as the handshake/fallback path, preserve pending first movement, coalesce obsolete absolute poses, and emit no duplicate travel on a timer tick or release. Real SlimBlade twist uses this same path. Send the saved response setting to Studio instead of a fixed 12 ms hint. Legacy clients, other adapters, M512, exact Alt face/wheel steps, normal pointing and custom bindings keep their existing paths.
