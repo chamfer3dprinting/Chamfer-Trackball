@@ -1,3 +1,11 @@
+# Reverse steering and backtick navigation
+
+- Hold backtick (`) to navigate; release it or roll back near the starting centre to stop.
+- Forward-right/left moves forward and turns right/left.
+- Back-right/left moves backward and turns right/left.
+- Straight side rolls strafe; scroll up/down controls height.
+- Preserve existing pointer/3D speeds, orbit/zoom, buttons, wheels and presets.
+
 # Return to centre to stop
 
 - Hold Navigate and roll to set travel or turning speed.

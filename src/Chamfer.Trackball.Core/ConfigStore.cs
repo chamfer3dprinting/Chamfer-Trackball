@@ -78,13 +78,22 @@ public sealed class ConfigStore {
             if(navigation!=null&&!hadNavigationCruise)navigation["feel"]!["navigationCruise"]=true;
             LoadProgram(config,I(config,"activeProgram",0));
         }
-        config["configVersion"]=31;Validate(config);
-        if(oldVersion<31&&File.Exists(path))Write(config);
+        if(oldVersion<32){
+            foreach(var item in config["programs"]!.AsArray().OfType<JsonObject>()){
+                if(S(item,"defaultKind",S(item,"name")).Contains("3D",StringComparison.OrdinalIgnoreCase)&&S(item,"navigateKeys").ToLowerInvariant() is "win" or "windows")item["navigateKeys"]="backtick";
+            }
+            foreach(var preset in config["presets"]!.AsArray()){
+                if(preset?["settings"] is JsonObject settings&&S(settings,"defaultKind").Contains("3D",StringComparison.OrdinalIgnoreCase)&&S(settings,"navigateKeys").ToLowerInvariant() is "win" or "windows")settings["navigateKeys"]="backtick";
+            }
+            LoadProgram(config,I(config,"activeProgram",0));
+        }
+        config["configVersion"]=32;Validate(config);
+        if(oldVersion<32&&File.Exists(path))Write(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
     public void Save(JsonObject incoming) {
         lock(gate){
-            var next=(JsonObject)incoming.DeepClone();Normalize(next);next["configVersion"]=31;
+            var next=(JsonObject)incoming.DeepClone();Normalize(next);next["configVersion"]=32;
             // Device identity comes from Raw Input, not a possibly stale settings page.
             bool sameDevice=S(incoming,"selectedDevice").Equals(S(config,"selectedDevice"),StringComparison.OrdinalIgnoreCase);
             next["selectedDevice"]=config["selectedDevice"]?.DeepClone()??JsonValue.Create("");

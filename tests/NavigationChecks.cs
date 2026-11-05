@@ -12,7 +12,7 @@ internal static class NavigationChecks {
         check(!rate.Step(0,0,0,1016,true).Active&&!rate.Step(0,0,0,1024).Active,"Navigation key release immediately clears every velocity");
         rate.Reset();check(!rate.Step(1,1,0,2000).Active,"One-count sensor noise does not launch the drone");
         rate.Reset();rate.Step(12,0,0,3000);var reverse=rate.Step(-30,8,-120,3008);reverse=rate.Step(0,0,0,3096);
-        check(reverse.Right<0&&reverse.Up<0&&reverse.Forward<0,"Rolling back and reverse scrolling command left/down/back");
+        check(reverse.Yaw<0&&reverse.Up<0&&reverse.Forward<0,"Rolling back and reverse scrolling command left steering/down/back");
         check(!rate.Step(0,0,0,3400).Active,"A paused loop discards stale navigation instead of catching up");
         rate.Reset();rate.Step(12,8,60,4000);rate.Reset();check(!rate.Step(0,0,0,4008).Active,"Focus/device/mode reset clears drone motion");
         double Travel(int dt){var r=new NavigationMotion();r.Step(12,0,0,1000);double x=0;for(int t=dt;t<=1000;t+=dt)x+=r.Step(0,0,0,1000+t).Right;return x;}
@@ -31,6 +31,14 @@ internal static class NavigationChecks {
         check((turnedRight.Target-turnedRight.Eye).X>0&&(turnedLeft.Target-turnedLeft.Eye).X<0,"Diagonal right/left turns change the camera heading correctly");
         check(Math.Abs(Vector3.Distance(turnedRight.Eye,turnedRight.Target)-Vector3.Distance(start.Eye,start.Target))<.0001f,"Turning retains the camera lens distance");
         check(CameraMath.Fly(start,turnRight,0,0)==start,"Zero translation and turning sensitivity stops every navigation component");
+        rate.Reset();var reverseRight=rate.Step(12,12,0,4720);rate.Reset();var reverseLeft=rate.Step(-12,12,0,4730);
+        check(reverseRight.Forward<0&&reverseRight.Yaw>0&&reverseRight.Right==0&&reverseLeft.Forward<0&&reverseLeft.Yaw<0&&reverseLeft.Right==0,"Backward diagonals reverse and steer toward the requested side");
+        var backRight=CameraMath.Fly(start,reverseRight,MotionPolicy.Gain(27),MotionPolicy.Gain(28));var backLeft=CameraMath.Fly(start,reverseLeft,MotionPolicy.Gain(27),MotionPolicy.Gain(28));
+        check(backRight.Eye.Z>start.Eye.Z&&backLeft.Eye.Z>start.Eye.Z&&(backRight.Target-backRight.Eye).X>0&&(backLeft.Target-backLeft.Eye).X<0,"Reverse diagonal travel and camera heading agree with right/left commands");
+        rate.Reset();rate.Step(12,12,0,4740);rate.Step(0,0,0,4748);var reverseStop=rate.Step(-10,-10,0,4756);
+        check(!reverseStop.Active&&rate.Centered,"Reverse steering stops completely when rolled back near centre");
+        check(CameraMath.Fly(start,reverseRight,0,0)==start,"Reverse steering respects zero translation and turn sensitivity");
+
         var move=CameraMath.Fly(start,new(12,8,15),MotionPolicy.Gain(27));
         check(move.Eye.X>start.Eye.X&&move.Eye.Y>start.Eye.Y&&move.Eye.Z<start.Eye.Z,"Ball directions follow the view and positive twist moves forward");
         check(Vector3.Distance(move.Target-move.Eye,start.Target-start.Eye)<.0001f&&move.Up==start.Up,"Drone translation preserves orientation and camera distance");
@@ -49,22 +57,29 @@ internal static class NavigationChecks {
             var store=new ConfigStore(file);check(!ConfigStore.B(store.Snapshot(),"navigationCruise"),"Normal mouse leaves continuous navigation off");
             store.Select(1);var cfg=store.Snapshot();check(ConfigStore.B(cfg,"navigationCruise")&&!ConfigStore.B(cfg,"spaceMouseCruise"),"3D default enables only navigation continuity, not orbit/pan/zoom cruise");
             var original=cfg["programs"]![0]!.DeepClone();cfg["navigationCruise"]=false;store.Save(cfg);store.SavePreset("Direct navigation");cfg=store.Snapshot();cfg["navigationCruise"]=true;store.Save(cfg);store.SavePreset("Drone navigation");
-            cfg=store.Snapshot();cfg["configVersion"]=30;store.Save(cfg);check(ConfigStore.I(JsonNode.Parse(File.ReadAllText(file)),"configVersion")==31,"An older interface save cannot downgrade the navigation schema");
+            cfg=store.Snapshot();cfg["configVersion"]=31;store.Save(cfg);check(ConfigStore.I(JsonNode.Parse(File.ReadAllText(file)),"configVersion")==32,"An older interface save cannot downgrade the current navigation schema");
             var reopened=new ConfigStore(file);check(ConfigStore.B(reopened.Snapshot(),"navigationCruise")&&JsonNode.DeepEquals(original,reopened.Snapshot()["programs"]![0]),"Navigation choice persists without modifying Normal mouse");
             reopened.ApplyPreset(0);check(!ConfigStore.B(reopened.Snapshot(),"navigationCruise"),"Saved preset restores direct navigation");
             reopened.ApplyPreset(1);check(ConfigStore.B(reopened.Snapshot(),"navigationCruise"),"Saved preset restores drone navigation");
             var old=reopened.Snapshot();old["configVersion"]=30;old.Remove("navigationCruise");foreach(var p in old["programs"]!.AsArray())p!["feel"]!.AsObject().Remove("navigationCruise");File.WriteAllText(file,old.ToJsonString());
-            var migrated=new ConfigStore(file).Snapshot();check(ConfigStore.I(migrated,"configVersion")==31&&ConfigStore.B(migrated,"navigationCruise")&&!ConfigStore.B(migrated["programs"]![0]!["feel"],"navigationCruise"),"Existing 3D settings gain navigation without changing Normal mouse");
+            var migrated=new ConfigStore(file).Snapshot();check(ConfigStore.I(migrated,"configVersion")==32&&ConfigStore.B(migrated,"navigationCruise")&&!ConfigStore.B(migrated["programs"]![0]!["feel"],"navigationCruise"),"Existing 3D settings gain navigation without changing Normal mouse");
+
+            var keyLegacy=new ConfigStore(file).Snapshot();keyLegacy["configVersion"]=31;keyLegacy["programs"]![1]!["navigateKeys"]="win";keyLegacy["programs"]![0]!["navigateKeys"]="none";
+            keyLegacy["presets"]!.AsArray().Add(new JsonObject{["name"]="Legacy 3D key",["settings"]=new JsonObject{["defaultKind"]="3D modelling",["navigateKeys"]="win"}});
+            File.WriteAllText(file,keyLegacy.ToJsonString());var keys=new ConfigStore(file).Snapshot();
+            check(ConfigStore.S(keys,"navigateKeys")=="backtick"&&ModeResolver.Resolve(keys,new HashSet<int>{192})==NavMode.Navigate&&ModeResolver.Resolve(keys,new HashSet<int>{91})==NavMode.Idle,"Existing standard Windows navigation moves to backtick");
+            check(ConfigStore.S(keys["programs"]![0],"navigateKeys")=="none"&&ConfigStore.S(keys["presets"]!.AsArray().Last()!["settings"],"navigateKeys")=="backtick","Normal mouse remains unchanged and standard 3D presets use the new key");
+            keys["configVersion"]=31;keys["programs"]![1]!["navigateKeys"]="q";File.WriteAllText(file,keys.ToJsonString());check(ConfigStore.S(new ConfigStore(file).Snapshot(),"navigateKeys")=="q","Other custom navigation chords survive the one-time backtick migration");
         }finally{foreach(var p in new[]{file,file+".previous",file+".writing"})if(File.Exists(p))File.Delete(p);}
         ExportTrace();
     }
     static object View(CameraPose p)=>new{eye=new[]{p.Eye.X,p.Eye.Y,p.Eye.Z},target=new[]{p.Target.X,p.Target.Y,p.Target.Z},up=new[]{p.Up.X,p.Up.Y,p.Up.Z},pivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},zoomPivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},verticalFov=p.VerticalFov,orthoHeight=p.OrthoHeight,width=p.Width,height=p.Height,orthographic=p.Orthographic};
     static void ExportTrace(){
         var cases=new List<object>();
-        foreach(var sample in new[]{("drone-right",12f,0f,0f),("drone-up",0f,0f,60f),("drone-forward",0f,-12f,0f),("drone-combined",12f,-8f,60f),("drone-turn-right",12f,-12f,0f),("drone-turn-left",-12f,-12f,0f)}){
+        foreach(var sample in new[]{("drone-right",12f,0f,0f),("drone-up",0f,0f,60f),("drone-forward",0f,-12f,0f),("drone-combined",12f,-8f,60f),("drone-turn-right",12f,-12f,0f),("drone-turn-left",-12f,-12f,0f),("drone-reverse-right",12f,12f,0f),("drone-reverse-left",-12f,12f,0f)}){
             var start=Pose();var pose=start;var rate=new NavigationMotion();var poses=new List<object>();
             for(int i=0;i<32;i++){var motion=rate.Step(i==0?sample.Item2:0,i==0?sample.Item3:0,i==0?sample.Item4:0,1000+i*8);pose=CameraMath.Fly(pose,motion,MotionPolicy.Gain(27),MotionPolicy.Gain(28));poses.Add(View(pose));}
-            cases.Add(new{label=sample.Item1,mode="Navigate",steers=sample.Item2!=0&&sample.Item3<0,turnSign=Math.Sign(sample.Item2),start=View(start),poses});
+            cases.Add(new{label=sample.Item1,mode="Navigate",steers=sample.Item2!=0&&sample.Item3!=0,turnSign=Math.Sign(sample.Item2),start=View(start),poses});
         }
         File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-navigation-trace.json"),JsonSerializer.Serialize(new{cases}));
     }

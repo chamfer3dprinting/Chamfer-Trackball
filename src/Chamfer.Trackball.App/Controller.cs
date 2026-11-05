@@ -443,7 +443,7 @@ public string AppName{get;private set;}="";
             navigationMotion.Reset();client.Pose=null;motionSamples.Move(-12,8);Flush(timeMilliseconds:3000);
             if(!pending.Peek().HasPrimary)throw new InvalidOperationException("Navigation lost its first command before the scene handshake.");
             client.Pose=start;Flush(timeMilliseconds:3008);
-            if(client.Pose.Eye.X>=start.Eye.X||client.Pose.Eye.Z<=start.Eye.Z)throw new InvalidOperationException("Navigation handshake did not retain left/back direction.");
+            if((client.Pose.Target-client.Pose.Eye).X>=0||client.Pose.Eye.Z<=start.Eye.Z)throw new InvalidOperationException("Navigation handshake did not retain left-steering/back direction.");
             client.Out.Clear();motionSamples.Move(12,-8);Flush(timeMilliseconds:3016);
             if(client.Pose!=null||client.Out.Count!=2||ConfigStore.S(client.Out.First(),"t")!="end"||ConfigStore.S(client.Out.Last(),"t")!="begin")throw new InvalidOperationException("Returning to centre did not freeze the displayed view and request a fresh scene.");
             client.Pose=client.BasePose=start;client.Out.Clear();Flush(timeMilliseconds:3024);
