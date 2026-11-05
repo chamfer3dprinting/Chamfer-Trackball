@@ -27,7 +27,7 @@ internal sealed class Controller:IDisposable{
     public string Mode=>circle.Active?"Zoom":mode.ToString();
     public JsonObject GuideState(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
-        return new(){["mode"]=Mode,["navigationActive"]=navigationSession,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+        return new(){["mode"]=Mode,["navigationActive"]=navigationSession,["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
     }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
@@ -199,7 +199,7 @@ public string AppName{get;private set;}="";
         if(navigationSession){
             cameraMotion.Reset();heldRate.Reset();glide.Reset();
             var flight=navigationMotion.Step(frame.X,frame.Y,frame.Wheel+slimBladeTwist.Take(),timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency);
-            if(flight.Active&&native!=null){server.Fly(native,flight,PanGain,OrbitGain);navigationWasMoving=true;}
+            if(flight.Active&&native!=null){server.Fly(native,flight,PanGain,OrbitGain,ConfigStore.B(cfg,"navigationLevelFlight"));navigationWasMoving=true;}
             else if(navigationWasMoving&&navigationMotion.Centered&&native!=null){navigationWasMoving=false;server.StopNavigation(native);}
             pending.ClearPrimary();pending.ClearDial();return;
         }
@@ -424,6 +424,27 @@ public string AppName{get;private set;}="";
             pending.Reset();motionSamples.Reset();profile=oldProfile;native=oldNative;cfg=oldCfg;foregroundWindow=oldWindow;foregroundPid=oldPid;foregroundExe=oldExe;AppName=oldName;mode=oldMode;latched=oldLatched;pressed.Clear();foregroundApps.Invalidate();
         }
         Console.WriteLine("Foreground browser tabs verified: same HWND entry/exit, title rename continuity, gesture release, re-entry and preview isolation.");
+    }
+    internal void VerifyLevelFlight(){
+        var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession,oldMoving=navigationWasMoving;
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["panSens"]=38;cfg["orbitSens"]=38;cfg["navigationLevelFlight"]=true;
+            var start=new CameraPose(new(0,120,160),System.Numerics.Vector3.Zero,new(0,.8f,-.6f),System.Numerics.Vector3.Zero,.8f,200,1200,800,false,System.Numerics.Vector3.UnitY);
+            var client=new NativeServer.Client{App="chamfer3d",Version=2,Mode=NavMode.Navigate,Pose=start,BasePose=start};native=client;mode=NavMode.Navigate;navigationSession=true;
+            pending.Reset();motionSamples.Reset();navigationMotion.Reset();motionSamples.Move(0,-12);
+            for(int i=0;i<32;i++)Flush(timeMilliseconds:1000+i*8);
+            if(Math.Abs(client.Pose!.Eye.Y-start.Eye.Y)>.0001f||client.Pose.Eye.Z>=start.Eye.Z)throw new InvalidOperationException("Level flight did not keep forward travel horizontal while looking down.");
+            navigationMotion.Reset();client.Pose=start;motionSamples.Move(0,-12);cfg["navigationLevelFlight"]=false;
+            for(int i=0;i<32;i++)Flush(timeMilliseconds:2000+i*8);
+            if(client.Pose!.Eye.Y>=start.Eye.Y)throw new InvalidOperationException("Turning off level flight did not restore view-direction travel.");
+            navigationMotion.Reset();client.Pose=start;cfg["navigationLevelFlight"]=true;pending.Wheel(60);
+            for(int i=0;i<32;i++)Flush(timeMilliseconds:3000+i*8);
+            if(client.Pose!.Eye.Y<=start.Eye.Y||Math.Abs(client.Pose.Eye.Z-start.Eye.Z)>.0001f)throw new InvalidOperationException("Level flight scroll did not control height independently of the camera tilt.");
+        }finally{
+            pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();glide.Reset();
+            cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;navigationWasMoving=oldMoving;
+        }
+        Console.WriteLine("Level-flight toggle verified through the actual controller: level forward travel, restored view-direction travel and independent scroll height.");
     }
     internal void VerifyHeldNavigation(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession,oldMoving=navigationWasMoving;

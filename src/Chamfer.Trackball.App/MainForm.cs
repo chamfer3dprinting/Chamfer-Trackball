@@ -336,6 +336,7 @@ internal sealed class MainForm:Form{
             await MotionClockChecks.Run();
             controller.VerifyCameraResponse();
             controller.VerifyHeldNavigation();
+            controller.VerifyLevelFlight();
             controller.VerifyImmediateStudioDelivery();
             controller.VerifySnapWheelRouting();
             controller.VerifyKnobHandshake();
