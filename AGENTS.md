@@ -33,6 +33,16 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Level-flight trial delivered in Admin 1.5.48
+
+Admin v1.5.48 is installed from source ed629fb47e030cf5069cffe31e65778a4b8e4cd4. Release 434712360 / main workflow 41955848929 pass 1,221 core checks, syntax/integration checks and both actual executables. Installed SHA-256 matches 653a1584982c6d535b00d8530663998ae4acb0d2f1aefa72d5fbbddb19d26257; local bridge reports 1.5.48. Admin and Studio are reopened and responding. The option remains off by default for existing/public programs.
+
+Enable the trial only in the owner's active 3D modelling program after saving Before level flight (off) and Level flight trial (on). All five preceding presets remain, seven total. A pre-install backup and immediate post-restart deep comparison preserve all previous settings and sensitivity values except the new trial flag and two presets. Owner-adjusted Orbit/Pan values remain 38. Backtick, forward/reverse steering, wheel height, neutral/release stop, buttons/wheels and direct orbit/zoom stay unchanged. A legacy preset missing the trial flag restores the original off behavior.
+
+Forward/back and strafe stay perpendicular to WorldUp while looking up/down; wheel controls world height and yaw retains viewing tilt. Pole views retain a finite horizontal travel heading. Turning the trial off restores camera-direction travel. All 312 focused plane/pole/rolled/alternate-axis checks and 140 prior sensitivity checks pass. The CI-exported C# trace exactly matches the 192 poses replayed in desktop-source and private web Studio 3.3.5, including no height drift through smoothing, independent scroll height, retained tilt and neutral freeze/rehandshake. Geometry/History/Undo stay unchanged and browser account/project writes are blocked. Physical evaluation remains for the owner.
+
+No Studio runtime or newer AI/modeling work, public activation or tester Send changed. Detailed proof is in private Studio docs/TRACKBALL-LEVEL-FLIGHT-TRIAL.json, commit ca0272c. Preserve the rollback preset until the owner evaluates the experiment.
+
 # 2026-11-04 — Reversible level-flight trial
 
 The owner asks to experiment after finding forward/up/down navigation confusing. Add an optional program/preset-scoped Level flight trial: horizontal forward/back/strafe stays perpendicular to the host WorldUp axis, wheel controls world height, and yaw turns about WorldUp while retaining camera tilt and lens distance. Look-straight-up/down uses the camera's horizontal right axis to retain a finite travel heading. Existing view-direction navigation remains the default and unchanged when the option is off. Keep Backtick, diagonal/reverse steering, neutral/release stop, direct orbit/zoom and all sensitivity values.
