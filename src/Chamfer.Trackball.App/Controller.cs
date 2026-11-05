@@ -28,7 +28,7 @@ internal sealed class Controller:IDisposable{
     public string Mode=>circle.Active?"Zoom":mode.ToString();
     public JsonObject GuideState(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
-        return new(){["pivotMarker"]=IsCad&&ConfigStore.B(cfg,"showPivot",true)&&(mode==NavMode.Orbit&&native?.Pose!=null||Environment.TickCount64<snapPivotUntil),["snapPivot"]=Environment.TickCount64<snapPivotUntil,["pivotX"]=snapPivotPoint.X,["pivotY"]=snapPivotPoint.Y,["mode"]=Mode,["navigationActive"]=navigationSession,["threeAxisControls"]=ConfigStore.B(cfg,"threeAxisControls"),["freeLook"]=!ConfigStore.B(cfg,"threeAxisControls")&&ConfigStore.B(cfg,"navigationFreeLook"),["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+        return new(){["pivotMarker"]=IsCad&&ConfigStore.B(cfg,"showPivot",true)&&(mode==NavMode.Orbit&&native?.Pose!=null||Environment.TickCount64<snapPivotUntil),["snapPivot"]=mode==NavMode.Idle&&Environment.TickCount64<snapPivotUntil,["pivotX"]=snapPivotPoint.X,["pivotY"]=snapPivotPoint.Y,["mode"]=Mode,["navigationActive"]=navigationSession,["threeAxisControls"]=ConfigStore.B(cfg,"threeAxisControls"),["freeLook"]=!ConfigStore.B(cfg,"threeAxisControls")&&ConfigStore.B(cfg,"navigationFreeLook"),["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
     }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
@@ -131,6 +131,7 @@ public string AppName{get;private set;}="";
         Flush();
     }
     void End(){
+        snapPivotUntil=0;
         navigationClock.SetEnabled(false);navigationSession=false;navigationWasMoving=false;navigationMotion.Reset();
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
