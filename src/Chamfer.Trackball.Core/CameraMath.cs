@@ -53,7 +53,8 @@ public static class CameraMath {
         if(angle==0)return c with{Eye=c.Eye+step,Target=c.Target+step,Pivot=c.Pivot+step,ZoomPivot=c.ZoomPivot+step};
         var half=Quaternion.CreateFromAxisAngle(up,angle/2);step=Vector3.Transform(step,half);
         var q=Quaternion.CreateFromAxisAngle(up,angle);var eye=c.Eye+step;
-        return c with{Eye=eye,Target=eye+Vector3.Transform(c.Target-c.Eye,q),Up=Unit(Vector3.Transform(c.Up,q)),Pivot=eye+Vector3.Transform(c.Pivot-c.Eye,q),ZoomPivot=c.ZoomPivot is Vector3 anchor?eye+Vector3.Transform(anchor-c.Eye,q):null};
+        float distance=Vector3.Distance(c.Target,c.Eye);var heading=Unit(Vector3.Transform(c.Target-c.Eye,q));
+        return c with{Eye=eye,Target=eye+heading*distance,Up=up,Pivot=eye+Vector3.Transform(c.Pivot-c.Eye,q),ZoomPivot=c.ZoomPivot is Vector3 anchor?eye+Vector3.Transform(anchor-c.Eye,q):null};
     }
     internal static Vector3? RotateZoomPivot(CameraPose c,Quaternion q)=>c.ZoomPivot is Vector3 p?c.Pivot+Vector3.Transform(p-c.Pivot,q):null;
     internal static int FaceOrientation(CameraPose pose,Vector3 face){

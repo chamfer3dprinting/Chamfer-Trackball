@@ -34,6 +34,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Return navigation to centre to stop
+
+The owner adds a second stop method: roll back near the starting position without releasing Navigate. Track a virtual centre for each ball/wheel command, enter neutral within 3 counts, and require 4 counts to leave neutral. Clear neutral-axis velocity immediately instead of easing a residual tail. When all commands return to centre, end the rendered session and request a new scene while the navigation key stays held, so Studio freezes at its displayed pose rather than finishing a queued target. A deliberate push restarts from centre; passing far enough through centre reverses. Keep key release/click/focus/device stop unchanged. Forward diagonals steer; straight side/back motion keeps travel mapping.
+
+A prior rendered turning trace finds accumulated float drift in camera distance and the old actual-Controller handshake assertion assumes every diagonal includes strafe. Normalize turning direction to retain lens distance and use the backward-diagonal strafe case for handshake retention. Add exact/near-centre, jitter, resume, reverse and full-controller freeze/rehandshake checks before delivery. The installed Admin is still 1.5.45 until this branch passes.
+
 # 2026-11-04 — Diagonal navigation steers the heading
 
 The owner clarifies that top-right/top-left ball rolls must turn the camera to face right/left while moving forward. Straight side rolls still strafe. Blend side speed into a bounded yaw command as the forward/back command leaves centre; keep wheel height independent. Integrate translation at the midpoint heading and rotate camera anchors with the heading to preserve travel speed and lens distance. Translation uses Pan/3D speed and steering uses Orbit/3D speed. Add side-versus-diagonal, heading, zero-speed and rendered turning cases. This supersedes the no-heading-change claim for diagonal navigation only; orbit/zoom are still unchanged.

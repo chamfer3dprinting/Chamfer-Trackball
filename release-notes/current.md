@@ -1,3 +1,11 @@
+# Return to centre to stop
+
+- Hold Navigate and roll to set travel or turning speed.
+- Roll back near the starting position to stop while keeping the key held. A small neutral zone makes the middle easier to find.
+- Roll beyond the middle to reverse; release Navigate to stop all commands immediately.
+- Keep ball forward/back/sideways, forward-diagonal steering and scroll up/down for height.
+- Retain all sensitivity values and direct orbit/zoom controls.
+
 # Diagonal navigation steering
 
 - Hold Windows/Navigate and roll diagonally forward-right/left to move forward and turn to face right/left.

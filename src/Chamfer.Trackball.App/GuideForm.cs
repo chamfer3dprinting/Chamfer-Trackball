@@ -59,7 +59,7 @@ internal sealed class GuideForm:Form{
    g.DrawString(label,tiny,held?accent:muted,new RectangleF(13,y,156,18));
    g.DrawString(ConfigStore.S(item,"label"),tiny,held?accent:text,180,y);
   }
-  string footer=drone?"Release Navigate to stop · roll back to slow":ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";
+  string footer=drone?"Roll back to centre or release Navigate: stop":ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";
   g.DrawString(footer,tiny,mode is "Snap" or "Roll"?accent:muted,new RectangleF(13,412,304,18));
 
  }
