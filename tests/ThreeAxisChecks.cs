@@ -58,6 +58,12 @@ internal static class ThreeAxisChecks {
     }
     public static void Run(Action<bool,string> check){
         RunMotion(check);
+        foreach(int speed in new[]{0,10,38,100}){
+            var numeric=new JsonObject{["speed"]=speed};
+            check(ConfigStore.D(numeric,"speed",50)==speed,"Integer-valued sensitivity does not fall back to the default");
+            numeric["speed"]=(float)speed;
+            check(ConfigStore.D(numeric,"speed",50)==speed,"Float-valued sensitivity preserves zero and the saved value");
+        }
         var defaults=ConfigStore.Defaults();check(!ConfigStore.B(defaults,"threeAxisControls"),"Normal mouse keeps its ordinary inputs");
         ConfigStore.LoadProgram(defaults,1);
         check(ConfigStore.B(defaults,"threeAxisControls")&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit&&ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.PanZoom&&ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Shift rotation, Alt translation and Backtick walk match the owner's diagrams");
