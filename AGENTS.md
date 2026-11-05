@@ -34,6 +34,16 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Final navigation delivered in Admin 1.5.46
+
+Admin v1.5.46 is installed from runtime source 3877e3a7de06d5b90aa20e022b898334ecbd07f6. Release 434675892 / main workflow 41951446618 pass 894 core checks, syntax/integration checks and both actual executables. The installed SHA-256 matches a5b00389aeebf7d4821e1f44696f274c8a1730398a28c614961915653cbc82d8; the local bridge reports 1.5.46. Admin and desktop Studio are reopened and responding. Public Trackball stable was not promoted.
+
+Final confirmed mapping while Navigate/Windows is held: ball forward/back travels forward/back; straight left/right strafes; forward diagonals turn the heading right/left while moving; scroll up/down controls height. Returning near the starting virtual centre stops while the key remains held; neutral hysteresis prevents jitter restart and the native end/begin sequence freezes/reanchors from the displayed pose. A new roll restarts, passing centre reverses, and release/click/focus/device interruption clears every command. Orbit and zoom remain direct and general cruise remains off.
+
+A fresh pre-install backup and immediate post-restart comparison preserve every setting except schema 30-to-31: enabled state, all five presets, devices, buttons/wheels, keys, pointer DPI and 3D speeds are unchanged. Preserve Before drone navigation and Drone navigation presets. The previous 1.5.45-stage enabled change occurred during UI use; do not claim the installer preserved that earlier false value.
+
+The exact CI C# trace matches all 192 synthetic poses rendered in both desktop-source and private web Studio 3.3.5. Steering, stable lens distance, neutral freeze/rehandshake and geometry/History/Undo pass, with external writes blocked. All 140 pointer/3D/steering sensitivity checks and 25 focused centre/steering checks pass. Studio runtime and newer AI/modeling work remain unchanged; no public Studio activation or tester Send. Physical feel of the final installed mapping remains for owner evaluation. Detailed source/test record is in private Studio docs/TRACKBALL-DRONE-NAVIGATION.json, committed in 5a7caa6.
+
 # 2026-11-04 — Return navigation to centre to stop
 
 The owner adds a second stop method: roll back near the starting position without releasing Navigate. Track a virtual centre for each ball/wheel command, enter neutral within 3 counts, and require 4 counts to leave neutral. Clear neutral-axis velocity immediately instead of easing a residual tail. When all commands return to centre, end the rendered session and request a new scene while the navigation key stays held, so Studio freezes at its displayed pose rather than finishing a queued target. A deliberate push restarts from centre; passing far enough through centre reverses. Keep key release/click/focus/device stop unchanged. Forward diagonals steer; straight side/back motion keeps travel mapping.
