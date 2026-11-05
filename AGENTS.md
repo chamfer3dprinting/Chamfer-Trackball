@@ -5,11 +5,16 @@ Keep source, tests and version history on GitHub. Do not create development fold
 on the owner's PC. Deliver only the executable as the user-facing download.
 
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
-mouse button swapping to implement app bindings. The owner's latest requested controls
-are Shift orbit, Ctrl+Shift pan, Ctrl plus ball for zoom, Alt plus ball for six-face
-snapping, Alt plus the physical LEFT scroll wheel for 90-degree face-orientation snaps, an optional separate Twist hold, and Backtick navigation with ball travel/diagonal steering and wheel height. Automatic ball-only twist estimation is now off in the 3D default. A quick Backtick tap types normally; hold Backtick to navigate in a supported 3D view. Windows input stays normal unless the user explicitly assigns it. Ctrl alone is permitted for
-Zoom in 3D apps; other Ctrl keyboard shortcuts must remain normal. The 3D program
-points normally until a held navigation command is used.
+mouse button swapping to implement app bindings. The owner's current 3D defaults
+match the supplied diagrams: Shift for rotation (ball pitch/yaw, Kensington twist
+roll); Alt for translation (ball pan, twist cursor depth zoom); Backtick for camera
+walk (ball forward/back/sideways, twist heading yaw). Walk continues while held and
+stops at virtual centre or key release. Top-right/button 2 is one-click nearest-face
+snapping. Rotation and face snaps use the exact cursor point as their pivot, with a
+click-through marker; zoom is cursor-centred. There is no default keyboard snap
+shortcut. Every held key and button binding remains customizable per program.
+Normal mouse keeps native clicks/wheel axes and ordinary Backtick typing. Ctrl
+remains an optional zoom hold and Ctrl keyboard shortcuts remain normal.
 
 Keep existing release history. Advance the real application version for a delivered
 update; do not reuse a release tag for a different executable. Build and test before
@@ -32,6 +37,39 @@ button numbers or the UI's descriptive labels; enable a correction only when
 a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
+
+# 2026-11-05 — Codex: Installed Admin 1.5.50 diagram controls and cursor-pivot snapping
+
+Admin 1.5.50 is installed from main eb934d3007e935e0e920b2848ca7e8b4dce45e94.
+Release 435250258 / main workflow 42037187268 pass 1,515 core checks and both actual
+executable UI/native checks. Installed SHA-256 matches
+cf3fecc6daab6c67724f2cd2b4a8aa7136df6624c904a71ea29d0f3f9d50b498; the restarted local
+bridge reports 1.5.50. The actual checks cover independent ball/twist walk commands,
+centre/release stop, gain independence and zero sensitivity, asynchronous one-click
+cursor-pivot face snap, stale/focus guards and a non-activating cursor marker.
+Fix ConfigStore.D to honor integer/float numeric values rather than falling back
+to default speed. All 22 synthetic cases / 518 poses exactly match the CI-produced
+C# trace and pass desktop-source plus live private Preview rendering, including
+fixed cursor projection in all six face snaps and unchanged geometry/History/Undo.
+
+The owner's 3D program now uses Shift rotation, Alt translation, Backtick walk and
+top-right/button 2 nearest-face snap; snapKeys is none. Three-axis controls and Show
+the pivot are enabled. Turn off circleZoom for this direct mapping so its checkbox
+matches the ball-pan/twist-depth behavior; keep the preceding value in the rollback
+preset. Keep level-flight choice and all saved speeds (Orbit/Pan/Zoom 38, Twist 37),
+device identities, native clicks/wheel axes, enabled state and all nine earlier
+presets. Before diagram controls and Diagram controls bring the total to eleven.
+A pre-install settings backup, executable rollback and deep post-restart comparison
+preserve every other saved value. The curved-sweep PR34 was closed unmerged and
+never installed. All customization and program/preset recording still use the
+existing save paths.
+
+Studio desktop and private web both remain verified 3.3.6. Private worker
+ae043f9e-e43a-40a4-be81-f5e5d641201f has 530 verified assets; no further Studio runtime,
+AI/modeling, public activation or tester Send change was needed. The public Trackball
+candidate remains a draft, and public Studio remains 2.1.4. Physical hardware feel
+is for the owner to evaluate; do not claim independent six-axis sensing. Full proof
+is in the private Studio repo at docs/TRACKBALL-THREE-AXIS-CONTROLS.json.
 
 # 2026-11-05 — Codex: Direct three-axis controls, button face snap and cursor pivot
 
