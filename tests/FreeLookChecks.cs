@@ -35,25 +35,15 @@ internal static class FreeLookChecks {
         var root=Pose(Vector3.UnitY);float low=Vector3.Distance(Forward(root),Forward(CameraMath.Look(root,12,-12,MotionPolicy.Gain(10)))),high=Vector3.Distance(Forward(root),Forward(CameraMath.Look(root,12,-12,MotionPolicy.Gain(38))));
         check(high>low*10,"Saved 3D Orbit speed controls look yaw and pitch");
         bool invalid=false;try{CameraMath.Look(root,float.NaN,0);}catch(ArgumentException){invalid=true;}check(invalid,"Invalid look input cannot corrupt the camera");
-        var motion=new NavigationMotion();var coupled=motion.Step(12,-12,60,1000,coupledLook:true);
-        check(coupled.Forward>0&&coupled.Up>0&&coupled.Yaw>0&&coupled.Pitch>0,"A single held navigation chord sets travel, height and free-look rates together");
-        var continued=motion.Step(0,0,0,1008,coupledLook:true);
-        check(continued.Forward>0&&continued.Yaw>0&&continued.Pitch>0,"Look and travel continue without an extra key or more ball reports");
-        var centred=motion.Step(-10,10,-60,1016,coupledLook:true);check(!centred.Active&&motion.Centered,"Returning near centre stops movement and looking together");
-        motion.Reset();var side=motion.Step(12,0,0,2000,coupledLook:true);check(side.Right>0&&side.Yaw>0&&side.Pitch==0,"A sideways single-hold command moves and looks toward that side");
-        motion.Reset();var previous=motion.Step(12,0,0,2000);check(previous.Right>0&&previous.Yaw==0&&previous.Pitch==0,"Turning the option off retains the previous pure side travel");
-        motion.Reset();motion.Step(12,-12,0,3000,coupledLook:true);check(!motion.Step(0,0,0,3008,true,coupledLook:true).Active&&!motion.Step(0,0,0,3016,coupledLook:true).Active,"Releasing navigation clears both look and travel commands");
-        var moved=CameraMath.Fly(root,coupled with{Up=0},.4f,.4f,true,true);
-        check(moved.Eye!=root.Eye&&Forward(moved).X>0&&Forward(moved).Y>0&&Math.Abs(moved.Eye.Y-root.Eye.Y)<.0001f,"Coupled navigation moves while looking up/right and retains level-flight height");
-        check(CameraMath.Fly(root,coupled,0,0,true,true)==root,"Zero speed stops both camera aiming and translation");
+        GestureMotionChecks.Run(check);
         var file=Path.Combine(Path.GetTempPath(),"chamfer-free-look-"+Guid.NewGuid().ToString("N")+".json");
         try{
             var store=new ConfigStore(file);store.Select(1);var cfg=store.Snapshot();var normal=cfg["programs"]![0]!.DeepClone();
-            check(!ConfigStore.B(cfg,"navigationFreeLook"),"Look and travel together is opt-in");
+            check(!ConfigStore.B(cfg,"navigationFreeLook"),"Automatic look gestures are opt-in");
             store.SavePreset("Before free look");cfg["navigationFreeLook"]=true;store.Save(cfg);store.SavePreset("Backtick free look");
             var reopened=new ConfigStore(file);check(ConfigStore.B(reopened.Snapshot(),"navigationFreeLook")&&JsonNode.DeepEquals(normal,reopened.Snapshot()["programs"]![0]),"Free-look preference persists without changing Normal mouse");
             reopened.ApplyPreset(0);check(!ConfigStore.B(reopened.Snapshot(),"navigationFreeLook"),"Before-free-look preset restores the previous movement");
-            reopened.ApplyPreset(1);check(ConfigStore.B(reopened.Snapshot(),"navigationFreeLook"),"Free-look preset restores coupled navigation");
+            reopened.ApplyPreset(1);check(ConfigStore.B(reopened.Snapshot(),"navigationFreeLook"),"Free-look preset restores automatic gesture navigation");
             var legacy=reopened.Snapshot();legacy["presets"]![0]!["settings"]!["feel"]!.AsObject().Remove("navigationFreeLook");File.WriteAllText(file,legacy.ToJsonString());
             var oldPreset=new ConfigStore(file);oldPreset.ApplyPreset(0);check(!ConfigStore.B(oldPreset.Snapshot(),"navigationFreeLook"),"An old preset without a free-look flag restores previous travel");
         }finally{foreach(var p in new[]{file,file+".previous",file+".writing"})if(File.Exists(p))File.Delete(p);}
@@ -62,13 +52,15 @@ internal static class FreeLookChecks {
     static object View(CameraPose p)=>new{eye=new[]{p.Eye.X,p.Eye.Y,p.Eye.Z},target=new[]{p.Target.X,p.Target.Y,p.Target.Z},up=new[]{p.Up.X,p.Up.Y,p.Up.Z},pivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},zoomPivot=new[]{p.ZoomPivot!.Value.X,p.ZoomPivot.Value.Y,p.ZoomPivot.Value.Z},worldUp=new[]{p.WorldUpAxis.X,p.WorldUpAxis.Y,p.WorldUpAxis.Z},verticalFov=p.VerticalFov,orthoHeight=p.OrthoHeight,width=p.Width,height=p.Height,orthographic=p.Orthographic};
     static void ExportTrace(){
         var cases=new List<object>();
-        foreach(var sample in new[]{("look-travel-right",12f,0f,0f,false),("look-travel-left",-12f,0f,0f,false),("look-travel-up",0f,-12f,0f,false),("look-travel-down",0f,12f,0f,false),("look-travel-diagonal",12f,-12f,0f,false),("look-reverse-diagonal",-12f,12f,0f,false),("level-look-travel",0f,-12f,0f,true),("level-look-height",0f,0f,60f,true)}){
-            var start=Pose(Vector3.UnitY);var pose=start;var rate=new NavigationMotion();var poses=new List<object>();
-            for(int i=0;i<32;i++){
-                var travel=rate.Step(i==0?sample.Item2:0,i==0?sample.Item3:0,i==0?sample.Item4:0,1000+i*8,coupledLook:true);
-                pose=CameraMath.Fly(pose,travel,MotionPolicy.Gain(38),MotionPolicy.Gain(38),sample.Item5,true);poses.Add(View(pose));
+        foreach(var sample in new[]{("travel-right",12f,0f,0f,0f),("travel-left",-12f,0f,0f,0f),("travel-forward",0f,-12f,0f,0f),("travel-back",0f,12f,0f,0f),("gesture-right-up",0f,-12f,0f,-1f),("gesture-left-up",0f,-12f,MathF.PI,1f),("gesture-right-down",0f,-12f,0f,1f),("gesture-left-down",0f,-12f,MathF.PI,-1f)}){
+            var start=Pose(Vector3.UnitY);var pose=start;var rate=new NavigationMotion();var poses=new List<object>();bool curve=sample.Item5!=0;
+            for(int i=0;i<64;i++){
+                float dx=i==0?sample.Item2:0,dy=i==0?sample.Item3:0;
+                if(curve&&i>=24&&i<30){float a=sample.Item4+sample.Item5*(i-24)*MathF.PI/8;dx=5*MathF.Cos(a);dy=5*MathF.Sin(a);}
+                var travel=rate.Step(dx,dy,0,1000+i*8,gestureLook:true);
+                pose=CameraMath.Fly(pose,travel,MotionPolicy.Gain(38),MotionPolicy.Gain(38),true,true);poses.Add(View(pose));
             }
-            cases.Add(new{label=sample.Item1,mode="Navigate",freeLook=true,coupledLook=true,lookOnly=false,levelFlight=sample.Item5,heightTravel=sample.Item4!=0,lookX=sample.Item2,lookY=sample.Item3,steers=sample.Item2!=0,turnSign=Math.Sign(sample.Item2),start=View(start),poses});
+            cases.Add(new{label=sample.Item1,mode="Navigate",freeLook=true,gestureLook=true,travelOnly=!curve,lookOnly=false,levelFlight=true,heightTravel=false,lookX=curve?(sample.Item4==0?1:-1):0,lookY=curve?(sample.Item4==0?sample.Item5:-sample.Item5):0,steers=curve,turnSign=sample.Item4==0?1:-1,start=View(start),poses});
         }
         File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-free-look-trace.json"),JsonSerializer.Serialize(new{cases}));
     }

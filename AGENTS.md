@@ -33,6 +33,14 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Codex: Restore travel and estimate looking from curved sweeps
+
+The owner reports that the 1.5.49 coupled-looking trial works for aiming but interferes with forward/back and sideways travel. Coupled looking was switched off locally immediately; Backtick, wheel height, level flight, all sensitivities and nine presets were preserved. The owner explicitly chooses ball-only automatic gesture detection rather than a right mouse button or extra Alt hold.
+
+Revise the opt-in navigationFreeLook setting to Automatic look gestures (trial): cardinal and straight diagonal strokes retain the existing travel/steering commands. A deliberate coherent curved sweep looks without changing the latched travel speed; pause 120 ms before the next travel stroke. A bounded 32 ms intent queue and direction chunks resist quantized straight motion, jitter and ordinary reversals. On recognizing a curve, restore any tentative travel command to its stroke-start value. This is an estimate: ambiguous/gentle curves can still be misclassified. Scroll remains height; centre/release clears all commands and buffered samples. The guide identifies Travel (straight) / Looking (curve).
+
+The exact core compiles in memory and passes 287 camera/gesture checks including cardinal direction, no automatic pitch/yaw on straight travel, curves in both directions, continued travel during looking, return-to-centre, release, quantized diagonals and reversals. The actual controller smoke now checks the same independent paths. The 512-pose synthetic trace, full workflow and installation are pending. Studio desktop/private Preview 3.3.6 already have verified camera-eye presentation and must retain that fix. No Studio runtime, private AI/modeling, public activation or tester Send change is needed for this gesture revision. Keep source changes on GitHub; no local Trackball development folder.
+
 # 2026-11-04 — Backtick-only look and travel
 
 The owner rejects the proposed Navigate+Alt look chord and explicitly requires Backtick alone. Add an opt-in program/preset-scoped Look and travel together option: ball deflection sets travel plus yaw/pitch rates with only Navigate held. Forward/back also tilts up/down; sideways also turns; scroll retains height. Return near the virtual centre or release Navigate to stop both. Current level-flight preference and all speeds remain unchanged. Save Before free look and Backtick free look presets for reversibility.
