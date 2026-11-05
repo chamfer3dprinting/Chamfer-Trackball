@@ -295,7 +295,7 @@ Check(closeUp.Valid&&Vector3.Distance(closeUp.Eye,closeUp.Target)>=.00009f,"Repe
 
 
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{91,68})==NavMode.Idle,"Windows+D is not a navigation chord");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Idle,"Backtick is available for ordinary typing");
+Check(ModeResolver.Resolve(ConfigStore.Defaults(),new HashSet<int>{192})==NavMode.Idle,"Normal mouse keeps Backtick available for ordinary typing");
 var mouseDefaults=ConfigStore.Defaults();
 Check(ModeResolver.Resolve(mouseDefaults,new HashSet<int>{91})==NavMode.Idle,"Normal mouse does not reserve Windows");
 Check(mouseDefaults["combos"]!.AsArray().Any(n=>n?["buttons"]?.ToJsonString()=="[3,4]"&&ConfigStore.S(n?["bind"],"action")=="lockRotate"),"Confirmed btn3+btn4 combination is a default without swapping clicks");
