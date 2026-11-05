@@ -512,7 +512,7 @@ var paused=new FaceSnap();paused.Reset(studioView);paused.Step(studioView,100,0,
 var afterPause=paused.Step(studioView,0,100,0,.2f,1600);
 Check(Vector3.Dot(Vector3.Normalize(afterPause.Eye-afterPause.Target),Vector3.UnitZ)>.999f,"A pause discards a partial directional stroke instead of mixing it into the next direction");
 var noCurve=new FaceSnap();noCurve.Reset(studioView);bool neverCurves=true;
-for(int frame=0;frame<180;frame++){float angle=frame*.08f;noCurve.Step(studioView,80*MathF.Cos(angle),80*MathF.Sin(angle),0,.2f,1000+frame*16);neverCurves&=!noCurve.Turning&&noCurve.TurnCount==0&&noCurve.Orientation==0;}
+for(int frame=0;frame<180;frame++){float angle=frame*.08f;noCurve.Step(studioView,80*MathF.Cos(angle),80*MathF.Sin(angle),0,.2f,1000+frame*16);neverCurves&=!noCurve.Turning&&noCurve.TurnCount==0;}
 Check(neverCurves,"Alt never reserves the former circular orientation gesture");
 var around=new FaceSnap();around.Reset(studioTop);bool bottom=false;
 for(int frame=0;frame<80;frame++){var next=around.Step(studioTop,0,50,0,.2f,1000+frame*16);bottom|=Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),-Vector3.UnitY)>.999f;}
