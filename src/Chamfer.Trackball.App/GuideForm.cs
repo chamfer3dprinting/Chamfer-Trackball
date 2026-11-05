@@ -37,7 +37,7 @@ internal sealed class GuideForm:Form{
    string label=a=="normal"?defaults[i]:a switch{"keys"=>ConfigStore.S(s["bindings"]?[names[i]],"keys"),"panToggle"=>"Orbit / pan","lock3d"=>"3D on/off",_=>a};
    g.DrawString(label,tiny,text,new RectangleF(x+47,y+3,109,21));
   }
-  var mode=ConfigStore.S(s,"mode");bool drone=mode=="Navigate"&&ConfigStore.B(s,"navigationActive");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>drone?"Drone navigation":"Navigate","Snap"=>ConfigStore.S(s,"snapLabel","Snap faces"),"Roll"=>"Twist",_=>mode};
+  var mode=ConfigStore.S(s,"mode");bool drone=mode=="Navigate"&&ConfigStore.B(s,"navigationActive");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>drone?(ConfigStore.B(s,"levelFlight")?"Level flight":"Drone navigation"):"Navigate","Snap"=>ConfigStore.S(s,"snapLabel","Snap faces"),"Roll"=>"Twist",_=>mode};
   var measure=g.MeasureString(title,bold);g.DrawString(title,bold,mode=="Idle"?text:accent,(330-measure.Width)/2,99);
   string program="Program: "+ConfigStore.S(s,"program");var pm=g.MeasureString(program,font);g.DrawString(program,font,muted,(330-pm.Width)/2,123);
   using var ball=new SolidBrush(Color.FromArgb(12,16,18));
@@ -48,7 +48,7 @@ internal sealed class GuideForm:Form{
   string roll=mode switch{"Idle"=>"Pointer","Orbit"=>"Orbit","PanZoom"=>"Pan","Zoom"=>"Zoom","Snap"=>"Snap","Roll"=>"Turn face","Navigate"=>"Move",_=>mode};
   string wheel=mode=="Orbit"?"Roll":mode=="Idle"?"Scroll":mode=="Snap"?"Turn face":mode=="Navigate"?(drone?"Up / down":"Turn"):"Zoom";
   g.DrawString(drone?"Ball: Forward/back/sideways · Scroll: Up/down":mode=="Snap"?"Ball: Faces   ·   Left wheel: 90°":"Roll: "+roll+"   ·   Wheel: "+wheel,font,text,drone?13:mode=="Snap"?35:53,249);
-  if(drone)g.DrawString("Diagonal: travel + turn · sideways: strafe",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
+  if(drone)g.DrawString(ConfigStore.B(s,"levelFlight")?"Forward: level travel · Scroll: height":"Diagonal: travel + turn · sideways: strafe",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
   g.DrawLine(line,12,301,318,301);
   var keys=new HashSet<int>(s["keys"]!.AsArray().Select(key=>key!.GetValue<int>()));
   int shortcutRow=0;

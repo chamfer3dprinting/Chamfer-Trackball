@@ -33,6 +33,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Reversible level-flight trial
+
+The owner asks to experiment after finding forward/up/down navigation confusing. Add an optional program/preset-scoped Level flight trial: horizontal forward/back/strafe stays perpendicular to the host WorldUp axis, wheel controls world height, and yaw turns about WorldUp while retaining camera tilt and lens distance. Look-straight-up/down uses the camera's horizontal right axis to retain a finite travel heading. Existing view-direction navigation remains the default and unchanged when the option is off. Keep Backtick, diagonal/reverse steering, neutral/release stop, direct orbit/zoom and all sensitivity values.
+
+Save Before level flight and Level flight trial presets locally, then enable the trial only in the owner's active 3D program. Retain every prior preset and current speed values. Old presets normalize the new flag to false so applying one restores the prior behavior. Add tilted/rolled/top-bottom-view and alternate world-axis checks, persistence/rollback coverage and actual Controller on/off/height tests. Workflow, rendered desktop/private-web replay, installation and physical evaluation are pending. No Studio runtime or newer AI/modeling work is included.
+
 # 2026-11-04 — Deliver Admin 1.5.47 reverse steering and Backtick hold
 
 Admin v1.5.47 is installed from source 169ef2180cdd5fcf02ec06f18b79908a3bdfff20. Release 434687988 / main workflow 41953614312 pass 903 core checks, syntax/integration and both actual executables. Installed SHA-256 matches 9c629e4fe4bf1e68ee1163351dc2d3dcab0fe01f48d8fbaf38c40d3d9d316db5; the local bridge reports 1.5.47. Admin and Studio are reopened and responsive.

@@ -1,3 +1,11 @@
+# Optional level-flight navigation trial
+
+- Keep forward/back and sideways travel level even while looking up or down.
+- Use scrolling for height; turning preserves your viewing tilt.
+- Turn Level flight off or apply your previous preset for view-direction navigation.
+- Preserve Backtick, reverse steering, center/release stop and all sensitivity values.
+- Save the choice with each program and preset; it is off by default.
+
 # Reverse steering and backtick navigation
 
 - Hold backtick (`) to navigate; release it or roll back near the starting centre to stop.

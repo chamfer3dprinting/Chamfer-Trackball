@@ -43,18 +43,28 @@ public static class CameraMath {
         }
         return mode==NavMode.Zoom?Zoom(c,-dy*.008f+wheel*.0015f):c;
     }
-    public static CameraPose Fly(CameraPose c,NavigationFrame motion,float gain=1,float turnGain=1){
+    public static CameraPose Fly(CameraPose c,NavigationFrame motion,float gain=1,float turnGain=1,bool levelFlight=false){
         if(!c.Valid||!float.IsFinite(gain)||!float.IsFinite(turnGain)||!float.IsFinite(motion.Right)||!float.IsFinite(motion.Up)||!float.IsFinite(motion.Forward)||!float.IsFinite(motion.Yaw))throw new ArgumentException("Invalid navigation camera.");
         var back=Unit(c.Eye-c.Target);var right=Unit(Vector3.Cross(c.Up,back));var up=Unit(Vector3.Cross(back,right));
         float depth=MathF.Max(1e-5f,MathF.Abs(Vector3.Dot(c.Eye-c.Pivot,back)));
         float pixel=(c.Orthographic?c.OrthoHeight:2*depth*MathF.Tan(c.VerticalFov/2))/c.Height;
-        var step=(right*motion.Right+up*motion.Up-back*motion.Forward)*(pixel*gain);
+        var travelRight=right;var travelBack=back;var travelUp=up;var turnAxis=up;
+        if(levelFlight){
+            travelUp=turnAxis=c.WorldUpAxis;
+            var horizontal=back-travelUp*Vector3.Dot(back,travelUp);
+            if(horizontal.LengthSquared()<1e-10f){
+                var horizontalRight=right-travelUp*Vector3.Dot(right,travelUp);
+                horizontal=Vector3.Cross(Unit(horizontalRight),travelUp);
+            }
+            travelBack=Unit(horizontal);travelRight=Unit(Vector3.Cross(travelUp,travelBack));
+        }
+        var step=(travelRight*motion.Right+travelUp*motion.Up-travelBack*motion.Forward)*(pixel*gain);
         float angle=-motion.Yaw*.005f*turnGain;
         if(angle==0)return c with{Eye=c.Eye+step,Target=c.Target+step,Pivot=c.Pivot+step,ZoomPivot=c.ZoomPivot+step};
-        var half=Quaternion.CreateFromAxisAngle(up,angle/2);step=Vector3.Transform(step,half);
-        var q=Quaternion.CreateFromAxisAngle(up,angle);var eye=c.Eye+step;
+        var half=Quaternion.CreateFromAxisAngle(turnAxis,angle/2);step=Vector3.Transform(step,half);
+        var q=Quaternion.CreateFromAxisAngle(turnAxis,angle);var eye=c.Eye+step;
         float distance=Vector3.Distance(c.Target,c.Eye);var heading=Unit(Vector3.Transform(c.Target-c.Eye,q));
-        return c with{Eye=eye,Target=eye+heading*distance,Up=up,Pivot=eye+Vector3.Transform(c.Pivot-c.Eye,q),ZoomPivot=c.ZoomPivot is Vector3 anchor?eye+Vector3.Transform(anchor-c.Eye,q):null};
+        return c with{Eye=eye,Target=eye+heading*distance,Up=levelFlight?Unit(Vector3.Transform(up,q)):up,Pivot=eye+Vector3.Transform(c.Pivot-c.Eye,q),ZoomPivot=c.ZoomPivot is Vector3 anchor?eye+Vector3.Transform(anchor-c.Eye,q):null};
     }
     internal static Vector3? RotateZoomPivot(CameraPose c,Quaternion q)=>c.ZoomPivot is Vector3 p?c.Pivot+Vector3.Transform(p-c.Pivot,q):null;
     internal static int FaceOrientation(CameraPose pose,Vector3 face){

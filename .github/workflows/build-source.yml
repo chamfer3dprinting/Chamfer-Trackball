@@ -88,6 +88,7 @@ jobs:
             ${{ runner.temp }}/chamfer-ui-smoke.*
             ${{ runner.temp }}/chamfer-orientation-trace.json
             ${{ runner.temp }}/chamfer-navigation-trace.json
+            ${{ runner.temp }}/chamfer-level-flight-trace.json
             ${{ runner.temp }}/*-ui.png
             ${{ runner.temp }}/*-guide.png
             ${{ runner.temp }}/*-smoke.stdout
