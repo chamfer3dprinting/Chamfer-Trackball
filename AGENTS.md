@@ -34,6 +34,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Reverse diagonals and backtick navigation
+
+The owner adds bottom-right/bottom-left ball rolls: move backward while turning the camera right/left. Use the magnitude of the depth command to blend strafe into steering in either travel direction, preserving left/right heading convention, midpoint translation, neutral stop and all sensitivity values. Straight sideways remains strafe and wheel up/down remains height.
+
+The owner also explicitly replaces Windows as the navigation key with backtick (`). Migrate the standard 3D Windows binding once, retain other custom navigation bindings and the Normal mouse program, and keep the assigned key in presets. Update the local standard 3D presets to match the requested key. Backtick taps must still type normally; holding it in a native 3D view selects navigation. This supersedes the prior Windows binding while preserving centre/release stop, direct orbit/zoom and all sensitivity values. Add reverse travel/heading/neutral/zero-speed tests plus desktop/private-web rendered cases before delivery.
+
 # 2026-11-04 — Final navigation delivered in Admin 1.5.46
 
 Admin v1.5.46 is installed from runtime source 3877e3a7de06d5b90aa20e022b898334ecbd07f6. Release 434675892 / main workflow 41951446618 pass 894 core checks, syntax/integration checks and both actual executables. The installed SHA-256 matches a5b00389aeebf7d4821e1f44696f274c8a1730398a28c614961915653cbc82d8; the local bridge reports 1.5.46. Admin and desktop Studio are reopened and responding. Public Trackball stable was not promoted.

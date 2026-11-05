@@ -32,7 +32,7 @@ public sealed class NavigationMotion {
         if(dt<=0||dt>.1){Reset();dt=1.0/125;}
         previous=milliseconds;
         right.Add(dx);up.Add(scroll/4);forward.Add(-dy);
-        double steer=forward.Active?Math.Clamp((forward.Position-3)/5,0,1):0;
+        double steer=forward.Active?Math.Clamp((Math.Abs(forward.Position)-3)/5,0,1):0;
         return new(Advance(ref vr,right.Rate*(1-steer),dt),Advance(ref vu,up.Rate,dt),Advance(ref vf,forward.Rate,dt),Advance(ref vyaw,right.Rate*steer,dt));
     }
     public void Reset(){right=up=forward=default;vr=vu=vf=vyaw=0;previous=double.NaN;}

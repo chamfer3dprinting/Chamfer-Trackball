@@ -1,5 +1,5 @@
 {
-  "configVersion": 31,
+  "configVersion": 32,
   "slimBladeSmoothTwist": false,
   "steadyCamera": false,
   "cameraResponseMs": 18,
@@ -757,7 +757,7 @@
       "modeButtons": {},
       "combos": [],
       "snapKeys": "alt",
-      "navigateKeys": "win",
+      "navigateKeys": "backtick",
       "circleZoom": true,
       "circleSize": 160,
       "twistKeys": "none",

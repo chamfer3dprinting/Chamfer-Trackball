@@ -224,6 +224,15 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
             if(!keyReplays.ToArray().SequenceEqual(new[]{(81,true),(87,true),(81,false),(87,false)}))
                 throw new InvalidOperationException("Deferred typing lost key order or a matching release.");
             while(keyReplays.TryDequeue(out _)){ }
+            IsNavigationChord=keys=>keys.Contains(192)&&keys.All(key=>key is 192 or 18);
+            if(!RouteKey(192,true)||!Keys.Contains(192)||!RouteKey(192,false)||Keys.Contains(192)||!keyReplays.ToArray().SequenceEqual(new[]{(192,true),(192,false)}))throw new InvalidOperationException("A Backtick tap did not type once and release its key state.");
+            while(keyReplays.TryDequeue(out _)){ }
+            RouteKey(192,true);lock(keysGate)usedDeferred.Add(192);RouteKey(192,false);
+            if(Keys.Contains(192)||!keyReplays.IsEmpty)throw new InvalidOperationException("A used Backtick hold typed a stray character or stayed held.");
+            if(RouteKey(91,true)||RouteKey(91,false)||!keyReplays.IsEmpty)throw new InvalidOperationException("Windows was reserved after changing navigation to Backtick.");
+            IsCad=()=>false;
+            if(RouteKey(192,true)||RouteKey(192,false))throw new InvalidOperationException("Backtick was intercepted outside the 3D context.");
+            IsCad=()=>true;
             IsNavigationChord=keys=>keys.Contains(91)&&keys.All(key=>key is 91 or 18);
             foreach(int win in new[]{91,92}){
                 if(!RouteKey(win,true)||!Keys.Contains(91)||!RouteKey(win,false)||!keyReplays.IsEmpty)

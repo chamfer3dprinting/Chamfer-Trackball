@@ -8,7 +8,7 @@ static class TrackballDeviceChecks{
    var legacy=ConfigStore.Defaults();legacy["configVersion"]=29;legacy["selectedDevice"]="m512";legacy["trackballSwapButtons"]=true;
    File.WriteAllText(path,legacy.ToJsonString());var store=new ConfigStore(path);var before=store.Snapshot();
    check(TrackballDevices.Read(before).Single() is {Id:"m512",SwapButtons:true,SwapWheels:false},"Upgrade remembers the existing trackball and its native corrections");
-   check(ConfigStore.I(before,"configVersion")==31&&ConfigStore.I(JsonNode.Parse(File.ReadAllText(path)),"configVersion")==31,"Device-list upgrade is persisted once");
+   check(ConfigStore.I(before,"configVersion")==32&&ConfigStore.I(JsonNode.Parse(File.ReadAllText(path)),"configVersion")==32,"Device-list upgrade is persisted once");
    var programs=before["programs"]!.ToJsonString();var presets=before["presets"]!.ToJsonString();
    store.IdentifyDevice("slimblade");var second=store.Snapshot();
    check(TrackballDevices.Read(second).Length==2&&TrackballDevices.Read(second).Any(d=>d.Id=="m512"),"Identifying a second trackball retains the M512");
