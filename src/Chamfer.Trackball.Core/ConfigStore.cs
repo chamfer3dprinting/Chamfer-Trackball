@@ -9,6 +9,13 @@ public sealed class ConfigStore {
     private JsonObject config;
     public long Revision {get;private set;}
     private static JsonObject? nodeProgram(JsonObject c,string name)=>c["programs"]!.AsArray().Select(n=>n?.AsObject()).FirstOrDefault(p=>p!=null&&S(p,"name").Contains(name,StringComparison.OrdinalIgnoreCase));
+    static bool BacktickAvailable(JsonObject settings){
+        foreach(var key in new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys"}){
+            var value=S(settings,key,"none");if(value is "" or "none")continue;
+            try{if(KeyChord.Parse(value).Keys.Contains(192))return false;}catch(FormatException){ }
+        }
+        return true;
+    }
     public static JsonObject Defaults() {
         using var stream=typeof(ConfigStore).Assembly.GetManifestResourceStream("Chamfer.Trackball.Core.defaults.json")!;
         return JsonNode.Parse(stream)!.AsObject();
@@ -80,10 +87,10 @@ public sealed class ConfigStore {
         }
         if(oldVersion<32){
             foreach(var item in config["programs"]!.AsArray().OfType<JsonObject>()){
-                if(S(item,"defaultKind",S(item,"name")).Contains("3D",StringComparison.OrdinalIgnoreCase)&&S(item,"navigateKeys").ToLowerInvariant() is "win" or "windows")item["navigateKeys"]="backtick";
+                if(S(item,"defaultKind",S(item,"name")).Contains("3D",StringComparison.OrdinalIgnoreCase)&&(S(item,"navigateKeys").ToLowerInvariant() is "win" or "windows")&&BacktickAvailable(item))item["navigateKeys"]="backtick";
             }
             foreach(var preset in config["presets"]!.AsArray()){
-                if(preset?["settings"] is JsonObject settings&&S(settings,"defaultKind").Contains("3D",StringComparison.OrdinalIgnoreCase)&&S(settings,"navigateKeys").ToLowerInvariant() is "win" or "windows")settings["navigateKeys"]="backtick";
+                if(preset?["settings"] is JsonObject settings&&S(settings,"defaultKind").Contains("3D",StringComparison.OrdinalIgnoreCase)&&(S(settings,"navigateKeys").ToLowerInvariant() is "win" or "windows")&&BacktickAvailable(settings))settings["navigateKeys"]="backtick";
             }
             LoadProgram(config,I(config,"activeProgram",0));
         }

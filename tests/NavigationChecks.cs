@@ -70,6 +70,9 @@ internal static class NavigationChecks {
             check(ConfigStore.S(keys,"navigateKeys")=="backtick"&&ModeResolver.Resolve(keys,new HashSet<int>{192})==NavMode.Navigate&&ModeResolver.Resolve(keys,new HashSet<int>{91})==NavMode.Idle,"Existing standard Windows navigation moves to backtick");
             check(ConfigStore.S(keys["programs"]![0],"navigateKeys")=="none"&&ConfigStore.S(keys["presets"]!.AsArray().Last()!["settings"],"navigateKeys")=="backtick","Normal mouse remains unchanged and standard 3D presets use the new key");
             keys["configVersion"]=31;keys["programs"]![1]!["navigateKeys"]="q";File.WriteAllText(file,keys.ToJsonString());check(ConfigStore.S(new ConfigStore(file).Snapshot(),"navigateKeys")=="q","Other custom navigation chords survive the one-time backtick migration");
+            keys["configVersion"]=31;keys["programs"]![1]!["navigateKeys"]="win";keys["programs"]![1]!["orbitKeys"]="backtick";File.WriteAllText(file,keys.ToJsonString());var conflict=new ConfigStore(file).Snapshot();
+            check(ConfigStore.S(conflict,"navigateKeys")=="win"&&ConfigStore.S(conflict,"orbitKeys")=="backtick","Migration preserves a custom Backtick assignment instead of creating duplicate holds");
+
         }finally{foreach(var p in new[]{file,file+".previous",file+".writing"})if(File.Exists(p))File.Delete(p);}
         ExportTrace();
     }
