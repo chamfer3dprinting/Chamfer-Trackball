@@ -117,7 +117,7 @@ public sealed class ConfigStore {
             if(i==current&&S(p,"name")==S(config["programs"]![current],"name"))next["twistCalibration"]=config["twistCalibration"]?.DeepClone();
             foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
             p["feel"]??=new JsonObject();
-            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise","navigationCruise","navigationLevelFlight","navigationFreeLook"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
+            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise","navigationCruise","navigationLevelFlight","navigationFreeLook","threeAxisControls"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
             next["feel"]=p["feel"]!.DeepClone();
             Validate(next);Write(next);config=next;Revision++;
         }
@@ -227,6 +227,7 @@ public sealed class ConfigStore {
                 settings["feel"]??=new JsonObject();
                 if(!settings["feel"]!.AsObject().ContainsKey("navigationLevelFlight"))settings["feel"]!["navigationLevelFlight"]=false;
                 if(!settings["feel"]!.AsObject().ContainsKey("navigationFreeLook"))settings["feel"]!["navigationFreeLook"]=false;
+                if(!settings["feel"]!.AsObject().ContainsKey("threeAxisControls"))settings["feel"]!["threeAxisControls"]=false;
             }
         }
         TrackballDevices.Normalize(c);
@@ -257,6 +258,16 @@ public sealed class ConfigStore {
     }
     public static string S(JsonNode? n,string key,string fallback="")=>n?[key]?.GetValueKind()==JsonValueKind.String?n[key]!.GetValue<string>():fallback;
     public static int I(JsonNode? n,string key,int fallback=0)=>n?[key] is JsonValue v&&v.TryGetValue<int>(out var a)?a:fallback;
-    public static double D(JsonNode? n,string key,double fallback=0)=>n?[key] is JsonValue v&&v.TryGetValue<double>(out var a)&&double.IsFinite(a)?a:fallback;
+    public static double D(JsonNode? n,string key,double fallback=0){
+        if(n?[key] is not JsonValue value)return fallback;
+        double number;
+        if(value.TryGetValue<double>(out number)){ }
+        else if(value.TryGetValue<int>(out var integer))number=integer;
+        else if(value.TryGetValue<long>(out var whole))number=whole;
+        else if(value.TryGetValue<float>(out var single))number=single;
+        else if(value.TryGetValue<decimal>(out var exact))number=(double)exact;
+        else return fallback;
+        return double.IsFinite(number)?number:fallback;
+    }
     public static bool B(JsonNode? n,string key,bool fallback=false)=>n?[key] is JsonValue v&&v.TryGetValue<bool>(out var a)?a:fallback;
 }

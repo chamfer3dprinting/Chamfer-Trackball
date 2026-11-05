@@ -33,6 +33,14 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-05 — Codex: Direct three-axis controls, button face snap and cursor pivot
+
+The owner's latest three diagrams supersede the uninstalled curved-sweep PR34: Shift rotation maps ball vertical/horizontal to pitch/yaw and Kensington knob twist to roll. Alt translation maps ball to horizontal/vertical pan and twist to cursor depth zoom. Backtick camera walk maps ball to forward/back and sideways travel, twist to heading yaw; diagonal ball travel no longer steers by itself. Keep continuity, neutral/release stop and current sensitivities. The owner explicitly assigns face snapping to a top-right/button-2 click, replacing its orbit/pan toggle; no keyboard face-snap shortcut is assigned by default. Native one-shot face snapping survives the quick button release, aligns the nearest flat face around the cursor pivot and ignores stale/unfocused scene replies.
+
+The owner requests a visible cursor pivot and repeats that snap rotation must use the cursor point. Existing host camera math keeps this off-centre point fixed during rotation, zoom and all six face snaps. Add a small click-through, non-activating native cursor marker while rotating and briefly after a snap, controlled by the existing Show the pivot setting; no camera/sensor callback waits on it. Rotation twist uses Twist speed independently of ball Rotation speed, translation depth uses Zoom speed, walk travel uses Pan speed and walk heading uses Twist speed. Three-axis controls are per program/preset; older saved presets retain their previous mapping. Normal mouse clicks, wheel axes, devices and custom key recorder remain.
+
+68 focused core checks pass in memory and export 22 synthetic cases / 518 native poses. Full rendered replay, actual button/marker/native checks and final installation are pending. Studio desktop/private Preview 3.3.6 already have the camera-eye correction and must stay synchronized. Do not change AI/modeling, public activation or tester Send. PR34 is closed unmerged; its automatic-gesture trial will not be installed. Keep source on GitHub and no local Trackball development folders. Physical hardware feel remains for owner evaluation.
+
 # 2026-11-04 — Backtick-only look and travel
 
 The owner rejects the proposed Navigate+Alt look chord and explicitly requires Backtick alone. Add an opt-in program/preset-scoped Look and travel together option: ball deflection sets travel plus yaw/pitch rates with only Navigate held. Forward/back also tilts up/down; sideways also turns; scroll retains height. Return near the virtual centre or release Navigate to stop both. Current level-flight preference and all speeds remain unchanged. Save Before free look and Backtick free look presets for reversibility.

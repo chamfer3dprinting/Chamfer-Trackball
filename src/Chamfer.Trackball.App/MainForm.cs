@@ -18,7 +18,7 @@ internal sealed class MainForm:Form{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer native;readonly Controller controller;
     readonly string settingsPath;readonly GuideForm guide;readonly AdminService admin;
     readonly System.Windows.Forms.Timer updateTimer=new(){Interval=900000};
-    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Hold Shift to orbit, Ctrl+Shift to pan, Ctrl to zoom and Alt for six-face snapping. Release the keys for normal pointing.")};
+    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Hold Shift for rotation, Alt for translation, Backtick for camera walk; click the top-right button to snap a face. Release the keys for normal pointing.")};
     string updateUrl="",updateHash="";
     readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(30)};
     public MainForm(bool smoke=false,bool startTray=false){
@@ -168,6 +168,19 @@ internal sealed class MainForm:Form{
         if(connection.Pose==null||!native.Move(connection,NavMode.Orbit,20,10,60,false,1))throw new Exception("Native camera/pivot handshake failed.");
         var pose=JsonNode.Parse(await client.GetStringAsync("http://127.0.0.1:47613/native/poll?app=blender&pid="+Environment.ProcessId))!;
         if(!pose["commands"]!.AsArray().Any(x=>ConfigStore.S(x,"t")=="camera"))throw new Exception("Native camera response missing.");
+        // A quick physical button click must survive release while the host
+        // asynchronously returns the cursor-anchored camera scene.
+        connection.Out.Clear();native.SnapFace(connection,240,120);
+        var snapSession=connection.Session;var snapScene=(JsonObject)scene.DeepClone();snapScene["session"]=snapSession;
+        snapScene["worldUp"]=new JsonArray(0,1,0);snapScene["orthographic"]=true;snapScene["zoomPivot"]=new JsonArray(1,1,0);
+        using(var response=await client.PostAsync("http://127.0.0.1:47613/native/scene",new StringContent(snapScene.ToJsonString(),Encoding.UTF8,"application/json")))response.EnsureSuccessStatusCode();
+        var commands=connection.Out.ToArray();var snapped=commands.FirstOrDefault(x=>ConfigStore.S(x,"t")=="camera")??throw new Exception("One-click face snap did not return a camera pose.");
+        Vector3 readSnap(string key){var a=snapped[key]!.AsArray();return new(a[0]!.GetValue<float>(),a[1]!.GetValue<float>(),a[2]!.GetValue<float>());}
+        var normal=Vector3.Normalize(readSnap("eye")-readSnap("target"));
+        if(Vector3.Distance(normal,CameraMath.NearestFace(normal))>.00001f||readSnap("pivot")!=new Vector3(1,1,0)||!ConfigStore.B(snapped,"orthographic")||commands.All(x=>ConfigStore.S(x,"t")!="end"||ConfigStore.S(x,"session")!=snapSession)||connection.Mode!=NavMode.Idle)throw new Exception("One-click face snap lost the cursor pivot, flat face or completion.");
+        connection.Out.Clear();using(var response=await client.PostAsync("http://127.0.0.1:47613/native/scene",new StringContent(snapScene.ToJsonString(),Encoding.UTF8,"application/json")))response.EnsureSuccessStatusCode();
+        if(connection.Out.Count!=0)throw new Exception("A stale scene replayed the one-click face snap.");
+        connection.Focus=false;native.SnapFace(connection,240,120);if(connection.Out.Count!=0)throw new Exception("Unfocused client accepted a one-click snap.");connection.Focus=true;
         // The real HTTP scene handshake must carry an off-centre cursor anchor.
         foreach(bool ortho in new[]{false,true}){
             native.Begin(connection,NavMode.Zoom,240,120);
@@ -338,6 +351,8 @@ internal sealed class MainForm:Form{
             controller.VerifyHeldNavigation();
             controller.VerifyLevelFlight();
             controller.VerifyFreeLook();
+            controller.VerifyThreeAxisControls();
+            using(var marker=new PivotForm()){var at=Cursor.Position;marker.UpdateMarker(true,at);if(!marker.Visible||Math.Abs(marker.Bounds.Left+marker.Width/2-at.X)>1||Math.Abs(marker.Bounds.Top+marker.Height/2-at.Y)>1)throw new Exception("Pivot marker did not appear under the cursor.");marker.UpdateMarker(false,at);if(marker.Visible)throw new Exception("Pivot marker did not hide on release.");}
             controller.VerifyImmediateStudioDelivery();
             controller.VerifySnapWheelRouting();
             controller.VerifyKnobHandshake();

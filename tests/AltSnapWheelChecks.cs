@@ -47,7 +47,7 @@ static class AltSnapWheelChecks{
 
   var defaults=ConfigStore.Defaults();check(!ConfigStore.B(defaults,"altTwistEstimate"),"Normal mouse does not guess ball twists");
   ConfigStore.LoadProgram(defaults,1);
-  check(ConfigStore.S(defaults,"snapKeys")=="alt"&&!ConfigStore.B(defaults,"altTwistEstimate"),"The 3D default uses Alt faces and left-wheel turns with ball-twist guessing off");
+  check(ConfigStore.S(defaults,"snapKeys")=="none"&&ConfigStore.S(defaults["buttons"]?["back"],"action")=="faceSnap"&&!ConfigStore.B(defaults,"altTwistEstimate"),"The 3D default uses the top-right face-snap button without ball-twist guessing");
   check(ConfigStore.S(defaults["buttons"]?["middle"],"action")=="normal"&&!ConfigStore.B(defaults,"trackballSwapButtons")&&!ConfigStore.B(defaults,"trackballSwapWheels"),"The top-left button and native click/wheel corrections remain unchanged");
 
   var path=Path.Combine(Path.GetTempPath(),"chamfer-left-wheel-"+Guid.NewGuid().ToString("N")+".json");
