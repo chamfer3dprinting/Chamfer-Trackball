@@ -369,3 +369,10 @@ The owner reports stutter, delayed/drifting motion, wrong pivots and wants the o
 Advertise a short display response in the begin handshake when Steady motion or cruise is enabled, and include current pivot anchors in absolute camera messages. A compatible Studio build can then interpolate camera orientation and anchor-relative offsets on each display frame. Keep existing sensitivity, shortcuts, clicks, wheel axes, remembered M512/SlimBlade and presets. The new setting is retained with programs and presets. Include the existing CameraResponseChecks in the core runner; it was present but not called there.
 
 Windows workflows, Admin-only delivery, compatible private Studio installation and physical evaluation are pending. Synthetic tests cannot establish SpaceMouse-equivalent feel. Stock Kensington wheel reports are not Rotatrix's custom-firmware full-resolution third axis. Source stays on GitHub; no local Trackball development folder and no public stable promotion.
+
+
+# 2026-11-04 — Correct diagonal orbit and face orientation continuity
+
+The owner rejects the cruise trial as still jumpy/delayed and reports all orientation faults. Restore direct movement locally. Replace ordered yaw/pitch/roll products with one screen-space axis-angle rotation vector, so one diagonal stroke is independent of report batching and its exact reverse restores the view. Retain camera-relative screen directions and the selected cursor pivot. When changing cube faces, carry the physically rotated Up vector into the new face's quarter-turn orientation instead of resetting it to the canonical world-up orientation.
+
+Add all 24 aligned starting orientations, diagonal batching/reversal, off-centre projection, four-face cycles, and direction regressions. Export only synthetic camera poses in the existing verification artifact for a disposable rendered Studio test; do not record owner geometry, device IDs or input. Keep exact wheel snaps, presets, devices, controls and optional rate response. Cloud checks, rendered replay and the next Admin-only install are pending. No new local Trackball source folder or public stable promotion.

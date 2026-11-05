@@ -497,7 +497,7 @@ foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.Un
  Check(Vector3.Distance(view.Up,initial.Up)<.0001,"Four knob snaps return to the original orientation on "+axis);
  foreach(var direction in new[]{new Vector2(1000,5),new Vector2(-1000,-5),new Vector2(5,1000),new Vector2(-5,-1000)}){
   var input=new FaceSnap();input.Reset(initial);var next=input.Step(initial,direction.X,direction.Y,0,.2f,1000);
-  Check(Math.Abs(Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),axis))<.001&&input.Orientation==0&&!input.Turning,"A noisy Alt direction selects one adjacent face on "+axis+" for "+direction);
+  Check(Math.Abs(Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),axis))<.001&&next.Valid&&!input.Turning,"A noisy Alt direction selects one adjacent face on "+axis+" for "+direction);
  }
 }
 var limited=new FaceSnap();limited.Reset(studioView);var snapPreviousFace=studioView;int changes=0;bool adjacent=true;
@@ -512,7 +512,7 @@ var paused=new FaceSnap();paused.Reset(studioView);paused.Step(studioView,100,0,
 var afterPause=paused.Step(studioView,0,100,0,.2f,1600);
 Check(Vector3.Dot(Vector3.Normalize(afterPause.Eye-afterPause.Target),Vector3.UnitZ)>.999f,"A pause discards a partial directional stroke instead of mixing it into the next direction");
 var noCurve=new FaceSnap();noCurve.Reset(studioView);bool neverCurves=true;
-for(int frame=0;frame<180;frame++){float angle=frame*.08f;noCurve.Step(studioView,80*MathF.Cos(angle),80*MathF.Sin(angle),0,.2f,1000+frame*16);neverCurves&=!noCurve.Turning&&noCurve.TurnCount==0&&noCurve.Orientation==0;}
+for(int frame=0;frame<180;frame++){float angle=frame*.08f;noCurve.Step(studioView,80*MathF.Cos(angle),80*MathF.Sin(angle),0,.2f,1000+frame*16);neverCurves&=!noCurve.Turning&&noCurve.TurnCount==0;}
 Check(neverCurves,"Alt never reserves the former circular orientation gesture");
 var around=new FaceSnap();around.Reset(studioTop);bool bottom=false;
 for(int frame=0;frame<80;frame++){var next=around.Step(studioTop,0,50,0,.2f,1000+frame*16);bottom|=Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),-Vector3.UnitY)>.999f;}
@@ -597,4 +597,5 @@ TrackballDeviceChecks.Run(Check);
 ForegroundAppChecks.Run(Check);
 CameraResponseChecks.Run(Check);
 HeldRateChecks.Run(Check);
+CameraOrientationChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

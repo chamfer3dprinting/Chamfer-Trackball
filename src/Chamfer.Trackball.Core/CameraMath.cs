@@ -20,8 +20,11 @@ public static class CameraMath {
             return Zoom(pose,wheel*.0015f);
         }
         if(mode==NavMode.Orbit){
-            var q=mode==NavMode.Roll?Quaternion.Identity:Quaternion.Normalize(Quaternion.CreateFromAxisAngle(up,-dx*.005f)*Quaternion.CreateFromAxisAngle(right,-dy*.005f));
-            q=Quaternion.Normalize(Quaternion.CreateFromAxisAngle(back,-wheel*.0015f)*q);
+            // A single screen-space rotation vector is invariant to report batching.
+            // Ordered yaw/pitch products add an unintended roll to diagonal strokes.
+            var rotation=-right*(dy*.005f)-up*(dx*.005f)-back*(wheel*.0015f);
+            float angle=rotation.Length();if(angle<1e-12f)return c;
+            var q=Quaternion.CreateFromAxisAngle(rotation/angle,angle);
             return c with{Eye=c.Pivot+Vector3.Transform(c.Eye-c.Pivot,q),Target=c.Pivot+Vector3.Transform(c.Target-c.Pivot,q),Up=Unit(Vector3.Transform(up,q)),ZoomPivot=RotateZoomPivot(c,q)};
         }
         if(mode==NavMode.Snap){
@@ -41,6 +44,12 @@ public static class CameraMath {
         return mode==NavMode.Zoom?Zoom(c,-dy*.008f+wheel*.0015f):c;
     }
     internal static Vector3? RotateZoomPivot(CameraPose c,Quaternion q)=>c.ZoomPivot is Vector3 p?c.Pivot+Vector3.Transform(p-c.Pivot,q):null;
+    internal static int FaceOrientation(CameraPose pose,Vector3 face){
+        var canonical=AlignFace(pose,face).Up;
+        var seen=Unit(pose.Up-face*Vector3.Dot(pose.Up,face));
+        float angle=MathF.Atan2(Vector3.Dot(face,Vector3.Cross(canonical,seen)),Vector3.Dot(canonical,seen));
+        return (int)MathF.Round(-angle/(MathF.PI/2));
+    }
     public static Vector3 NearestFace(Vector3 direction)=>FaceDirections.MaxBy(face=>Vector3.Dot(face,direction));
     public static CameraPose AlignFace(CameraPose c,Vector3 face,int quarterTurns=0){
         var back=Unit(c.Eye-c.Target);var right=Unit(Vector3.Cross(c.Up,back));var up=Unit(Vector3.Cross(back,right));
@@ -88,10 +97,7 @@ public sealed class FaceSnap{
   lastAligned=pose;face=pose==null?Vector3.Zero:CameraMath.NearestFace(Vector3.Normalize(pose.Eye-pose.Target));
   quarterTurns=0;wheelRemainder=travel=0;axis=-1;heading=0;strokeAxis=Vector3.Zero;lastMotion=lastFace=0;Samples=0;TurnCount=LastTurnDirection=0;LastTurnAt=0;
   if(pose!=null&&Vector3.Dot(Vector3.Normalize(pose.Eye-pose.Target),face)>.999f){
-   var canonical=CameraMath.AlignFace(pose,face).Up;
-   var seen=Vector3.Normalize(pose.Up-face*Vector3.Dot(pose.Up,face));
-   float angle=MathF.Atan2(Vector3.Dot(face,Vector3.Cross(canonical,seen)),Vector3.Dot(canonical,seen));
-   quarterTurns=(int)MathF.Round(-angle/(MathF.PI/2));
+   quarterTurns=CameraMath.FaceOrientation(pose,face);
   }
  }
  public CameraPose Step(CameraPose start,float x,float y,float wheel=0,float gain=1,long now=0){
@@ -120,7 +126,7 @@ public sealed class FaceSnap{
     var rotation=Quaternion.CreateFromAxisAngle(strokeAxis,-heading*MathF.PI/2);
     var proposed=view with{Eye=view.Pivot+Vector3.Transform(view.Eye-view.Pivot,rotation),Target=view.Pivot+Vector3.Transform(view.Target-view.Pivot,rotation),Up=Vector3.Normalize(Vector3.Transform(view.Up,rotation)),ZoomPivot=CameraMath.RotateZoomPivot(view,rotation)};
     face=CameraMath.NearestFace(Vector3.Normalize(proposed.Eye-proposed.Target));
-    quarterTurns=0;view=CameraMath.AlignFace(proposed,face);travel=0;lastFace=time;
+    quarterTurns=CameraMath.FaceOrientation(proposed,face);view=CameraMath.AlignFace(proposed,face,quarterTurns);travel=0;lastFace=time;
    }
   }
   wheelRemainder+=Math.Clamp(wheel,-1200,1200);int wheelTurns=(int)(wheelRemainder/120);wheelRemainder-=wheelTurns*120;
