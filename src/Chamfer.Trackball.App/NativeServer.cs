@@ -70,6 +70,12 @@ internal sealed class NativeServer:IDisposable {
             if(c.Mode!=NavMode.Navigate||c.Pose==null)return;
             // End freezes Studio at its displayed pose. A fresh scene starts
             // from there without releasing the physical navigation key.
+            // Freeze at the host's displayed pose, not an undelivered travel pose.
+            // Gesture classification may have queued a frame while waiting to
+            // recognize the return stroke; it must not lurch forward at centre.
+            var keep=new List<JsonObject>();
+            while(c.Out.TryDequeue(out var queued))if(ConfigStore.S(queued,"t")!="camera"||ConfigStore.S(queued,"session")!=c.Session)keep.Add(queued);
+            foreach(var queued in keep)c.Out.Enqueue(queued);
             Queue(c,new(){["t"]="end",["session"]=c.Session});StartSession(c,NavMode.Navigate);
         }
     }
