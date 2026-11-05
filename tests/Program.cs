@@ -2,6 +2,12 @@ using System.Numerics;
 using System.Text.Json.Nodes;
 using Chamfer.Trackball.Core;
 int count=0;void Check(bool pass,string name){count++;if(!pass)throw new Exception("FAILED: "+name);Console.WriteLine("PASS "+name);}
+JsonObject Legacy3DDefaults(){
+    var value=ConfigStore.Defaults();var program=value["programs"]![1]!;
+    program["panKeys"]="ctrl+shift";program["snapKeys"]="alt";program["buttons"]!["back"]=new JsonObject{["action"]="panToggle",["tap"]="click"};
+    program["feel"]!["threeAxisControls"]=false;program["feel"]!["navigationLevelFlight"]=false;
+    return value;
+}
 var defaults=ConfigStore.Defaults();
 Check(ConfigStore.I(defaults,"activeProgram")==0&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Idle,"Factory startup is an ordinary mouse");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Normal mouse keeps Ctrl as an ordinary modifier");
@@ -10,8 +16,8 @@ Check(ConfigStore.S(defaults,"ball")=="pointer"&&ModeResolver.Resolve(defaults,n
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Zoom,"Ctrl and roll selects Zoom in the 3D program");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&ModeResolver.Resolve(defaults,new HashSet<int>{17,86})==NavMode.Idle,"Ctrl+C and Ctrl+V remain ordinary keyboard shortcuts");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom,"Ctrl+Shift wins over Shift");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap,"Alt snaps");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.Idle,"Ctrl+Shift does not accidentally activate Shift rotation");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.PanZoom,"Alt selects object translation");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Backtick navigates");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{91})==NavMode.Idle,"Windows is no longer the default navigation key");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{192,18})==NavMode.Navigate,"Alt remains an optional modifier for Backtick navigation");
@@ -118,18 +124,18 @@ try{
  Check(invalidIdentity&&ConfigStore.S(store.Snapshot(),"selectedDevice")=="trackball-device-b","Invalid identification cannot replace the saved trackball");
  Check(ConfigStore.I(reset,"activeProgram")==0&&ModeResolver.Resolve(reset,new HashSet<int>{16})==NavMode.Idle,"Reset selects normal mouse without navigation");
  Check(!ConfigStore.B(reset,"trackballSwapButtons")&&!ConfigStore.B(reset,"trackballSwapWheels"),"Reset disables device corrections as well as bindings");Check(ConfigStore.S(reset,"leftWheel")=="normal"&&ConfigStore.S(reset,"rightWheel")=="normal","Reset restores both wheels");
- Check(reset["programs"]![0]!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")&&reset["programs"]![1]!["buttons"]!.AsObject().Where(b=>b.Key!="back").All(b=>ConfigStore.S(b.Value,"action")=="normal")&&ConfigStore.S(reset["programs"]![1]!["buttons"]!["back"],"action")=="panToggle","Reset restores normal mouse clicks and the 3D Back toggle");
+ Check(reset["programs"]![0]!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")&&reset["programs"]![1]!["buttons"]!.AsObject().Where(b=>b.Key!="back").All(b=>ConfigStore.S(b.Value,"action")=="normal")&&ConfigStore.S(reset["programs"]![1]!["buttons"]!["back"],"action")=="faceSnap","Reset restores normal mouse clicks and the 3D Back toggle");
  var bad=store.Snapshot();bad["orbitKeys"]="ctrl";bool rejected=false;try{store.Save(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"Saving Ctrl-only navigation is rejected");
 
  var partial=store.Snapshot();partial["programs"]!.AsArray().Add(new JsonObject{["name"]="New legacy program",["feel"]=new JsonObject{["orbitSens"]=82}});
  store.Save(partial);store.Select(2);var repaired=store.Snapshot();
  Check(ConfigStore.I(repaired,"orbitSens")==82&&ConfigStore.I(repaired,"panSens")==50&&ConfigStore.I(repaired,"pointerSpeed")==10,"An incomplete added program gets its own full motion defaults instead of leaking the previous program");
  store.Select(0);
- var migrated=ConfigStore.Defaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
+ var migrated=Legacy3DDefaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
  Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==32,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
-  var old=ConfigStore.Defaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
+  var old=Legacy3DDefaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
   old["programs"]![1]!["ball"]="orbit";old["programs"]![1]!["zoomKeys"]=zoomBinding;
   old["programs"]![1]!["orbitKeys"]="Alt+Q";old["programs"]![1]!["panKeys"]="Ctrl+Space";
   File.WriteAllText(path,old.ToJsonString());var upgraded=new ConfigStore(path).Snapshot();
@@ -422,8 +428,8 @@ foreach(int step in new[]{2,10,19}){
 }
 var twistDefaults=ConfigStore.Defaults();
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Normal mouse keeps Alt+Shift as ordinary keyboard input");
-ConfigStore.LoadProgram(twistDefaults,1);
-Check(!ConfigStore.B(twistDefaults,"altTwistEstimate")&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Factory 3D uses Alt faces and wheel orientation without requiring Shift");
+ConfigStore.LoadProgram(twistDefaults,1);twistDefaults["panKeys"]="ctrl+shift";twistDefaults["snapKeys"]="alt";
+Check(!ConfigStore.B(twistDefaults,"altTwistEstimate")&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Legacy 3D profiles retain Alt faces and wheel orientation without requiring Shift");
 twistDefaults["twistKeys"]="alt+shift";
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Roll,"Alt+Shift selects the new held Twist mode");
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{18})==NavMode.Snap&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16})==NavMode.Orbit,"Alt face switching and Shift orbit stay separate from Twist");
@@ -456,7 +462,7 @@ foreach(var direction in new[]{new Vector2(5,0),new Vector2(-5,0),new Vector2(0,
 }
 var twistPath=Path.Combine(Path.GetTempPath(),"chamfer-twist-"+Guid.NewGuid().ToString("N")+".json");
 try{
- var old=ConfigStore.Defaults();old["configVersion"]=25;old["activeProgram"]=1;old["selectedDevice"]="twist-device";
+ var old=Legacy3DDefaults();old["configVersion"]=25;old["activeProgram"]=1;old["selectedDevice"]="twist-device";
  foreach(var node in old["programs"]!.AsArray()){node!.AsObject().Remove("twistKeys");node["feel"]!.AsObject().Remove("twistSens");node["feel"]!.AsObject().Remove("twistAxis");node["feel"]!.AsObject().Remove("invertTwist");}
  old["programs"]![1]!["feel"]!["orbitSens"]=4;old["programs"]![0]!["pointerSpeed"]=3;File.WriteAllText(twistPath,old.ToJsonString());
  var store=new ConfigStore(twistPath);var migrated=store.Snapshot();
@@ -471,7 +477,7 @@ try{
  var oldPreset=reopened.Snapshot();oldPreset["presets"]![0]!["settings"]!["feel"]!.AsObject().Remove("twistSens");oldPreset["presets"]![0]!["settings"]!["feel"]!.AsObject().Remove("twistAxis");oldPreset["presets"]![0]!["settings"]!["feel"]!.AsObject().Remove("invertTwist");
  File.WriteAllText(twistPath,oldPreset.ToJsonString());var withOldPreset=new ConfigStore(twistPath);var oldApplied=withOldPreset.ApplyPreset(0);
  Check(ConfigStore.I(oldApplied,"twistSens")==23&&ConfigStore.S(oldApplied,"twistAxis")=="y","An older preset without Twist feel fields retains the current Twist tuning");
- var conflicting=ConfigStore.Defaults();conflicting["configVersion"]=25;conflicting["activeProgram"]=1;conflicting["programs"]![1]!["twistKeys"]="none";conflicting["programs"]![1]!["orbitKeys"]="alt+shift";
+ var conflicting=Legacy3DDefaults();conflicting["configVersion"]=25;conflicting["activeProgram"]=1;conflicting["programs"]![1]!["twistKeys"]="none";conflicting["programs"]![1]!["orbitKeys"]="alt+shift";
  File.WriteAllText(twistPath,conflicting.ToJsonString());var conflictSaved=new ConfigStore(twistPath).Snapshot();
  Check(ConfigStore.S(conflictSaved,"orbitKeys")=="alt+shift"&&ConfigStore.S(conflictSaved,"twistKeys")=="none","Twist migration never takes over an existing Alt+Shift binding");
  var duplicate=ConfigStore.Defaults();duplicate["programs"]![1]!["twistKeys"]="alt";bool rejected=false;try{ConfigStore.Validate(duplicate);}catch(InvalidDataException){rejected=true;}
