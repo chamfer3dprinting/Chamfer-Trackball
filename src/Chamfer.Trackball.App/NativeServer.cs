@@ -65,10 +65,10 @@ internal sealed class NativeServer:IDisposable {
             Queue(c,PoseMessage(c));return true;
         }
     }
-    public bool Fly(Client c,NavigationFrame motion,float gain){
+    public bool Fly(Client c,NavigationFrame motion,float gain,float turnGain=1){
         lock(c.Gate){
             if(c.Version<2||c.Pose==null)return false;
-            c.Pose=CameraMath.Fly(c.Pose,motion,gain);Queue(c,PoseMessage(c));return true;
+            c.Pose=CameraMath.Fly(c.Pose,motion,gain,turnGain);Queue(c,PoseMessage(c));return true;
         }
     }
     public bool PendingSnap(Client? c){if(c==null)return false;lock(c.Gate)return c.EstimateTwist&&c.EstimatedSnap.Pending;}

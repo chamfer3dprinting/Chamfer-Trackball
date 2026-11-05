@@ -34,6 +34,10 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Diagonal navigation steers the heading
+
+The owner clarifies that top-right/top-left ball rolls must turn the camera to face right/left while moving forward. Straight side rolls still strafe. Blend side speed into a bounded yaw command as the forward/back command leaves centre; keep wheel height independent. Integrate translation at the midpoint heading and rotate camera anchors with the heading to preserve travel speed and lens distance. Translation uses Pan/3D speed and steering uses Orbit/3D speed. Add side-versus-diagonal, heading, zero-speed and rendered turning cases. This supersedes the no-heading-change claim for diagonal navigation only; orbit/zoom are still unchanged.
+
 # 2026-11-04 — Final navigation mapping: wheel height, ball travel
 
 The owner replaces the preceding drone mapping: while Windows/Navigate is held, ball forward/back moves along the current view, ball left/right strafes, and scroll up/down (Kensington twist) controls up/down. Keep continuous travel until Navigate release and keep orbit/zoom unchanged. Swap only the two NavigationMotion input channels and update the guide/instructions. Existing per-axis 3D speed scaling is unchanged. Add explicit ball-depth and wheel-height isolation checks.

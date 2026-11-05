@@ -48,7 +48,7 @@ internal sealed class GuideForm:Form{
   string roll=mode switch{"Idle"=>"Pointer","Orbit"=>"Orbit","PanZoom"=>"Pan","Zoom"=>"Zoom","Snap"=>"Snap","Roll"=>"Turn face","Navigate"=>"Move",_=>mode};
   string wheel=mode=="Orbit"?"Roll":mode=="Idle"?"Scroll":mode=="Snap"?"Turn face":mode=="Navigate"?(drone?"Up / down":"Turn"):"Zoom";
   g.DrawString(drone?"Ball: Forward/back/sideways · Scroll: Up/down":mode=="Snap"?"Ball: Faces   ·   Left wheel: 90°":"Roll: "+roll+"   ·   Wheel: "+wheel,font,text,drone?13:mode=="Snap"?35:53,249);
-  if(drone)g.DrawString("Movement follows the current view",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
+  if(drone)g.DrawString("Diagonal: forward + turn · sideways: strafe",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
   g.DrawLine(line,12,301,318,301);
   var keys=new HashSet<int>(s["keys"]!.AsArray().Select(key=>key!.GetValue<int>()));
   int shortcutRow=0;

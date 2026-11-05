@@ -8,16 +8,23 @@ internal static class NavigationChecks {
         var rate=new NavigationMotion();rate.Reset();var ball=rate.Step(0,-12,0,900);check(ball.Forward>0&&ball.Up==0&&ball.Right==0,"Ball forward controls depth without changing height");
         rate.Reset();var scroll=rate.Step(0,0,60,950);check(scroll.Up>0&&scroll.Forward==0&&scroll.Right==0,"Scroll up controls height without changing depth");
         rate.Reset();var a=rate.Step(12,-8,60,1000);var b=rate.Step(0,0,0,1008);
-        check(a.Right>0&&a.Up>0&&a.Forward>0&&b.Right>a.Right,"Drone controls combine right/up/forward and continue without new movement");
+        check(a.Yaw>0&&a.Up>0&&a.Forward>0&&b.Forward>a.Forward,"Drone controls combine steering/up/forward and continue without new movement");
         check(!rate.Step(0,0,0,1016,true).Active&&!rate.Step(0,0,0,1024).Active,"Navigation key release immediately clears every velocity");
         rate.Reset();check(!rate.Step(1,1,0,2000).Active,"One-count sensor noise does not launch the drone");
         rate.Reset();rate.Step(12,0,0,3000);var reverse=rate.Step(-30,8,-120,3008);reverse=rate.Step(0,0,0,3096);
-        check(reverse.Right<0&&reverse.Up<0&&reverse.Forward<0,"Rolling back and reverse twisting command left/down/back");
+        check(reverse.Yaw<0&&reverse.Up<0&&reverse.Forward<0,"Rolling back and reverse scrolling command left steering/down/back");
         check(!rate.Step(0,0,0,3400).Active,"A paused loop discards stale navigation instead of catching up");
         rate.Reset();rate.Step(12,8,60,4000);rate.Reset();check(!rate.Step(0,0,0,4008).Active,"Focus/device/mode reset clears drone motion");
         double Travel(int dt){var r=new NavigationMotion();r.Step(12,0,0,1000);double x=0;for(int t=dt;t<=1000;t+=dt)x+=r.Step(0,0,0,1000+t).Right;return x;}
         check(Math.Abs(Travel(8)-Travel(20))<.01,"Drone travel is integrated over elapsed time");
-        var start=Pose();var move=CameraMath.Fly(start,new(12,8,15),MotionPolicy.Gain(27));
+        rate.Reset();var strafe=rate.Step(12,0,0,4500);check(strafe.Right>0&&strafe.Yaw==0&&strafe.Forward==0,"A straight side roll strafes without turning");
+        rate.Reset();var turnRight=rate.Step(12,-12,0,4600);rate.Reset();var turnLeft=rate.Step(-12,-12,0,4700);
+        check(turnRight.Forward>0&&turnRight.Yaw>0&&turnRight.Right==0&&turnLeft.Forward>0&&turnLeft.Yaw<0,"Forward diagonals steer in the requested direction");
+        var start=Pose();var turnedRight=CameraMath.Fly(start,turnRight,MotionPolicy.Gain(27),MotionPolicy.Gain(28));var turnedLeft=CameraMath.Fly(start,turnLeft,MotionPolicy.Gain(27),MotionPolicy.Gain(28));
+        check((turnedRight.Target-turnedRight.Eye).X>0&&(turnedLeft.Target-turnedLeft.Eye).X<0,"Diagonal right/left turns change the camera heading correctly");
+        check(Math.Abs(Vector3.Distance(turnedRight.Eye,turnedRight.Target)-Vector3.Distance(start.Eye,start.Target))<.0001f,"Turning retains the camera lens distance");
+        check(CameraMath.Fly(start,turnRight,0,0)==start,"Zero translation and turning sensitivity stops every navigation component");
+        var move=CameraMath.Fly(start,new(12,8,15),MotionPolicy.Gain(27));
         check(move.Eye.X>start.Eye.X&&move.Eye.Y>start.Eye.Y&&move.Eye.Z<start.Eye.Z,"Ball directions follow the view and positive twist moves forward");
         check(Vector3.Distance(move.Target-move.Eye,start.Target-start.Eye)<.0001f&&move.Up==start.Up,"Drone translation preserves orientation and camera distance");
         check(Vector3.Distance(move.Pivot-start.Pivot,move.Eye-start.Eye)<.0001f&&Vector3.Distance(move.ZoomPivot!.Value-start.ZoomPivot!.Value,move.Eye-start.Eye)<.0001f,"Camera anchors move with the drone");
@@ -47,10 +54,10 @@ internal static class NavigationChecks {
     static object View(CameraPose p)=>new{eye=new[]{p.Eye.X,p.Eye.Y,p.Eye.Z},target=new[]{p.Target.X,p.Target.Y,p.Target.Z},up=new[]{p.Up.X,p.Up.Y,p.Up.Z},pivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},zoomPivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},verticalFov=p.VerticalFov,orthoHeight=p.OrthoHeight,width=p.Width,height=p.Height,orthographic=p.Orthographic};
     static void ExportTrace(){
         var cases=new List<object>();
-        foreach(var sample in new[]{("drone-right",12f,0f,0f),("drone-up",0f,0f,60f),("drone-forward",0f,-12f,0f),("drone-combined",12f,-8f,60f)}){
+        foreach(var sample in new[]{("drone-right",12f,0f,0f),("drone-up",0f,0f,60f),("drone-forward",0f,-12f,0f),("drone-combined",12f,-8f,60f),("drone-turn-right",12f,-12f,0f),("drone-turn-left",-12f,-12f,0f)}){
             var start=Pose();var pose=start;var rate=new NavigationMotion();var poses=new List<object>();
-            for(int i=0;i<32;i++){var motion=rate.Step(i==0?sample.Item2:0,i==0?sample.Item3:0,i==0?sample.Item4:0,1000+i*8);pose=CameraMath.Fly(pose,motion,MotionPolicy.Gain(27));poses.Add(View(pose));}
-            cases.Add(new{label=sample.Item1,mode="Navigate",start=View(start),poses});
+            for(int i=0;i<32;i++){var motion=rate.Step(i==0?sample.Item2:0,i==0?sample.Item3:0,i==0?sample.Item4:0,1000+i*8);pose=CameraMath.Fly(pose,motion,MotionPolicy.Gain(27),MotionPolicy.Gain(28));poses.Add(View(pose));}
+            cases.Add(new{label=sample.Item1,mode="Navigate",steers=sample.Item2!=0&&sample.Item3!=0,turnSign=Math.Sign(sample.Item2),start=View(start),poses});
         }
         File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-navigation-trace.json"),JsonSerializer.Serialize(new{cases}));
     }

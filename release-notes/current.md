@@ -1,3 +1,10 @@
+# Diagonal navigation steering
+
+- Hold Windows/Navigate and roll diagonally forward-right/left to move forward and turn to face right/left.
+- Straight left/right rolls move sideways; straight forward/back rolls move forward/back.
+- Scroll up/down controls height. Release Navigate to stop movement and turning immediately.
+- 3D sensitivity controls translation and steering; direct orbit and zoom remain unchanged.
+
 # Ball travel and wheel height navigation
 
 - Hold Windows/Navigate: roll forward/back to move forward/back, roll left/right to move sideways, and scroll up/down to move up/down.

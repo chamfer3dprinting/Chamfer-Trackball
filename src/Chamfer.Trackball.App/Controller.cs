@@ -199,7 +199,7 @@ public string AppName{get;private set;}="";
         if(navigationSession){
             cameraMotion.Reset();heldRate.Reset();glide.Reset();
             var flight=navigationMotion.Step(frame.X,frame.Y,frame.Wheel+slimBladeTwist.Take(),timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency);
-            if(flight.Active&&native!=null)server.Fly(native,flight,PanGain);
+            if(flight.Active&&native!=null)server.Fly(native,flight,PanGain,OrbitGain);
             pending.ClearPrimary();pending.ClearDial();return;
         }
         MotionFrame output;
@@ -435,7 +435,7 @@ public string AppName{get;private set;}="";
             for(int i=1;i<=125;i++)Flush(timeMilliseconds:1000+i*8);
             var after=client.Pose!;
             if(after.Eye.X<=first.Eye.X||after.Eye.Y<=first.Eye.Y||after.Eye.Z>=first.Eye.Z||client.Out.Count!=1)throw new InvalidOperationException("Held navigation did not continue right/up/forward without new reports.");
-            if(System.Numerics.Vector3.Distance(after.Target-after.Eye,start.Target-start.Eye)>.0001f||after.Up!=start.Up)throw new InvalidOperationException("Drone translation changed orientation or lens distance.");
+            if(Math.Abs(System.Numerics.Vector3.Distance(after.Target,after.Eye)-System.Numerics.Vector3.Distance(start.Target,start.Eye))>.0001f||after.Up!=start.Up)throw new InvalidOperationException("Drone movement changed its up vector or lens distance.");
             motionSamples.Move(20,20);pending.Wheel(120);var stopped=client.Pose;int queued=client.Out.Count;
             Flush(finish:true,timeMilliseconds:2010);
             if(client.Pose!=stopped||client.Out.Count!=queued||pending.Peek().HasPrimary||motionSamples.Peek().HasPrimary)throw new InvalidOperationException("Navigation release applied pending motion or emitted a catch-up pose.");
