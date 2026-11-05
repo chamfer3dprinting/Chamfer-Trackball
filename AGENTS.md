@@ -7,8 +7,7 @@ on the owner's PC. Deliver only the executable as the user-facing download.
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
 mouse button swapping to implement app bindings. The owner's latest requested controls
 are Shift orbit, Ctrl+Shift pan, Ctrl plus ball for zoom, Alt plus ball for six-face
-snapping, Alt plus the physical LEFT scroll wheel for 90-degree face-orientation snaps, an optional separate Twist hold, and Windows navigation with Alt for height. Automatic ball-only twist estimation is now off in the 3D default. Reserve the Windows tap in the 3D
-context so releasing it never opens Start; keep system shortcuts and non-3D Windows input normal. Ctrl alone is permitted for
+snapping, Alt plus the physical LEFT scroll wheel for 90-degree face-orientation snaps, an optional separate Twist hold, and Backtick navigation with ball travel/diagonal steering and wheel height. Automatic ball-only twist estimation is now off in the 3D default. A quick Backtick tap types normally; hold Backtick to navigate in a supported 3D view. Windows input stays normal unless the user explicitly assigns it. Ctrl alone is permitted for
 Zoom in 3D apps; other Ctrl keyboard shortcuts must remain normal. The 3D program
 points normally until a held navigation command is used.
 
@@ -33,6 +32,16 @@ button numbers or the UI's descriptive labels; enable a correction only when
 a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
+
+# 2026-11-04 — Deliver Admin 1.5.47 reverse steering and Backtick hold
+
+Admin v1.5.47 is installed from source 169ef2180cdd5fcf02ec06f18b79908a3bdfff20. Release 434687988 / main workflow 41953614312 pass 903 core checks, syntax/integration and both actual executables. Installed SHA-256 matches 9c629e4fe4bf1e68ee1163351dc2d3dcab0fe01f48d8fbaf38c40d3d9d316db5; the local bridge reports 1.5.47. Admin and Studio are reopened and responsive.
+
+Navigation is now held with Backtick (`), replacing Windows in the standard 3D profile and its four 3D presets. All five saved presets remain. A pre-install backup and post-restart deep comparison preserve all other settings, enabled state, devices, buttons/wheels, sensitivity values, direct orbit/zoom and centre stop; schema is 32. Other custom navigation bindings and an existing Backtick assignment to another command are preserved rather than creating duplicate holds. Actual keyboard checks cover normal taps, used hold/release without stray typing or stuck key state, and normal Windows input after reassignment.
+
+Bottom-right/bottom-left ball rolls move backward while turning the camera right/left. Forward diagonals still move forward and turn; straight side rolls strafe and scroll controls height. Centre/release stop and zero sensitivity remain effective during reverse turns. The exact exported CI trace matches the 256-pose desktop-source and live private web rendered fixture; heading, lens distance, neutral freeze/rehandshake and geometry/History/Undo pass with external writes blocked. The 29 focused motion checks and 140 sensitivity checks pass. Physical feel after this final update remains for owner evaluation.
+
+Desktop and Owner Preview Studio stay 3.3.5. No newer private AI/modeling work, public activation or tester Send was changed; public Trackball stable remains separate. Detailed proof is in private Studio docs/TRACKBALL-DRONE-NAVIGATION.json, committed in 75f6cdd.
 
 # 2026-11-04 — Reverse diagonals and backtick navigation
 
