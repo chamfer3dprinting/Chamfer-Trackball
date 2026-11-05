@@ -5,7 +5,7 @@ using Chamfer.Trackball.Core;
 internal static class NavigationChecks {
     static CameraPose Pose()=>new(new(0,0,200),Vector3.Zero,Vector3.UnitY,Vector3.Zero,.8f,200,1200,800,false,Vector3.UnitY,Vector3.Zero);
     public static void Run(Action<bool,string> check){
-        var rate=new NavigationMotion();var a=rate.Step(12,-8,60,1000),b=rate.Step(0,0,0,1008);
+        var rate=new NavigationMotion();var a=rate.Step(12,-8,60,1000);var b=rate.Step(0,0,0,1008);
         check(a.Right>0&&a.Up>0&&a.Forward>0&&b.Right>a.Right,"Drone controls combine right/up/forward and continue without new movement");
         check(!rate.Step(0,0,0,1016,true).Active&&!rate.Step(0,0,0,1024).Active,"Navigation key release immediately clears every velocity");
         rate.Reset();check(!rate.Step(1,1,0,2000).Active,"One-count sensor noise does not launch the drone");
