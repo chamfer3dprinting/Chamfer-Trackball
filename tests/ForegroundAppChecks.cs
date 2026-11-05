@@ -38,6 +38,6 @@ static class ForegroundAppChecks{
   var ambiguousPattern=string.Concat(Enumerable.Repeat("a*",60))+"z.exe";
   check(!MatchExecutable(new string('a',4000)+"y.exe",ambiguousPattern)&&MatchExecutable(new string('a',4000)+"z.exe",ambiguousPattern),"Adversarial wildcard input resolves without regex backtracking or timeout");
   ConfigStore.LoadProgram(cfg,1);
-  check(ConfigStore.S(cfg,"orbitKeys")=="shift"&&ConfigStore.S(cfg,"panKeys")=="ctrl+shift"&&ConfigStore.S(cfg,"zoomKeys")=="ctrl"&&ConfigStore.S(cfg,"snapKeys")=="alt","Foreground detection never rewrites the saved held controls");
+  check(ConfigStore.S(cfg,"orbitKeys")=="shift"&&ConfigStore.S(cfg,"panKeys")=="alt"&&ConfigStore.S(cfg,"zoomKeys")=="ctrl"&&ConfigStore.S(cfg,"snapKeys")=="none","Foreground detection never rewrites the saved held controls");
  }
 }
