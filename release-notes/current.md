@@ -1,10 +1,10 @@
-# Look up/down while navigating
+# Backtick-only look and travel
 
-- Keep Backtick/Navigate held, add Alt and roll the ball to freely look up/down/left/right.
-- Existing travel and scroll height can continue while you look. Release Alt to adjust travel with the ball again.
-- Automatic diagonal steering pauses while looking; the travel centre stays where you set it.
-- Release Navigate to stop movement and looking immediately.
-- Preserve the level-flight choice, Shift orbit, Alt snapping outside navigation, speeds and presets.
+- Enable Look and travel together and hold only Backtick/Navigate.
+- Forward/back rolls move and tilt the view up/down; sideways rolls move sideways and turn left/right.
+- Scroll keeps height control. Return near centre or release Navigate to stop both movement and looking.
+- Preserve the level-flight choice, sensitivities, Shift orbit and Alt snapping outside navigation.
+- Save the choice with programs/presets; turn it off for the previous travel-only behavior.
 
 # Optional level-flight navigation trial
 
