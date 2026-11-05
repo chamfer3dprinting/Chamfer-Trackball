@@ -34,6 +34,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Remove duplicate Kensington camera delays
+
+The owner still reports delayed, uneven navigation in both desktop and private web Studio. For held continuous SlimBlade native Studio modes with Steady motion enabled and cruise off, deliver measured motion directly from each raw report and smooth only in Studio on its display clock. Keep the timer as the handshake/fallback path, preserve pending first movement, coalesce obsolete absolute poses, and emit no duplicate travel on a timer tick or release. Real SlimBlade twist uses this same path. Send the saved response setting to Studio instead of a fixed 12 ms hint. Legacy clients, other adapters, M512, exact Alt face/wheel steps, normal pointing and custom bindings keep their existing paths.
+
+Do not classify a curved held SlimBlade pan as circle zoom; its real twist scroll supplies zoom. Preserve M512 and optional free-ball circle gestures. Core policy coverage and both actual-executable smoke checks verify the event-driven path before any timer tick, 121 reports with one queued pose, conserved travel, pending scene handshake, combined ball/twist and configurable response. Workflow validation, installation and physical feel are pending. Private web Preview is being synchronized separately to Studio 3.3.5. No hardware equivalence, public promotion or tester Send is claimed.
+
 # 2026-10-31 — Reduce Admin lag when maximized
 
 The owner reports the Admin app lags and becomes difficult to use, especially when maximized. The Home page was calling the WebView-to-C# status bridge on every animation frame, potentially 60–144 calls per second. Cap active Home/Controls status updates at 20 Hz, other visible pages at 4 Hz, and hidden pages at 1 Hz. Keep the native trackball controller on its 16 ms input timer. Add interface regression coverage for the 20 Hz cap and unchanged sensor interval.

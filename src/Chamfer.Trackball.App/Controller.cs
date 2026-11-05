@@ -121,7 +121,7 @@ public string AppName{get;private set;}="";
         }
         if(native==null&&!demo&&!ConfigStore.B(cfg,"allowEmulation",true)){Integration="Native integration required";return;}
         mode=next;knobHoldActive=nextKnob;timer.Interval=MotionPolicy.FrameIntervalMs;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
-        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist,ConfigStore.B(cfg,"steadyCamera")||ConfigStore.B(cfg,"spaceMouseCruise"));}
+        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist,ConfigStore.B(cfg,"steadyCamera")||ConfigStore.B(cfg,"spaceMouseCruise"),DirectPresentation(input.ActiveDevice)?(float)ConfigStore.D(cfg,"cameraResponseMs",18):12);}
     }
     void End(){
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
@@ -164,14 +164,21 @@ public string AppName{get;private set;}="";
         }
         if(mode==NavMode.Gestures){gx+=x;gy+=y;return;}
         motionSamples.Move(x,y);
+        if(DirectPresentation(device)){
+            if(!IsCad){End();return;}
+            Flush(device:device);
+        }
     }
+    bool DirectPresentation(string device)=>NativeDelivery.Direct(device,ConfigStore.S(profile,"id"),native?.Version??0,mode,ConfigStore.B(cfg,"steadyCamera"),ConfigStore.B(cfg,"spaceMouseCruise"));
     bool CruiseActive=>native?.Version>=2&&HeldNavigation&&ConfigStore.B(cfg,"spaceMouseCruise")&&mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate;
-    void Flush(bool finish=false,double? timeMilliseconds=null){
+    void Flush(bool finish=false,double? timeMilliseconds=null,string? device=null){
         // Classify each newly sampled path once, even if a camera handshake delays delivery.
         var sample=motionSamples.Peek();motionSamples.ClearMove();bool consumed=false;
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
         bool cruise=CruiseActive;
-        if(cruise||!MotionPolicy.Circle(mode,ConfigStore.B(cfg,"circleZoom"),!freeBall))circle.Reset();
+        string deliveryDevice=device??input.ActiveDevice;
+        bool direct=DirectPresentation(deliveryDevice);
+        if(cruise||!NativeDelivery.Circle(deliveryDevice,mode,ConfigStore.B(cfg,"circleZoom"),!freeBall))circle.Reset();
         else{
             var dial=circle.Add(sample.X,sample.Y,Environment.TickCount64,(float)ConfigStore.D(cfg,"circleSize",160));
             consumed=dial.Consumed;
@@ -182,7 +189,12 @@ public string AppName{get;private set;}="";
         bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate);
         if((steady||cruise)&&native is {Version:>=2,Pose:null})return;
         MotionFrame output;
-        if(cruise){
+        if(direct){
+            // Studio presents absolute poses on its display clock. Do not add a
+            // second driver filter or wait for the WinForms camera timer.
+            cameraMotion.Reset();heldRate.Reset();glide.Reset();
+            output=new(frame.X,frame.Y,frame.Wheel+slimBladeTwist.Take(),0);
+        }else if(cruise){
             cameraMotion.Reset();glide.Reset();
             float twist=slimBladeTwist.Take();
             output=heldRate.Step(frame.X,frame.Y,frame.Wheel+twist,
@@ -262,7 +274,9 @@ public string AppName{get;private set;}="";
         if(ConfigStore.B(cfg,"slimBladeSmoothTwist")&&native?.Version>=2&&
            SlimBladeTwist.Applies(input.ActiveDevice,mode,msg)&&ModeResolver.Resolve(cfg,input.Keys)==mode&&
            (mode!=NavMode.Orbit||ConfigStore.B(cfg,"twist",true))){
-            slimBladeTwist.Add(data,mode);return true;
+            slimBladeTwist.Add(data,mode);
+            if(DirectPresentation(input.ActiveDevice)&&IsCad)Flush();
+            return true;
         }
         if(wheel&&SnapWheelPolicy.Captures(mode,msg)){if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);else pending.Wheel(data);return true;}
         if(wheel){
@@ -395,6 +409,43 @@ public string AppName{get;private set;}="";
             pending.Reset();motionSamples.Reset();profile=oldProfile;native=oldNative;cfg=oldCfg;foregroundWindow=oldWindow;foregroundPid=oldPid;foregroundExe=oldExe;AppName=oldName;mode=oldMode;latched=oldLatched;pressed.Clear();foregroundApps.Invalidate();
         }
         Console.WriteLine("Foreground browser tabs verified: same HWND entry/exit, title rename continuity, gesture release, re-entry and preview isolation.");
+    }
+    internal void VerifyImmediateStudioDelivery(){
+        var oldCfg=cfg;var oldNative=native;var oldMode=mode;var oldProfile=profile;var oldWindow=foregroundWindow;bool oldFocus=nativeFocusAllowed;
+        double oldOx=ox,oldOy=oy,oldPx=px,oldPy=py,oldZoom=zoom,oldZoomLog=zoomLog;
+        const string device="HID#VID_047D&PID_80D6&IMMEDIATE-FIXTURE";
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["enabled"]=true;cfg["steadyCamera"]=true;cfg["cameraResponseMs"]=6;cfg["spaceMouseCruise"]=false;cfg["circleZoom"]=false;
+            cfg["orbitSens"]=50;cfg["panSens"]=50;cfg["zoomSens"]=50;cfg["invertOrbitX"]=false;cfg["invertOrbitY"]=false;cfg["invertPan"]=false;cfg["invertZoom"]=false;
+            profile=new(){["id"]="chamfer3d"};foregroundWindow=Win32.GetForegroundWindow();nativeFocusAllowed=true;mode=NavMode.Orbit;
+            pending.Reset();motionSamples.Reset();cameraMotion.Reset();slimBladeTwist.Reset();
+            var pose=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
+            var client=new NativeServer.Client{App="chamfer3d",Version=2,Pose=pose,BasePose=pose};native=client;
+            var clock=Stopwatch.StartNew();
+            Motion(12,6,device,true);
+            var expected=CameraMath.Move(pose,NavMode.Orbit,12,6,0,false);
+            if(System.Numerics.Vector3.Distance(client.Pose!.Eye,expected.Eye)>.0001f||client.Out.Count!=1||pending.Peek().HasPrimary||motionSamples.Peek().HasPrimary)throw new InvalidOperationException("Raw Studio motion waited for a timer or changed its measured travel.");
+            for(int i=0;i<120;i++)Motion(1,0,device,true);
+            expected=CameraMath.Move(expected,NavMode.Orbit,120,0,0,false);
+            if(System.Numerics.Vector3.Distance(client.Pose!.Eye,expected.Eye)>.001f||client.Out.Count!=1)throw new InvalidOperationException("Immediate reports were lost or obsolete camera poses accumulated.");
+            var still=client.Pose;Flush(device:device);Flush(finish:true,device:device);
+            if(client.Pose!=still||client.Out.Count!=1)throw new InvalidOperationException("The timer or release repeated immediate motion.");
+            mode=NavMode.PanZoom;client.Pose=pose;slimBladeTwist.Add(120,mode);Motion(4,2,device,true);
+            expected=CameraMath.Move(pose,mode,4,2,90,false);
+            if(System.Numerics.Vector3.Distance(client.Pose!.Eye,expected.Eye)>.0001f||slimBladeTwist.Take()!=0)throw new InvalidOperationException("Ball pan and real twist zoom did not share immediate delivery.");
+            mode=NavMode.Orbit;client.Pose=null;pending.Reset();motionSamples.Reset();Motion(7,3,device,true);
+            if(!pending.Peek().HasPrimary)throw new InvalidOperationException("Immediate input was dropped before the scene handshake.");
+            client.Pose=client.BasePose=pose;Flush(device:device);expected=CameraMath.Move(pose,mode,7,3,0,false);
+            if(System.Numerics.Vector3.Distance(client.Pose!.Eye,expected.Eye)>.0001f||pending.Peek().HasPrimary)throw new InvalidOperationException("Handshake input was lost or filtered twice.");
+            server.Begin(client,NavMode.Orbit,0,0,smoothPresentation:true,displayResponseMs:6);
+            if(client.Out.Last()["responseMs"]!.GetValue<float>()!=6)throw new InvalidOperationException("The saved 6 ms response did not reach Studio.");
+            server.Begin(client,NavMode.Orbit,0,0,smoothPresentation:true,displayResponseMs:24);
+            if(client.Out.Last()["responseMs"]!.GetValue<float>()!=24)throw new InvalidOperationException("Changing response retained a hard-coded Studio delay.");
+            Console.WriteLine("Immediate Studio delivery verified before any timer tick; 121 reports in "+clock.Elapsed.TotalMilliseconds.ToString("F2")+" ms, one queued camera pose, no release replay, real twist and configurable display response.");
+        }finally{
+            pending.Reset();motionSamples.Reset();cameraMotion.Reset();slimBladeTwist.Reset();heldRate.Reset();glide.Reset();
+            cfg=oldCfg;native=oldNative;mode=oldMode;profile=oldProfile;foregroundWindow=oldWindow;nativeFocusAllowed=oldFocus;ox=oldOx;oy=oldOy;px=oldPx;py=oldPy;zoom=oldZoom;zoomLog=oldZoomLog;
+        }
     }
     internal void VerifyCameraResponse(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;var oldProfile=profile;bool oldKnob=knobHoldActive;double oldZoom=zoom,oldZoomLog=zoomLog;

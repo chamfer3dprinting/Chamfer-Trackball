@@ -596,6 +596,7 @@ CursorZoomChecks.Run(Check);
 TrackballDeviceChecks.Run(Check);
 ForegroundAppChecks.Run(Check);
 CameraResponseChecks.Run(Check);
+NativeDeliveryChecks.Run(Check);
 HeldRateChecks.Run(Check);
 CameraOrientationChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

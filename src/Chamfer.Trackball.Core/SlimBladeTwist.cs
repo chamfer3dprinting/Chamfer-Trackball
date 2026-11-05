@@ -4,9 +4,12 @@ public sealed class SlimBladeTwist
 {
     private float remaining;
 
+    public static bool IsDevice(string device) =>
+        device.Contains("HID#VID_047D&PID_80D6&", StringComparison.OrdinalIgnoreCase);
+
     public static bool Applies(string device, NavMode mode, int message) =>
         message == 0x20a && (mode is NavMode.Orbit or NavMode.PanZoom) &&
-        device.Contains("HID#VID_047D&PID_80D6&", StringComparison.OrdinalIgnoreCase);
+        IsDevice(device);
 
     public void Add(int scroll, NavMode mode)
     {
