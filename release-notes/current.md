@@ -1,3 +1,26 @@
+# Return to centre to stop
+
+- Hold Navigate and roll to set travel or turning speed.
+- Roll back near the starting position to stop while keeping the key held. A small neutral zone makes the middle easier to find.
+- Roll beyond the middle to reverse; release Navigate to stop all commands immediately.
+- Keep ball forward/back/sideways, forward-diagonal steering and scroll up/down for height.
+- Retain all sensitivity values and direct orbit/zoom controls.
+
+# Diagonal navigation steering
+
+- Hold Windows/Navigate and roll diagonally forward-right/left to move forward and turn to face right/left.
+- Straight left/right rolls move sideways; straight forward/back rolls move forward/back.
+- Scroll up/down controls height. Release Navigate to stop movement and turning immediately.
+- 3D sensitivity controls translation and steering; direct orbit and zoom remain unchanged.
+
+# Ball travel and wheel height navigation
+
+- Hold Windows/Navigate: roll forward/back to move forward/back, roll left/right to move sideways, and scroll up/down to move up/down.
+- Kensington twist supplies the scroll input for height.
+- Small rolls set continuing movement. Roll back to slow or reverse; release Navigate to stop every axis immediately.
+- Keep direct orbit/zoom and all existing sensitivity values.
+- Preserve the current settings schema when an older interface saves.
+
 # Navigation-only drone control
 
 - Hold Windows (or your Navigate binding) and roll the ball up/down/left/right to set camera travel.

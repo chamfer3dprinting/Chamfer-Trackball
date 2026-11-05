@@ -34,6 +34,22 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Return navigation to centre to stop
+
+The owner adds a second stop method: roll back near the starting position without releasing Navigate. Track a virtual centre for each ball/wheel command, enter neutral within 3 counts, and require 4 counts to leave neutral. Clear neutral-axis velocity immediately instead of easing a residual tail. When all commands return to centre, end the rendered session and request a new scene while the navigation key stays held, so Studio freezes at its displayed pose rather than finishing a queued target. A deliberate push restarts from centre; passing far enough through centre reverses. Keep key release/click/focus/device stop unchanged. Forward diagonals steer; straight side/back motion keeps travel mapping.
+
+A prior rendered turning trace finds accumulated float drift in camera distance and the old actual-Controller handshake assertion assumes every diagonal includes strafe. Normalize turning direction to retain lens distance and use the backward-diagonal strafe case for handshake retention. Add exact/near-centre, jitter, resume, reverse and full-controller freeze/rehandshake checks before delivery. The installed Admin is still 1.5.45 until this branch passes.
+
+# 2026-11-04 — Diagonal navigation steers the heading
+
+The owner clarifies that top-right/top-left ball rolls must turn the camera to face right/left while moving forward. Straight side rolls still strafe. Blend side speed into a bounded yaw command as the forward/back command leaves centre; keep wheel height independent. Integrate translation at the midpoint heading and rotate camera anchors with the heading to preserve travel speed and lens distance. Translation uses Pan/3D speed and steering uses Orbit/3D speed. Add side-versus-diagonal, heading, zero-speed and rendered turning cases. This supersedes the no-heading-change claim for diagonal navigation only; orbit/zoom are still unchanged.
+
+# 2026-11-04 — Final navigation mapping: wheel height, ball travel
+
+The owner replaces the preceding drone mapping: while Windows/Navigate is held, ball forward/back moves along the current view, ball left/right strafes, and scroll up/down (Kensington twist) controls up/down. Keep continuous travel until Navigate release and keep orbit/zoom unchanged. Swap only the two NavigationMotion input channels and update the guide/instructions. Existing per-axis 3D speed scaling is unchanged. Add explicit ball-depth and wheel-height isolation checks.
+
+Admin 1.5.45 was installed and verified from 27cd9a78 / workflow 41948603062 before this latest mapping change. A post-install check finds the UI can resave an older configVersion; force the current schema on Save and add a regression. The saved 3D-controls enabled flag was false before installation and is now true after UI interaction; preserve the current value and avoid claiming that field was unchanged. All sensitivity values and prior controls remain unchanged. The two local navigation presets are already saved; retain them.
+
 # 2026-11-04 — Navigation-only drone hold
 
 The owner supersedes the broad SpaceMouse/cruise request: keep orbit and zoom unchanged and make only the Navigate hold continue until released. Their confirmed mapping is ball up/down/left/right with twist forward/back. Add program/preset-scoped Continuous navigation, on in the 3D default and off for Normal mouse. Preserve existing keys, buttons, wheels, device settings and speed gains. Camera translation follows the current view, keeps its orientation/lens and carries its anchors. Each input adjusts a bounded velocity; release/click/focus/device/mode interruption clears all axes without applying pending travel. Existing general cruise stays off.

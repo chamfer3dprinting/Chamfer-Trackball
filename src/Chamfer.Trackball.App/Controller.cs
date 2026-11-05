@@ -6,7 +6,7 @@ namespace Chamfer.Trackball.App;
 internal sealed class Controller:IDisposable{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer server;
     readonly System.Windows.Forms.Timer timer=new(){Interval=MotionPolicy.FrameIntervalMs};
-    readonly MotionClock navigationClock;readonly NavigationMotion navigationMotion=new();bool navigationSession;
+    readonly MotionClock navigationClock;readonly NavigationMotion navigationMotion=new();bool navigationSession,navigationWasMoving;
     volatile JsonObject cfg;volatile JsonObject? profile;NativeServer.Client? native;
     readonly ForegroundApps foregroundApps=new();string foregroundExe="";
     readonly ComboTracker combos=new();readonly HashSet<int> pressed=[];readonly HashSet<int> comboUsed=[];
@@ -130,7 +130,7 @@ public string AppName{get;private set;}="";
         Flush();
     }
     void End(){
-        navigationClock.SetEnabled(false);navigationSession=false;navigationMotion.Reset();
+        navigationClock.SetEnabled(false);navigationSession=false;navigationWasMoving=false;navigationMotion.Reset();
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
     }
@@ -199,7 +199,8 @@ public string AppName{get;private set;}="";
         if(navigationSession){
             cameraMotion.Reset();heldRate.Reset();glide.Reset();
             var flight=navigationMotion.Step(frame.X,frame.Y,frame.Wheel+slimBladeTwist.Take(),timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency);
-            if(flight.Active&&native!=null)server.Fly(native,flight,PanGain);
+            if(flight.Active&&native!=null){server.Fly(native,flight,PanGain,OrbitGain);navigationWasMoving=true;}
+            else if(navigationWasMoving&&navigationMotion.Centered&&native!=null){navigationWasMoving=false;server.StopNavigation(native);}
             pending.ClearPrimary();pending.ClearDial();return;
         }
         MotionFrame output;
@@ -425,29 +426,34 @@ public string AppName{get;private set;}="";
         Console.WriteLine("Foreground browser tabs verified: same HWND entry/exit, title rename continuity, gesture release, re-entry and preview isolation.");
     }
     internal void VerifyHeldNavigation(){
-        var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession;
+        var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession,oldMoving=navigationWasMoving;
         try{
             cfg=(JsonObject)cfg.DeepClone();cfg["panSens"]=27;cfg["steadyCamera"]=true;cfg["spaceMouseCruise"]=false;
             var start=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
-            var client=new NativeServer.Client{App="chamfer3d",Version=2,Pose=start,BasePose=start};native=client;mode=NavMode.Navigate;navigationSession=true;
+            var client=new NativeServer.Client{App="chamfer3d",Version=2,Mode=NavMode.Navigate,Pose=start,BasePose=start};native=client;mode=NavMode.Navigate;navigationSession=true;
             pending.Reset();motionSamples.Reset();navigationMotion.Reset();motionSamples.Move(12,-8);pending.Wheel(60);
             Flush(timeMilliseconds:1000);var first=client.Pose!;
             for(int i=1;i<=125;i++)Flush(timeMilliseconds:1000+i*8);
             var after=client.Pose!;
             if(after.Eye.X<=first.Eye.X||after.Eye.Y<=first.Eye.Y||after.Eye.Z>=first.Eye.Z||client.Out.Count!=1)throw new InvalidOperationException("Held navigation did not continue right/up/forward without new reports.");
-            if(System.Numerics.Vector3.Distance(after.Target-after.Eye,start.Target-start.Eye)>.0001f||after.Up!=start.Up)throw new InvalidOperationException("Drone translation changed orientation or lens distance.");
+            if(Math.Abs(System.Numerics.Vector3.Distance(after.Target,after.Eye)-System.Numerics.Vector3.Distance(start.Target,start.Eye))>.001f||after.Up!=start.Up)throw new InvalidOperationException("Drone movement changed its up vector or lens distance.");
             motionSamples.Move(20,20);pending.Wheel(120);var stopped=client.Pose;int queued=client.Out.Count;
             Flush(finish:true,timeMilliseconds:2010);
             if(client.Pose!=stopped||client.Out.Count!=queued||pending.Peek().HasPrimary||motionSamples.Peek().HasPrimary)throw new InvalidOperationException("Navigation release applied pending motion or emitted a catch-up pose.");
             navigationMotion.Reset();client.Pose=null;motionSamples.Move(-12,8);Flush(timeMilliseconds:3000);
             if(!pending.Peek().HasPrimary)throw new InvalidOperationException("Navigation lost its first command before the scene handshake.");
             client.Pose=start;Flush(timeMilliseconds:3008);
-            if(client.Pose.Eye.X>=start.Eye.X||client.Pose.Eye.Y>=start.Eye.Y)throw new InvalidOperationException("Navigation handshake did not retain left/down direction.");
+            if(client.Pose.Eye.X>=start.Eye.X||client.Pose.Eye.Z<=start.Eye.Z)throw new InvalidOperationException("Navigation handshake did not retain left/back direction.");
+            client.Out.Clear();motionSamples.Move(12,-8);Flush(timeMilliseconds:3016);
+            if(client.Pose!=null||client.Out.Count!=2||ConfigStore.S(client.Out.First(),"t")!="end"||ConfigStore.S(client.Out.Last(),"t")!="begin")throw new InvalidOperationException("Returning to centre did not freeze the displayed view and request a fresh scene.");
+            client.Pose=client.BasePose=start;client.Out.Clear();Flush(timeMilliseconds:3024);
+            if(client.Pose!=start||client.Out.Count!=0)throw new InvalidOperationException("Centred navigation kept moving while the key remained held.");
+
         }finally{
             pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();glide.Reset();
-            cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;
+            cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;navigationWasMoving=oldMoving;
         }
-        Console.WriteLine("Held navigation verified: independent screen right/up and twist-forward commands, continuing motion, unchanged orientation, first-handshake retention, one queued pose and immediate release without catch-up.");
+        Console.WriteLine("Held navigation verified: independent ball right/forward and wheel-up commands, continuing motion, unchanged orientation, first-handshake retention, one queued pose and immediate release without catch-up.");
     }
     internal void VerifyImmediateStudioDelivery(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;var oldProfile=profile;var oldWindow=foregroundWindow;bool oldFocus=nativeFocusAllowed;
