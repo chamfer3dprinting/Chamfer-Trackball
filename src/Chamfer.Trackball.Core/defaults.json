@@ -756,7 +756,7 @@
         "invertTwist": false,
         "spaceMouseCruise": false,
         "navigationCruise": true,
-        "navigationLevelFlight": true,
+        "navigationLevelFlight": false,
         "navigationFreeLook": false,
         "threeAxisControls": true
       },
