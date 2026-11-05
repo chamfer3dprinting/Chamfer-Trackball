@@ -356,7 +356,7 @@ try{
  Check(savedPreset["presets"]!.AsArray().Count==1&&ConfigStore.S(savedPreset["presets"]![0],"name")=="Fine CAD","A named preset saves with a trimmed name");
  var presetSettings=savedPreset["presets"]![0]!["settings"]!;
  Check(ConfigStore.I(presetSettings,"pointerSpeed")==7&&ConfigStore.I(presetSettings["feel"],"glide")==64&&!ConfigStore.B(presetSettings["feel"],"smooth"),"Presets save pointer speed, glide and motion feel");
- Check(ConfigStore.S(presetSettings,"navigateKeys")=="win"&&ConfigStore.S(presetSettings,"leftWheelUpKeys")=="Ctrl+S"&&ConfigStore.S(presetSettings["gestures"]!["up"],"keys")=="F","Presets save navigation keys, wheels and gestures");
+ Check(ConfigStore.S(presetSettings,"navigateKeys")=="backtick"&&ConfigStore.S(presetSettings,"leftWheelUpKeys")=="Ctrl+S"&&ConfigStore.S(presetSettings["gestures"]!["up"],"keys")=="F","Presets save navigation keys, wheels and gestures");
  Check(!presetSettings.AsObject().ContainsKey("selectedDevice")&&!presetSettings.AsObject().ContainsKey("profiles")&&!presetSettings.AsObject().ContainsKey("theme"),"A program preset excludes device identity and unrelated app settings");
  library.Save(staleLibrary);Check(library.Snapshot()["presets"]!.AsArray().Count==1,"An older settings page cannot erase a newly saved preset");
  var reopenedLibrary=new ConfigStore(presetPath);reopenedLibrary.Select(0);
