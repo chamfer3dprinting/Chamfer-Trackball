@@ -681,7 +681,8 @@
         "spaceMouseCruise": false,
         "navigationCruise": false,
         "navigationLevelFlight": false,
-        "navigationFreeLook": false
+        "navigationFreeLook": false,
+        "threeAxisControls": false
       },
       "modeButtons": {},
       "combos": [
@@ -712,7 +713,7 @@
           "tap": "click"
         },
         "back": {
-          "action": "panToggle",
+          "action": "faceSnap",
           "tap": "click"
         },
         "right": {
@@ -733,7 +734,7 @@
         1
       ],
       "orbitKeys": "shift",
-      "panKeys": "ctrl+shift",
+      "panKeys": "alt",
       "zoomKeys": "ctrl",
       "gestures": {},
       "pointerSpeed": 10,
@@ -755,12 +756,13 @@
         "invertTwist": false,
         "spaceMouseCruise": false,
         "navigationCruise": true,
-        "navigationLevelFlight": false,
-        "navigationFreeLook": false
+        "navigationLevelFlight": true,
+        "navigationFreeLook": false,
+        "threeAxisControls": true
       },
       "modeButtons": {},
       "combos": [],
-      "snapKeys": "alt",
+      "snapKeys": "none",
       "navigateKeys": "backtick",
       "circleZoom": true,
       "circleSize": 160,
@@ -797,7 +799,8 @@
     "invertTwist": false,
     "navigationCruise": false,
     "navigationLevelFlight": false,
-    "navigationFreeLook": false
+    "navigationFreeLook": false,
+    "threeAxisControls": false
   },
   "snapKeys": "none",
   "navigateKeys": "none",
@@ -819,5 +822,6 @@
   "spaceMouseCruise": false,
   "navigationCruise": false,
   "navigationLevelFlight": false,
-  "navigationFreeLook": false
+  "navigationFreeLook": false,
+  "threeAxisControls": false
 }

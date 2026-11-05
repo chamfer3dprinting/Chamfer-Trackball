@@ -90,6 +90,7 @@ jobs:
             ${{ runner.temp }}/chamfer-navigation-trace.json
             ${{ runner.temp }}/chamfer-level-flight-trace.json
             ${{ runner.temp }}/chamfer-free-look-trace.json
+            ${{ runner.temp }}/chamfer-three-axis-trace.json
             ${{ runner.temp }}/*-ui.png
             ${{ runner.temp }}/*-guide.png
             ${{ runner.temp }}/*-smoke.stdout

@@ -548,7 +548,7 @@ Check(acceptedOverlap.EstimatedTwist,"A mathematically identical horizontal roll
 var estimateDefaults=ConfigStore.Defaults();
 Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate"),"Normal mouse does not estimate 3D twist");
 ConfigStore.LoadProgram(estimateDefaults,1);
-Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="alt","The 3D default separates ball faces and left-wheel orientation turns under Alt");
+Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="none"&&ConfigStore.S(estimateDefaults["buttons"]?["back"],"action")=="faceSnap","The 3D default uses the top-right button for one-click face snapping");
 
 
 var obliqueEstimate=new EstimatedFaceSnap();var obliqueStart=studioView with{Eye=new Vector3(4,6,10)};
@@ -599,6 +599,7 @@ ForegroundAppChecks.Run(Check);
 CameraResponseChecks.Run(Check);
 NativeDeliveryChecks.Run(Check);
 NavigationChecks.Run(Check);
+ThreeAxisChecks.Run(Check);
 LevelFlightChecks.Run(Check);
 FreeLookChecks.Run(Check);
 HeldRateChecks.Run(Check);
