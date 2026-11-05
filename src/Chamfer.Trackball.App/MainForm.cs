@@ -337,6 +337,7 @@ internal sealed class MainForm:Form{
             controller.VerifyCameraResponse();
             controller.VerifyHeldNavigation();
             controller.VerifyLevelFlight();
+            controller.VerifyFreeLook();
             controller.VerifyImmediateStudioDelivery();
             controller.VerifySnapWheelRouting();
             controller.VerifyKnobHandshake();

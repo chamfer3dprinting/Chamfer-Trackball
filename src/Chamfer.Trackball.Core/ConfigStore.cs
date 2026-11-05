@@ -117,7 +117,7 @@ public sealed class ConfigStore {
             if(i==current&&S(p,"name")==S(config["programs"]![current],"name"))next["twistCalibration"]=config["twistCalibration"]?.DeepClone();
             foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
             p["feel"]??=new JsonObject();
-            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise","navigationCruise","navigationLevelFlight"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
+            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise","navigationCruise","navigationLevelFlight","navigationFreeLook"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
             next["feel"]=p["feel"]!.DeepClone();
             Validate(next);Write(next);config=next;Revision++;
         }
@@ -226,6 +226,7 @@ public sealed class ConfigStore {
             if(preset?["settings"] is JsonObject settings){
                 settings["feel"]??=new JsonObject();
                 if(!settings["feel"]!.AsObject().ContainsKey("navigationLevelFlight"))settings["feel"]!["navigationLevelFlight"]=false;
+                if(!settings["feel"]!.AsObject().ContainsKey("navigationFreeLook"))settings["feel"]!["navigationFreeLook"]=false;
             }
         }
         TrackballDevices.Normalize(c);

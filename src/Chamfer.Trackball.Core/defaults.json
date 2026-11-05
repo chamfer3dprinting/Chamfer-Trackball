@@ -680,7 +680,8 @@
         "invertTwist": false,
         "spaceMouseCruise": false,
         "navigationCruise": false,
-        "navigationLevelFlight": false
+        "navigationLevelFlight": false,
+        "navigationFreeLook": false
       },
       "modeButtons": {},
       "combos": [
@@ -754,7 +755,8 @@
         "invertTwist": false,
         "spaceMouseCruise": false,
         "navigationCruise": true,
-        "navigationLevelFlight": false
+        "navigationLevelFlight": false,
+        "navigationFreeLook": false
       },
       "modeButtons": {},
       "combos": [],
@@ -794,7 +796,8 @@
     "twistAxis": "x",
     "invertTwist": false,
     "navigationCruise": false,
-    "navigationLevelFlight": false
+    "navigationLevelFlight": false,
+    "navigationFreeLook": false
   },
   "snapKeys": "none",
   "navigateKeys": "none",
@@ -815,5 +818,6 @@
   "trackballs": [],
   "spaceMouseCruise": false,
   "navigationCruise": false,
-  "navigationLevelFlight": false
+  "navigationLevelFlight": false,
+  "navigationFreeLook": false
 }

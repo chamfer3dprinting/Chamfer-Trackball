@@ -43,8 +43,29 @@ public static class CameraMath {
         }
         return mode==NavMode.Zoom?Zoom(c,-dy*.008f+wheel*.0015f):c;
     }
-    public static CameraPose Fly(CameraPose c,NavigationFrame motion,float gain=1,float turnGain=1,bool levelFlight=false){
-        if(!c.Valid||!float.IsFinite(gain)||!float.IsFinite(turnGain)||!float.IsFinite(motion.Right)||!float.IsFinite(motion.Up)||!float.IsFinite(motion.Forward)||!float.IsFinite(motion.Yaw))throw new ArgumentException("Invalid navigation camera.");
+    public static CameraPose Look(CameraPose c,float dx,float dy,float gain=1){
+        if(!c.Valid||!float.IsFinite(dx)||!float.IsFinite(dy)||!float.IsFinite(gain))throw new ArgumentException("Invalid free-look camera.");
+        dx=Math.Clamp(dx,-1000,1000)*gain;dy=Math.Clamp(dy,-1000,1000)*gain;
+        if(dx==0&&dy==0)return c;
+        var worldUp=c.WorldUpAxis;var forward=Unit(c.Target-c.Eye);
+        var yaw=Quaternion.CreateFromAxisAngle(worldUp,-dx*.005f);
+        var aimed=Unit(Vector3.Transform(forward,yaw));var up=Unit(Vector3.Transform(c.Up,yaw));
+        var right=Vector3.Cross(aimed,worldUp);
+        if(right.LengthSquared()<1e-10f)right=Vector3.Transform(Unit(Vector3.Cross(c.Up,-forward)),yaw);
+        right=Unit(right);
+        float elevation=MathF.Asin(Math.Clamp(Vector3.Dot(aimed,worldUp),-1,1));
+        const float limit=MathF.PI/2-.01f;
+        float pitch=Math.Clamp(elevation-dy*.005f,-limit,limit)-elevation;
+        var tilt=Quaternion.CreateFromAxisAngle(right,pitch);var rotation=Quaternion.Normalize(tilt*yaw);
+        float distance=Vector3.Distance(c.Target,c.Eye);
+        return c with{Target=c.Eye+Unit(Vector3.Transform(aimed,tilt))*distance,Up=Unit(Vector3.Transform(up,tilt)),Pivot=c.Eye+Vector3.Transform(c.Pivot-c.Eye,rotation),ZoomPivot=c.ZoomPivot is Vector3 anchor?c.Eye+Vector3.Transform(anchor-c.Eye,rotation):null};
+    }
+    public static CameraPose Fly(CameraPose c,NavigationFrame motion,float gain=1,float turnGain=1,bool levelFlight=false,bool freeLook=false){
+        if(!c.Valid||!float.IsFinite(gain)||!float.IsFinite(turnGain)||!float.IsFinite(motion.Right)||!float.IsFinite(motion.Up)||!float.IsFinite(motion.Forward)||!float.IsFinite(motion.Yaw)||!float.IsFinite(motion.Pitch))throw new ArgumentException("Invalid navigation camera.");
+        if(freeLook){
+            c=Look(c,motion.Yaw,-motion.Pitch,turnGain);
+            motion=motion with{Yaw=0,Pitch=0};
+        }
         var back=Unit(c.Eye-c.Target);var right=Unit(Vector3.Cross(c.Up,back));var up=Unit(Vector3.Cross(back,right));
         float depth=MathF.Max(1e-5f,MathF.Abs(Vector3.Dot(c.Eye-c.Pivot,back)));
         float pixel=(c.Orthographic?c.OrthoHeight:2*depth*MathF.Tan(c.VerticalFov/2))/c.Height;

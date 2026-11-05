@@ -33,6 +33,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Backtick-only look and travel
+
+The owner rejects the proposed Navigate+Alt look chord and explicitly requires Backtick alone. Add an opt-in program/preset-scoped Look and travel together option: ball deflection sets travel plus yaw/pitch rates with only Navigate held. Forward/back also tilts up/down; sideways also turns; scroll retains height. Return near the virtual centre or release Navigate to stop both. Current level-flight preference and all speeds remain unchanged. Save Before free look and Backtick free look presets for reversibility.
+
+This newer instruction supersedes the prior Alt-look proposal. Do not ship the extra Alt requirement or its input buffer/routing changes. Keep the prior travel-only behavior when the option is off. Use Orbit/3D sensitivity for view rate and Pan/3D speed for travel, limit pitch before flipping and coalesce the resulting camera pose. Add opt-in persistence/rollback, coupled movement/look, zero-speed, centre/release and actual Controller/handshake checks, plus rendered desktop/private-web traces. Installation and physical evaluation are pending.
+
 # 2026-11-04 — Level-flight trial delivered in Admin 1.5.48
 
 Admin v1.5.48 is installed from source ed629fb47e030cf5069cffe31e65778a4b8e4cd4. Release 434712360 / main workflow 41955848929 pass 1,221 core checks, syntax/integration checks and both actual executables. Installed SHA-256 matches 653a1584982c6d535b00d8530663998ae4acb0d2f1aefa72d5fbbddb19d26257; local bridge reports 1.5.48. Admin and Studio are reopened and responding. The option remains off by default for existing/public programs.

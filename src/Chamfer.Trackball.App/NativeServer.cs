@@ -73,10 +73,10 @@ internal sealed class NativeServer:IDisposable {
             Queue(c,new(){["t"]="end",["session"]=c.Session});StartSession(c,NavMode.Navigate);
         }
     }
-    public bool Fly(Client c,NavigationFrame motion,float gain,float turnGain=1,bool levelFlight=false){
+    public bool Fly(Client c,NavigationFrame motion,float gain,float turnGain=1,bool levelFlight=false,bool freeLook=false){
         lock(c.Gate){
             if(c.Version<2||c.Pose==null)return false;
-            c.Pose=CameraMath.Fly(c.Pose,motion,gain,turnGain,levelFlight);Queue(c,PoseMessage(c));return true;
+            c.Pose=CameraMath.Fly(c.Pose,motion,gain,turnGain,levelFlight,freeLook);Queue(c,PoseMessage(c));return true;
         }
     }
     public bool PendingSnap(Client? c){if(c==null)return false;lock(c.Gate)return c.EstimateTwist&&c.EstimatedSnap.Pending;}

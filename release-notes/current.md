@@ -1,3 +1,11 @@
+# Backtick-only look and travel
+
+- Enable Look and travel together and hold only Backtick/Navigate.
+- Forward/back rolls move and tilt the view up/down; sideways rolls move sideways and turn left/right.
+- Scroll keeps height control. Return near centre or release Navigate to stop both movement and looking.
+- Preserve the level-flight choice, sensitivities, Shift orbit and Alt snapping outside navigation.
+- Save the choice with programs/presets; turn it off for the previous travel-only behavior.
+
 # Optional level-flight navigation trial
 
 - Keep forward/back and sideways travel level even while looking up or down.
