@@ -86,6 +86,7 @@ jobs:
           name: verification
           path: |
             ${{ runner.temp }}/chamfer-ui-smoke.*
+            ${{ runner.temp }}/chamfer-orientation-trace.json
             ${{ runner.temp }}/*-ui.png
             ${{ runner.temp }}/*-guide.png
             ${{ runner.temp }}/*-smoke.stdout

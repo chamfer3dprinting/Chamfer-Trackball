@@ -497,7 +497,7 @@ foreach(var axis in new[]{Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.Un
  Check(Vector3.Distance(view.Up,initial.Up)<.0001,"Four knob snaps return to the original orientation on "+axis);
  foreach(var direction in new[]{new Vector2(1000,5),new Vector2(-1000,-5),new Vector2(5,1000),new Vector2(-5,-1000)}){
   var input=new FaceSnap();input.Reset(initial);var next=input.Step(initial,direction.X,direction.Y,0,.2f,1000);
-  Check(Math.Abs(Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),axis))<.001&&input.Orientation==0&&!input.Turning,"A noisy Alt direction selects one adjacent face on "+axis+" for "+direction);
+  Check(Math.Abs(Vector3.Dot(Vector3.Normalize(next.Eye-next.Target),axis))<.001&&next.Valid&&!input.Turning,"A noisy Alt direction selects one adjacent face on "+axis+" for "+direction);
  }
 }
 var limited=new FaceSnap();limited.Reset(studioView);var snapPreviousFace=studioView;int changes=0;bool adjacent=true;
@@ -597,4 +597,5 @@ TrackballDeviceChecks.Run(Check);
 ForegroundAppChecks.Run(Check);
 CameraResponseChecks.Run(Check);
 HeldRateChecks.Run(Check);
+CameraOrientationChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

@@ -1,3 +1,9 @@
+## Consistent orbit and cube-face orientation
+- Diagonal rolls now use one 3D rotation, avoiding unintended tilt when the same movement arrives in differently sized reports.
+- Reverse a roll to return to its starting orientation; keep the cursor pivot and screen-relative directions.
+- Preserve face orientation through neighboring cube faces instead of resetting to canonical world-up at each step.
+- Keep exact Alt 90° turns, existing controls, devices and saved presets.
+
 ## Gentle held cruise and smoother Studio presentation
 - Optional **Buttons & keys → Extras → Hold to cruise (trial)**: a small roll sets a gentle camera speed while a native navigation key is held. Release the key or click to stop.
 - Keep a fine centre, bounded faster movement, immediate release/reset, configured sensitivity and program/preset persistence.
