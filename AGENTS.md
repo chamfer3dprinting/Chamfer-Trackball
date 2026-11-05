@@ -34,6 +34,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Navigation-only drone hold
+
+The owner supersedes the broad SpaceMouse/cruise request: keep orbit and zoom unchanged and make only the Navigate hold continue until released. Their confirmed mapping is ball up/down/left/right with twist forward/back. Add program/preset-scoped Continuous navigation, on in the 3D default and off for Normal mouse. Preserve existing keys, buttons, wheels, device settings and speed gains. Camera translation follows the current view, keeps its orientation/lens and carries its anchors. Each input adjusts a bounded velocity; release/click/focus/device/mode interruption clears all axes without applying pending travel. Existing general cruise stays off.
+
+Use an active-only waitable 8 ms clock that posts at most one callback to the UI thread. Fall back to the normal timer if unavailable. A hidden in-memory clock probe on the owner PC measured median 8.12 ms / p95 8.59 ms, versus the prior WinForms 15.81 ms median. No source checkout or development folder was created for Trackball. Add core direction/persistence/migration checks, actual Controller hold/release/handshake smoke checks, idle/canceled-clock/restart checks and an exported synthetic camera trace for rendered desktop/web replay. Workflow validation, installation and physical evaluation are pending. Do not enable continuous orbit or zoom; this newer request supersedes earlier commentary about doing so.
+
 # 2026-11-04 — Deliver and verify immediate Studio response
 
 Admin v1.5.44 is installed and its SHA-256 matches the release asset: 863b7d2de9b2a03f87104c4095e23fb807bc85632592ab40365f102b0148407d. Runtime source 7da6f78dde6f187092756d446a55f1f023efa8ac, main workflow 41945041997 passes 862 core checks, syntax and both actual-executable/native interface tests. The bridge reports 1.5.44 and Admin responds after restart. The corresponding public executable remains an unpublished candidate; no public stable promotion occurred.

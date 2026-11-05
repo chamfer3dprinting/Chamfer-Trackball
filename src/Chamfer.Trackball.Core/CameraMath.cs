@@ -43,6 +43,14 @@ public static class CameraMath {
         }
         return mode==NavMode.Zoom?Zoom(c,-dy*.008f+wheel*.0015f):c;
     }
+    public static CameraPose Fly(CameraPose c,NavigationFrame motion,float gain=1){
+        if(!c.Valid||!float.IsFinite(gain)||!float.IsFinite(motion.Right)||!float.IsFinite(motion.Up)||!float.IsFinite(motion.Forward))throw new ArgumentException("Invalid navigation camera.");
+        var back=Unit(c.Eye-c.Target);var right=Unit(Vector3.Cross(c.Up,back));var up=Unit(Vector3.Cross(back,right));
+        float depth=MathF.Max(1e-5f,MathF.Abs(Vector3.Dot(c.Eye-c.Pivot,back)));
+        float pixel=(c.Orthographic?c.OrthoHeight:2*depth*MathF.Tan(c.VerticalFov/2))/c.Height;
+        var step=(right*motion.Right+up*motion.Up-back*motion.Forward)*(pixel*gain);
+        return c with{Eye=c.Eye+step,Target=c.Target+step,Pivot=c.Pivot+step,ZoomPivot=c.ZoomPivot+step};
+    }
     internal static Vector3? RotateZoomPivot(CameraPose c,Quaternion q)=>c.ZoomPivot is Vector3 p?c.Pivot+Vector3.Transform(p-c.Pivot,q):null;
     internal static int FaceOrientation(CameraPose pose,Vector3 face){
         var canonical=AlignFace(pose,face).Up;
