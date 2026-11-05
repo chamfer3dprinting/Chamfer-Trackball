@@ -14,7 +14,7 @@ internal sealed class NativeServer:IDisposable {
         public string Id=Guid.NewGuid().ToString("N"),App="",Session="";
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
         public NavMode Mode=NavMode.Idle;
-        public bool Focus=true,SnapTwist,EstimateTwist,SmoothPresentation;public float TwistGain=1;public string TwistAxis="x";public bool ReverseTwist;public TwistCalibrationModel? TwistCalibration;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
+        public bool Focus=true,SnapTwist,EstimateTwist,SmoothPresentation;public float TwistGain=1,DisplayResponseMs=12;public string TwistAxis="x";public bool ReverseTwist;public TwistCalibrationModel? TwistCalibration;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
         public readonly SemaphoreSlim OutSignal=new(0,1);
         public object Gate=new();
@@ -29,9 +29,9 @@ internal sealed class NativeServer:IDisposable {
     public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
     public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
-    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null,bool smoothPresentation=false){
+    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null,bool smoothPresentation=false,float displayResponseMs=12){
         lock(c.Gate){
-            c.SmoothPresentation=smoothPresentation;c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;
+            c.SmoothPresentation=smoothPresentation;c.DisplayResponseMs=NativeDelivery.DisplayResponse(displayResponseMs);c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;
             c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();
             StartSession(c,mode,x,y);
         }
@@ -39,7 +39,7 @@ internal sealed class NativeServer:IDisposable {
     void StartSession(Client c,NavMode mode,int? x=null,int? y=null){
         c.Mode=mode;c.Began=DateTime.UtcNow;c.Session=Guid.NewGuid().ToString("N");
         c.Pose=c.BasePose=null;c.Snap.Reset();
-        var message=new JsonObject{["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["responseMs"]=c.SmoothPresentation?12:0};
+        var message=new JsonObject{["t"]="begin",["session"]=c.Session,["mode"]=mode.ToString(),["responseMs"]=c.SmoothPresentation?c.DisplayResponseMs:0};
         if(x.HasValue&&y.HasValue){message["x"]=x.Value;message["y"]=y.Value;}
         Queue(c,message);
     }

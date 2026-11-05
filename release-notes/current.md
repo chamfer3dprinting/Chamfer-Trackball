@@ -1,3 +1,10 @@
+# Immediate native Kensington response
+
+- Deliver held SlimBlade navigation to Chamfer Studio as raw reports arrive, with one display-based smoothing stage.
+- Apply the saved short camera response instead of adding a fixed second delay.
+- Keep curved held panning as pan; real twist scrolling provides zoom.
+- Preserve exact Alt face/90° turns, other trackballs, normal mouse controls, presets and custom bindings.
+
 ## Consistent orbit and cube-face orientation
 - Diagonal rolls now use one 3D rotation, avoiding unintended tilt when the same movement arrives in differently sized reports.
 - Reverse a roll to return to its starting orientation; keep the cursor pivot and screen-relative directions.
