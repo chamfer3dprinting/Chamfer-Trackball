@@ -5,7 +5,9 @@ using Chamfer.Trackball.Core;
 internal static class NavigationChecks {
     static CameraPose Pose()=>new(new(0,0,200),Vector3.Zero,Vector3.UnitY,Vector3.Zero,.8f,200,1200,800,false,Vector3.UnitY,Vector3.Zero);
     public static void Run(Action<bool,string> check){
-        var rate=new NavigationMotion();var a=rate.Step(12,-8,60,1000);var b=rate.Step(0,0,0,1008);
+        var rate=new NavigationMotion();rate.Reset();var ball=rate.Step(0,-12,0,900);check(ball.Forward>0&&ball.Up==0&&ball.Right==0,"Ball forward controls depth without changing height");
+        rate.Reset();var scroll=rate.Step(0,0,60,950);check(scroll.Up>0&&scroll.Forward==0&&scroll.Right==0,"Scroll up controls height without changing depth");
+        rate.Reset();var a=rate.Step(12,-8,60,1000);var b=rate.Step(0,0,0,1008);
         check(a.Right>0&&a.Up>0&&a.Forward>0&&b.Right>a.Right,"Drone controls combine right/up/forward and continue without new movement");
         check(!rate.Step(0,0,0,1016,true).Active&&!rate.Step(0,0,0,1024).Active,"Navigation key release immediately clears every velocity");
         rate.Reset();check(!rate.Step(1,1,0,2000).Active,"One-count sensor noise does not launch the drone");
@@ -33,6 +35,7 @@ internal static class NavigationChecks {
             var store=new ConfigStore(file);check(!ConfigStore.B(store.Snapshot(),"navigationCruise"),"Normal mouse leaves continuous navigation off");
             store.Select(1);var cfg=store.Snapshot();check(ConfigStore.B(cfg,"navigationCruise")&&!ConfigStore.B(cfg,"spaceMouseCruise"),"3D default enables only navigation continuity, not orbit/pan/zoom cruise");
             var original=cfg["programs"]![0]!.DeepClone();cfg["navigationCruise"]=false;store.Save(cfg);store.SavePreset("Direct navigation");cfg=store.Snapshot();cfg["navigationCruise"]=true;store.Save(cfg);store.SavePreset("Drone navigation");
+            cfg=store.Snapshot();cfg["configVersion"]=30;store.Save(cfg);check(ConfigStore.I(JsonNode.Parse(File.ReadAllText(file)),"configVersion")==31,"An older interface save cannot downgrade the navigation schema");
             var reopened=new ConfigStore(file);check(ConfigStore.B(reopened.Snapshot(),"navigationCruise")&&JsonNode.DeepEquals(original,reopened.Snapshot()["programs"]![0]),"Navigation choice persists without modifying Normal mouse");
             reopened.ApplyPreset(0);check(!ConfigStore.B(reopened.Snapshot(),"navigationCruise"),"Saved preset restores direct navigation");
             reopened.ApplyPreset(1);check(ConfigStore.B(reopened.Snapshot(),"navigationCruise"),"Saved preset restores drone navigation");
@@ -44,7 +47,7 @@ internal static class NavigationChecks {
     static object View(CameraPose p)=>new{eye=new[]{p.Eye.X,p.Eye.Y,p.Eye.Z},target=new[]{p.Target.X,p.Target.Y,p.Target.Z},up=new[]{p.Up.X,p.Up.Y,p.Up.Z},pivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},zoomPivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},verticalFov=p.VerticalFov,orthoHeight=p.OrthoHeight,width=p.Width,height=p.Height,orthographic=p.Orthographic};
     static void ExportTrace(){
         var cases=new List<object>();
-        foreach(var sample in new[]{("drone-right",12f,0f,0f),("drone-up",0f,-12f,0f),("drone-forward",0f,0f,60f),("drone-combined",12f,-8f,60f)}){
+        foreach(var sample in new[]{("drone-right",12f,0f,0f),("drone-up",0f,0f,60f),("drone-forward",0f,-12f,0f),("drone-combined",12f,-8f,60f)}){
             var start=Pose();var pose=start;var rate=new NavigationMotion();var poses=new List<object>();
             for(int i=0;i<32;i++){var motion=rate.Step(i==0?sample.Item2:0,i==0?sample.Item3:0,i==0?sample.Item4:0,1000+i*8);pose=CameraMath.Fly(pose,motion,MotionPolicy.Gain(27));poses.Add(View(pose));}
             cases.Add(new{label=sample.Item1,mode="Navigate",start=View(start),poses});

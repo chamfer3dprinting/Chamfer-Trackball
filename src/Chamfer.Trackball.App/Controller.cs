@@ -442,12 +442,12 @@ public string AppName{get;private set;}="";
             navigationMotion.Reset();client.Pose=null;motionSamples.Move(-12,8);Flush(timeMilliseconds:3000);
             if(!pending.Peek().HasPrimary)throw new InvalidOperationException("Navigation lost its first command before the scene handshake.");
             client.Pose=start;Flush(timeMilliseconds:3008);
-            if(client.Pose.Eye.X>=start.Eye.X||client.Pose.Eye.Y>=start.Eye.Y)throw new InvalidOperationException("Navigation handshake did not retain left/down direction.");
+            if(client.Pose.Eye.X>=start.Eye.X||client.Pose.Eye.Z<=start.Eye.Z)throw new InvalidOperationException("Navigation handshake did not retain left/back direction.");
         }finally{
             pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();glide.Reset();
             cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;
         }
-        Console.WriteLine("Held navigation verified: independent screen right/up and twist-forward commands, continuing motion, unchanged orientation, first-handshake retention, one queued pose and immediate release without catch-up.");
+        Console.WriteLine("Held navigation verified: independent ball right/forward and wheel-up commands, continuing motion, unchanged orientation, first-handshake retention, one queued pose and immediate release without catch-up.");
     }
     internal void VerifyImmediateStudioDelivery(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;var oldProfile=profile;var oldWindow=foregroundWindow;bool oldFocus=nativeFocusAllowed;

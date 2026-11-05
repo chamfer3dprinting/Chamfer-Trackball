@@ -23,7 +23,7 @@ public sealed class NavigationMotion {
         double dt=double.IsNaN(previous)?1.0/125:(milliseconds-previous)/1000;
         if(dt<=0||dt>.1){Reset();dt=1.0/125;}
         previous=milliseconds;
-        right=Math.Clamp(right+dx,-40,40);up=Math.Clamp(up-dy,-40,40);forward=Math.Clamp(forward+scroll/4,-40,40);
+        right=Math.Clamp(right+dx,-40,40);up=Math.Clamp(up+scroll/4,-40,40);forward=Math.Clamp(forward-dy,-40,40);
         return new(Advance(ref vr,Target(right),dt),Advance(ref vu,Target(up),dt),Advance(ref vf,Target(forward),dt));
     }
     public void Reset(){right=up=forward=vr=vu=vf=0;previous=double.NaN;}

@@ -1,3 +1,11 @@
+# Ball travel and wheel height navigation
+
+- Hold Windows/Navigate: roll forward/back to move forward/back, roll left/right to move sideways, and scroll up/down to move up/down.
+- Kensington twist supplies the scroll input for height.
+- Small rolls set continuing movement. Roll back to slow or reverse; release Navigate to stop every axis immediately.
+- Keep direct orbit/zoom and all existing sensitivity values.
+- Preserve the current settings schema when an older interface saves.
+
 # Navigation-only drone control
 
 - Hold Windows (or your Navigate binding) and roll the ball up/down/left/right to set camera travel.

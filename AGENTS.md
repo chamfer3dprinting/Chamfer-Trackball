@@ -34,6 +34,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Final navigation mapping: wheel height, ball travel
+
+The owner replaces the preceding drone mapping: while Windows/Navigate is held, ball forward/back moves along the current view, ball left/right strafes, and scroll up/down (Kensington twist) controls up/down. Keep continuous travel until Navigate release and keep orbit/zoom unchanged. Swap only the two NavigationMotion input channels and update the guide/instructions. Existing per-axis 3D speed scaling is unchanged. Add explicit ball-depth and wheel-height isolation checks.
+
+Admin 1.5.45 was installed and verified from 27cd9a78 / workflow 41948603062 before this latest mapping change. A post-install check finds the UI can resave an older configVersion; force the current schema on Save and add a regression. The saved 3D-controls enabled flag was false before installation and is now true after UI interaction; preserve the current value and avoid claiming that field was unchanged. All sensitivity values and prior controls remain unchanged. The two local navigation presets are already saved; retain them.
+
 # 2026-11-04 — Navigation-only drone hold
 
 The owner supersedes the broad SpaceMouse/cruise request: keep orbit and zoom unchanged and make only the Navigate hold continue until released. Their confirmed mapping is ball up/down/left/right with twist forward/back. Add program/preset-scoped Continuous navigation, on in the 3D default and off for Normal mouse. Preserve existing keys, buttons, wheels, device settings and speed gains. Camera translation follows the current view, keeps its orientation/lens and carries its anchors. Each input adjusts a bounded velocity; release/click/focus/device/mode interruption clears all axes without applying pending travel. Existing general cruise stays off.

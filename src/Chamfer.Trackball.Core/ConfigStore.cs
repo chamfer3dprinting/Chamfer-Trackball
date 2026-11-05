@@ -84,7 +84,7 @@ public sealed class ConfigStore {
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
     public void Save(JsonObject incoming) {
         lock(gate){
-            var next=(JsonObject)incoming.DeepClone();Normalize(next);
+            var next=(JsonObject)incoming.DeepClone();Normalize(next);next["configVersion"]=31;
             // Device identity comes from Raw Input, not a possibly stale settings page.
             bool sameDevice=S(incoming,"selectedDevice").Equals(S(config,"selectedDevice"),StringComparison.OrdinalIgnoreCase);
             next["selectedDevice"]=config["selectedDevice"]?.DeepClone()??JsonValue.Create("");
