@@ -33,6 +33,12 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-04 — Free look while navigating
+
+The owner clarifies the real issue is changing where the camera faces, including looking up/down, and selects freely looking around while navigating rather than cube-face snapping. Add Backtick/Navigate + Alt + ball free look; release Alt for travel input again and release Navigate to stop both. Existing travel velocity and scroll height can continue during look. Pause automatic diagonal yaw while Alt-look controls the view, retain the virtual travel centre, and use Orbit/3D sensitivity for yaw/pitch. Clamp pitch short of the pole to avoid flipping; keep eye position and lens distance while aiming and retain existing roll. Preserve Shift orbit, Alt face snapping outside navigation, current level-flight choice, presets and speed values.
+
+Use a separate pending look buffer so aim motion never becomes a travel command, retain first look through a scene handshake and discard pending look on release/focus/device stop. Coalesce look and travel into one absolute camera output. Add core angle/pole/batching/roll/gain checks, movement-plus-look and actual Controller handshake/release tests, plus rendered desktop/private-web traces before delivery. The installed Admin remains 1.5.48 until validation and installation finish. The preceding level-flight trial changes travel only; it was not the requested free-look fix.
+
 # 2026-11-04 — Level-flight trial delivered in Admin 1.5.48
 
 Admin v1.5.48 is installed from source ed629fb47e030cf5069cffe31e65778a4b8e4cd4. Release 434712360 / main workflow 41955848929 pass 1,221 core checks, syntax/integration checks and both actual executables. Installed SHA-256 matches 653a1584982c6d535b00d8530663998ae4acb0d2f1aefa72d5fbbddb19d26257; local bridge reports 1.5.48. Admin and Studio are reopened and responding. The option remains off by default for existing/public programs.

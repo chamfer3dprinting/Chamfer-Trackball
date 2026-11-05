@@ -37,7 +37,7 @@ internal sealed class GuideForm:Form{
    string label=a=="normal"?defaults[i]:a switch{"keys"=>ConfigStore.S(s["bindings"]?[names[i]],"keys"),"panToggle"=>"Orbit / pan","lock3d"=>"3D on/off",_=>a};
    g.DrawString(label,tiny,text,new RectangleF(x+47,y+3,109,21));
   }
-  var mode=ConfigStore.S(s,"mode");bool drone=mode=="Navigate"&&ConfigStore.B(s,"navigationActive");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>drone?(ConfigStore.B(s,"levelFlight")?"Level flight":"Drone navigation"):"Navigate","Snap"=>ConfigStore.S(s,"snapLabel","Snap faces"),"Roll"=>"Twist",_=>mode};
+  var mode=ConfigStore.S(s,"mode");bool drone=mode=="Navigate"&&ConfigStore.B(s,"navigationActive");bool looking=drone&&ConfigStore.B(s,"looking");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>looking?"Free look":drone?(ConfigStore.B(s,"levelFlight")?"Level flight":"Drone navigation"):"Navigate","Snap"=>ConfigStore.S(s,"snapLabel","Snap faces"),"Roll"=>"Twist",_=>mode};
   var measure=g.MeasureString(title,bold);g.DrawString(title,bold,mode=="Idle"?text:accent,(330-measure.Width)/2,99);
   string program="Program: "+ConfigStore.S(s,"program");var pm=g.MeasureString(program,font);g.DrawString(program,font,muted,(330-pm.Width)/2,123);
   using var ball=new SolidBrush(Color.FromArgb(12,16,18));
@@ -47,8 +47,8 @@ internal sealed class GuideForm:Form{
   foreach(int yy in new[]{218,227,236}){g.DrawLine(line,37-(yy-218)/2,yy,128+(yy-218)/2,yy);g.DrawLine(line,194-(yy-218)/2,yy,287+(yy-218)/2,yy);}
   string roll=mode switch{"Idle"=>"Pointer","Orbit"=>"Orbit","PanZoom"=>"Pan","Zoom"=>"Zoom","Snap"=>"Snap","Roll"=>"Turn face","Navigate"=>"Move",_=>mode};
   string wheel=mode=="Orbit"?"Roll":mode=="Idle"?"Scroll":mode=="Snap"?"Turn face":mode=="Navigate"?(drone?"Up / down":"Turn"):"Zoom";
-  g.DrawString(drone?"Ball: Forward/back/sideways · Scroll: Up/down":mode=="Snap"?"Ball: Faces   ·   Left wheel: 90°":"Roll: "+roll+"   ·   Wheel: "+wheel,font,text,drone?13:mode=="Snap"?35:53,249);
-  if(drone)g.DrawString(ConfigStore.B(s,"levelFlight")?"Forward: level travel · Scroll: height":"Diagonal: travel + turn · sideways: strafe",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
+  g.DrawString(looking?"Ball: Look up/down/left/right · Scroll: height":drone?"Ball: Forward/back/sideways · Scroll: Up/down":mode=="Snap"?"Ball: Faces   ·   Left wheel: 90°":"Roll: "+roll+"   ·   Wheel: "+wheel,font,text,drone?13:mode=="Snap"?35:53,249);
+  if(drone)g.DrawString(looking?"Alt: look · release Alt: travel":ConfigStore.B(s,"levelFlight")?"Forward: level travel · Scroll: height":"Diagonal: travel + turn · sideways: strafe",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
   g.DrawLine(line,12,301,318,301);
   var keys=new HashSet<int>(s["keys"]!.AsArray().Select(key=>key!.GetValue<int>()));
   int shortcutRow=0;
@@ -59,7 +59,7 @@ internal sealed class GuideForm:Form{
    g.DrawString(label,tiny,held?accent:muted,new RectangleF(13,y,156,18));
    g.DrawString(ConfigStore.S(item,"label"),tiny,held?accent:text,180,y);
   }
-  string footer=drone?"Roll back to centre or release Navigate: stop":ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";
+  string footer=looking?"Release Navigate to stop travel and looking":drone?"Roll back to centre or release Navigate: stop":ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";
   g.DrawString(footer,tiny,mode is "Snap" or "Roll"?accent:muted,new RectangleF(13,412,304,18));
 
  }

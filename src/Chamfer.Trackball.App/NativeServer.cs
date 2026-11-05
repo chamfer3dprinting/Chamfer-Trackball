@@ -65,6 +65,12 @@ internal sealed class NativeServer:IDisposable {
             Queue(c,PoseMessage(c));return true;
         }
     }
+    public bool Look(Client c,float dx,float dy,float gain){
+        lock(c.Gate){
+            if(c.Version<2||c.Pose==null)return false;
+            c.Pose=CameraMath.Look(c.Pose,dx,dy,gain);Queue(c,PoseMessage(c));return true;
+        }
+    }
     public void StopNavigation(Client c){
         lock(c.Gate){
             if(c.Mode!=NavMode.Navigate||c.Pose==null)return;

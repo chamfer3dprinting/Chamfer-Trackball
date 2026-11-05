@@ -25,7 +25,7 @@ public sealed class NavigationMotion {
         double travel=command*dt+(velocity-command)*tau*(1-decay);
         velocity=command+(velocity-command)*decay;return (float)travel;
     }
-    public NavigationFrame Step(float dx,float dy,float scroll,double milliseconds,bool finish=false){
+    public NavigationFrame Step(float dx,float dy,float scroll,double milliseconds,bool finish=false,bool suspendSteering=false){
         if(!float.IsFinite(dx)||!float.IsFinite(dy)||!float.IsFinite(scroll)||!double.IsFinite(milliseconds))throw new ArgumentException("Invalid navigation motion.");
         if(finish){Reset();return default;}
         double dt=double.IsNaN(previous)?1.0/125:(milliseconds-previous)/1000;
@@ -33,7 +33,7 @@ public sealed class NavigationMotion {
         previous=milliseconds;
         right.Add(dx);up.Add(scroll/4);forward.Add(-dy);
         double steer=forward.Active?Math.Clamp((Math.Abs(forward.Position)-3)/5,0,1):0;
-        return new(Advance(ref vr,right.Rate*(1-steer),dt),Advance(ref vu,up.Rate,dt),Advance(ref vf,forward.Rate,dt),Advance(ref vyaw,right.Rate*steer,dt));
+        return new(Advance(ref vr,right.Rate*(1-steer),dt),Advance(ref vu,up.Rate,dt),Advance(ref vf,forward.Rate,dt),Advance(ref vyaw,suspendSteering?0:right.Rate*steer,dt));
     }
     public void Reset(){right=up=forward=default;vr=vu=vf=vyaw=0;previous=double.NaN;}
 }

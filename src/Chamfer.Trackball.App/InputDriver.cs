@@ -229,6 +229,9 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
             while(keyReplays.TryDequeue(out _)){ }
             RouteKey(192,true);lock(keysGate)usedDeferred.Add(192);RouteKey(192,false);
             if(Keys.Contains(192)||!keyReplays.IsEmpty)throw new InvalidOperationException("A used Backtick hold typed a stray character or stayed held.");
+            RouteKey(192,true);lock(keysGate)usedDeferred.Add(192);RouteKey(18,true);RouteKey(18,false);RouteKey(192,false);
+            if(!keyReplays.IsEmpty||Keys.Contains(18)||Keys.Contains(192))throw new InvalidOperationException("An unused Alt look within active navigation opened a menu or left a held key.");
+
             if(RouteKey(91,true)||RouteKey(91,false)||!keyReplays.IsEmpty)throw new InvalidOperationException("Windows was reserved after changing navigation to Backtick.");
             IsCad=()=>false;
             if(RouteKey(192,true)||RouteKey(192,false))throw new InvalidOperationException("Backtick was intercepted outside the 3D context.");
@@ -312,7 +315,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                 ReplayKey(k,down);if(!down)delayedKeys.Remove(k);return true;
             }
             bool trigger=k is not (16 or 17 or 160 or 161 or 162 or 163)&&HookHealthy&&IsNavigationChord(Keys);
-            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);if(k is 91 or 92||Keys.Contains(91))usedDeferred.Add(k);NotifyKeys();return true;}
+            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);if(k is 91 or 92||Keys.Contains(91)||k==18&&usedDeferred.Any(key=>key is not (16 or 17 or 18)))usedDeferred.Add(k);NotifyKeys();return true;}
             if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)&&deferred.Count>0){
                 foreach(var old in deferred.ToArray()){
                     ReplayKey(old,true);delayedKeys.Add(old);deferred.Remove(old);usedDeferred.Remove(old);

@@ -600,6 +600,7 @@ CameraResponseChecks.Run(Check);
 NativeDeliveryChecks.Run(Check);
 NavigationChecks.Run(Check);
 LevelFlightChecks.Run(Check);
+FreeLookChecks.Run(Check);
 HeldRateChecks.Run(Check);
 CameraOrientationChecks.Run(Check);
 Console.WriteLine(count+" regression checks passed.");

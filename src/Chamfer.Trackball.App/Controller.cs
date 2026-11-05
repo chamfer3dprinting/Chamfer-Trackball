@@ -6,7 +6,7 @@ namespace Chamfer.Trackball.App;
 internal sealed class Controller:IDisposable{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer server;
     readonly System.Windows.Forms.Timer timer=new(){Interval=MotionPolicy.FrameIntervalMs};
-    readonly MotionClock navigationClock;readonly NavigationMotion navigationMotion=new();bool navigationSession,navigationWasMoving;
+    readonly MotionClock navigationClock;readonly NavigationMotion navigationMotion=new();readonly MotionFrames navigationLook=new();bool navigationSession,navigationWasMoving;
     volatile JsonObject cfg;volatile JsonObject? profile;NativeServer.Client? native;
     readonly ForegroundApps foregroundApps=new();string foregroundExe="";
     readonly ComboTracker combos=new();readonly HashSet<int> pressed=[];readonly HashSet<int> comboUsed=[];
@@ -27,7 +27,7 @@ internal sealed class Controller:IDisposable{
     public string Mode=>circle.Active?"Zoom":mode.ToString();
     public JsonObject GuideState(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
-        return new(){["mode"]=Mode,["navigationActive"]=navigationSession,["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+        return new(){["mode"]=Mode,["navigationActive"]=navigationSession,["looking"]=NavigationLooking,["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
     }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
@@ -130,7 +130,7 @@ public string AppName{get;private set;}="";
         Flush();
     }
     void End(){
-        navigationClock.SetEnabled(false);navigationSession=false;navigationWasMoving=false;navigationMotion.Reset();
+        navigationClock.SetEnabled(false);navigationSession=false;navigationWasMoving=false;navigationMotion.Reset();navigationLook.Reset();
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
     }
@@ -170,16 +170,18 @@ public string AppName{get;private set;}="";
             if(ConfigStore.B(cfg,"smooth",true))timer.Interval=MotionPolicy.FrameIntervalMs;return;
         }
         if(mode==NavMode.Gestures){gx+=x;gy+=y;return;}
+        if(NavigationLooking){navigationLook.Move(x,y);return;}
         motionSamples.Move(x,y);
         if(DirectPresentation(device)){
             if(!IsCad){End();return;}
             Flush(device:device);
         }
     }
+    bool NavigationLooking=>navigationSession&&input.Keys.Contains(18);
     bool DirectPresentation(string device)=>!navigationSession&&NativeDelivery.Direct(device,ConfigStore.S(profile,"id"),native?.Version??0,mode,ConfigStore.B(cfg,"steadyCamera"),ConfigStore.B(cfg,"spaceMouseCruise"));
     bool CruiseActive=>native?.Version>=2&&HeldNavigation&&ConfigStore.B(cfg,"spaceMouseCruise")&&mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate;
     void Flush(bool finish=false,double? timeMilliseconds=null,string? device=null){
-        if(finish&&navigationSession){pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();return;}
+        if(finish&&navigationSession){pending.Reset();motionSamples.Reset();navigationMotion.Reset();navigationLook.Reset();slimBladeTwist.Reset();return;}
         // Classify each newly sampled path once, even if a camera handshake delays delivery.
         var sample=motionSamples.Peek();motionSamples.ClearMove();bool consumed=false;
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
@@ -198,9 +200,11 @@ public string AppName{get;private set;}="";
         if((steady||cruise||navigationSession)&&native is {Version:>=2,Pose:null})return;
         if(navigationSession){
             cameraMotion.Reset();heldRate.Reset();glide.Reset();
-            var flight=navigationMotion.Step(frame.X,frame.Y,frame.Wheel+slimBladeTwist.Take(),timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency);
+            var look=navigationLook.Peek();
+            if(look.HasPrimary&&native!=null){server.Look(native,look.X,look.Y,OrbitGain);navigationLook.ClearPrimary();}
+            var flight=navigationMotion.Step(frame.X,frame.Y,frame.Wheel+slimBladeTwist.Take(),timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency,suspendSteering:NavigationLooking);
             if(flight.Active&&native!=null){server.Fly(native,flight,PanGain,OrbitGain,ConfigStore.B(cfg,"navigationLevelFlight"));navigationWasMoving=true;}
-            else if(navigationWasMoving&&navigationMotion.Centered&&native!=null){navigationWasMoving=false;server.StopNavigation(native);}
+            else if(navigationWasMoving&&navigationMotion.Centered&&native!=null&&!look.HasPrimary){navigationWasMoving=false;server.StopNavigation(native);}
             pending.ClearPrimary();pending.ClearDial();return;
         }
         MotionFrame output;
@@ -424,6 +428,31 @@ public string AppName{get;private set;}="";
             pending.Reset();motionSamples.Reset();profile=oldProfile;native=oldNative;cfg=oldCfg;foregroundWindow=oldWindow;foregroundPid=oldPid;foregroundExe=oldExe;AppName=oldName;mode=oldMode;latched=oldLatched;pressed.Clear();foregroundApps.Invalidate();
         }
         Console.WriteLine("Foreground browser tabs verified: same HWND entry/exit, title rename continuity, gesture release, re-entry and preview isolation.");
+    }
+    internal void VerifyFreeLook(){
+        var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession,oldMoving=navigationWasMoving;
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["panSens"]=38;cfg["orbitSens"]=38;cfg["navigationLevelFlight"]=true;
+            var start=new CameraPose(new(0,0,200),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,200,1200,800,false,System.Numerics.Vector3.UnitY);
+            var client=new NativeServer.Client{App="chamfer3d",Version=2,Mode=NavMode.Navigate,Pose=start,BasePose=start};native=client;mode=NavMode.Navigate;navigationSession=true;
+            pending.Reset();motionSamples.Reset();navigationMotion.Reset();navigationLook.Reset();
+            navigationLook.Move(12,-12);Flush(timeMilliseconds:1000);
+            var heading=System.Numerics.Vector3.Normalize(client.Pose!.Target-client.Pose.Eye);
+            if(client.Pose.Eye!=start.Eye||heading.X<=0||heading.Y<=0||client.Out.Count!=1||navigationLook.Peek().HasPrimary)throw new InvalidOperationException("Free look did not aim right/up without moving the camera or left stale input.");
+            motionSamples.Move(0,-12);navigationLook.Move(-6,6);Flush(timeMilliseconds:1008);
+            if(client.Pose.Eye.Z>=start.Eye.Z||client.Out.Count!=1)throw new InvalidOperationException("Travel did not continue with camera look in one coalesced pose.");
+            var stopped=client.Pose;client.Out.Clear();navigationLook.Move(100,100);Flush(finish:true,timeMilliseconds:1016);
+            if(client.Pose!=stopped||client.Out.Count!=0||navigationLook.Peek().HasPrimary)throw new InvalidOperationException("Navigation release emitted pending look or kept turning.");
+            navigationMotion.Reset();client.Pose=null;navigationLook.Move(8,-8);Flush(timeMilliseconds:2000);
+            if(!navigationLook.Peek().HasPrimary)throw new InvalidOperationException("First look was lost before the native scene arrived.");
+            client.Pose=client.BasePose=start;Flush(timeMilliseconds:2008);
+            heading=System.Numerics.Vector3.Normalize(client.Pose!.Target-client.Pose.Eye);
+            if(heading.X<=0||heading.Y<=0||navigationLook.Peek().HasPrimary)throw new InvalidOperationException("Pending free look did not survive the scene handshake.");
+        }finally{
+            pending.Reset();motionSamples.Reset();navigationMotion.Reset();navigationLook.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();glide.Reset();
+            cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;navigationWasMoving=oldMoving;
+        }
+        Console.WriteLine("Free look verified in the actual controller: eye-fixed up/right aim, simultaneous travel, coalesced output, clean release and pending scene handshake.");
     }
     internal void VerifyLevelFlight(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession,oldMoving=navigationWasMoving;
