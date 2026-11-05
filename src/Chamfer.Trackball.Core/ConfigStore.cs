@@ -19,7 +19,7 @@ public sealed class ConfigStore {
             // Do not silently replace an unreadable configuration.
             config=JsonNode.Parse(File.ReadAllText(path))?.AsObject()??throw new InvalidDataException("Settings must be a JSON object.");
         }
-        var oldVersion=I(config,"configVersion",0); Normalize(config);
+        var oldVersion=I(config,"configVersion",0);bool hadNavigationCruise=config["programs"] is JsonArray savedPrograms&&savedPrograms.OfType<JsonObject>().Any(p=>S(p,"name").Contains("3D",StringComparison.OrdinalIgnoreCase)&&p["feel"] is JsonObject feel&&feel.ContainsKey("navigationCruise")); Normalize(config);
         if(oldVersion<21){
             foreach(var node in config["programs"]!.AsArray()){
                 var p=node!.AsObject();
@@ -73,8 +73,13 @@ public sealed class ConfigStore {
             }
             LoadProgram(config,I(config,"activeProgram",0));
         }
-        config["configVersion"]=30;Validate(config);
-        if(oldVersion<30&&File.Exists(path))Write(config);
+        if(oldVersion<31){
+            var navigation=nodeProgram(config,"3D");
+            if(navigation!=null&&!hadNavigationCruise)navigation["feel"]!["navigationCruise"]=true;
+            LoadProgram(config,I(config,"activeProgram",0));
+        }
+        config["configVersion"]=31;Validate(config);
+        if(oldVersion<31&&File.Exists(path))Write(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
     public void Save(JsonObject incoming) {
@@ -96,7 +101,7 @@ public sealed class ConfigStore {
             if(i==current&&S(p,"name")==S(config["programs"]![current],"name"))next["twistCalibration"]=config["twistCalibration"]?.DeepClone();
             foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
             p["feel"]??=new JsonObject();
-            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
+            foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise","navigationCruise"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
             next["feel"]=p["feel"]!.DeepClone();
             Validate(next);Write(next);config=next;Revision++;
         }

@@ -1,5 +1,5 @@
 {
-  "configVersion": 30,
+  "configVersion": 31,
   "slimBladeSmoothTwist": false,
   "steadyCamera": false,
   "cameraResponseMs": 18,
@@ -678,7 +678,8 @@
         "twistSens": 50,
         "twistAxis": "x",
         "invertTwist": false,
-        "spaceMouseCruise": false
+        "spaceMouseCruise": false,
+        "navigationCruise": false
       },
       "modeButtons": {},
       "combos": [
@@ -750,7 +751,8 @@
         "twistSens": 50,
         "twistAxis": "x",
         "invertTwist": false,
-        "spaceMouseCruise": false
+        "spaceMouseCruise": false,
+        "navigationCruise": true
       },
       "modeButtons": {},
       "combos": [],
@@ -788,7 +790,8 @@
     "glide": 5,
     "twistSens": 50,
     "twistAxis": "x",
-    "invertTwist": false
+    "invertTwist": false,
+    "navigationCruise": false
   },
   "snapKeys": "none",
   "navigateKeys": "none",
@@ -807,5 +810,6 @@
   "altTwistEstimate": false,
   "twistCalibration": null,
   "trackballs": [],
-  "spaceMouseCruise": false
+  "spaceMouseCruise": false,
+  "navigationCruise": false
 }

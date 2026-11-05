@@ -1,3 +1,12 @@
+# Navigation-only drone control
+
+- Hold Windows (or your Navigate binding) and roll the ball up/down/left/right to set camera travel.
+- Twist the Kensington ball for forward/back travel. Movement follows the current view.
+- Movement continues while Navigate stays held. Roll back to slow or reverse; release the key or click to stop every axis immediately.
+- Orbit and zoom keep direct ball control. Normal mouse, existing buttons, wheels and shortcuts are preserved.
+- Continuous navigation is saved with each program and its presets; turn it off for the earlier direct navigation.
+- Use an active-only high-resolution navigation clock, with coalesced UI callbacks and no stale release movement.
+
 # Immediate native Kensington response
 
 - Deliver held SlimBlade navigation to Chamfer Studio as raw reports arrive, with one display-based smoothing stage.

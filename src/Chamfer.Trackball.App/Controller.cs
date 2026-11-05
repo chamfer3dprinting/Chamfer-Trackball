@@ -6,6 +6,7 @@ namespace Chamfer.Trackball.App;
 internal sealed class Controller:IDisposable{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer server;
     readonly System.Windows.Forms.Timer timer=new(){Interval=MotionPolicy.FrameIntervalMs};
+    readonly MotionClock navigationClock;readonly NavigationMotion navigationMotion=new();bool navigationSession;
     volatile JsonObject cfg;volatile JsonObject? profile;NativeServer.Client? native;
     readonly ForegroundApps foregroundApps=new();string foregroundExe="";
     readonly ComboTracker combos=new();readonly HashSet<int> pressed=[];readonly HashSet<int> comboUsed=[];
@@ -26,13 +27,13 @@ internal sealed class Controller:IDisposable{
     public string Mode=>circle.Active?"Zoom":mode.ToString();
     public JsonObject GuideState(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
-        return new(){["mode"]=Mode,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+        return new(){["mode"]=Mode,["navigationActive"]=navigationSession,["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
     }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
     public bool IsCad=>!calibration.Receiving&&profile!=null&&nativeFocusAllowed&&ConfigStore.B(cfg,"enabled")&&Win32.GetForegroundWindow()==foregroundWindow;
     public Controller(ConfigStore store,InputDriver input,NativeServer server){
-        this.store=store;this.input=input;this.server=server;cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);
+        this.store=store;this.input=input;this.server=server;navigationClock=new(NavigationTick);cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);
         input.IsCad=()=>IsCad;input.IsCapture=()=>mode!=NavMode.Idle||PointerCapture;input.SelectedDevice=()=>ConfigStore.S(cfg,"selectedDevice");
         input.SwapButtons=()=>ConfigStore.B(cfg,"trackballSwapButtons");input.SwapWheels=()=>ConfigStore.B(cfg,"trackballSwapWheels");input.Enabled=()=>ConfigStore.B(cfg,"enabled");
         input.Identified+=device=>{store.IdentifyDevice(device);cfg=store.Snapshot();input.ConfigureDevices(cfg);Log("Trackball remembered. Previously identified trackballs remain available.");};
@@ -47,7 +48,7 @@ public string AppName{get;private set;}="";
     public JsonArray LogAfter(long s)=>new(logs.Where(x=>ConfigStore.D(x,"seq")>s).Select(x=>x.DeepClone()).ToArray());
     void Tick(object? sender,EventArgs e){
         const int idleInterval=50;
-        int interval=mode==NavMode.Idle&&!pointer.Active&&!calibration.Receiving?idleInterval:MotionPolicy.FrameIntervalMs;
+        int interval=(mode==NavMode.Idle&&!pointer.Active&&!calibration.Receiving)||navigationSession&&navigationClock.Enabled?idleInterval:MotionPolicy.FrameIntervalMs;
         if(timer.Interval!=interval)timer.Interval=interval;
         if(revision!=store.Revision){End();cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);input.ConfigureDevices(cfg);revision=store.Revision;foregroundApps.Invalidate();foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
         if(calibration.Active&&(calibrationProgram!=ConfigStore.I(cfg,"activeProgram")||calibrationProgramName!=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name")||calibrationDevice!=input.ActiveDevice||!ConfigStore.B(cfg,"enabled"))){
@@ -85,7 +86,7 @@ public string AppName{get;private set;}="";
             if(native.Version>=2&&native.Pose==null&&DateTime.UtcNow-native.Began>TimeSpan.FromMilliseconds(300)){End();stoppedByClick=true;Integration="Place the pointer over a 3D viewport, release the keys, and try again.";return;}
             if(server.Find(ConfigStore.S(profile,"id"),foregroundPid)!=native){End();Integration="Integration disconnected";return;}
         }
-        if(mode!=NavMode.Idle)Flush();
+        if(mode!=NavMode.Idle&&!(navigationSession&&navigationClock.Enabled))Flush();
     }
     void RefreshForeground(nint window,int pid,string exe,string title){
         var next=ForegroundApps.Match(cfg["profiles"]!.AsArray(),exe,title);
@@ -120,10 +121,16 @@ public string AppName{get;private set;}="";
             Integration=next+" requires the native integration for "+ConfigStore.S(profile,"name");return;
         }
         if(native==null&&!demo&&!ConfigStore.B(cfg,"allowEmulation",true)){Integration="Native integration required";return;}
-        mode=next;knobHoldActive=nextKnob;timer.Interval=MotionPolicy.FrameIntervalMs;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
-        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist,ConfigStore.B(cfg,"steadyCamera")||ConfigStore.B(cfg,"spaceMouseCruise"),DirectPresentation(input.ActiveDevice)?(float)ConfigStore.D(cfg,"cameraResponseMs",18):12);}
+        mode=next;knobHoldActive=nextKnob;navigationSession=next==NavMode.Navigate&&native?.Version>=2&&HeldNavigation&&ConfigStore.B(cfg,"navigationCruise");timer.Interval=MotionPolicy.FrameIntervalMs;Integration=native!=null?"Native camera + cursor pivot":demo?"Navigation preview":"Mouse emulation";
+        if(native!=null){Win32.GetCursorPos(out var at);server.Begin(native,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,ConfigStore.S(cfg,"twistAxis","x"),ConfigStore.B(cfg,"invertTwist"),learnedTwist,ConfigStore.B(cfg,"steadyCamera")||ConfigStore.B(cfg,"spaceMouseCruise"),DirectPresentation(input.ActiveDevice)||navigationSession?(float)ConfigStore.D(cfg,"cameraResponseMs",18):12);}
+        navigationClock.SetEnabled(navigationSession);
+    }
+    void NavigationTick(){
+        if(!navigationSession||!HeldNavigation||!IsCad||!input.Ready||native==null||server.Find(ConfigStore.S(profile,"id"),foregroundPid)!=native){End();return;}
+        Flush();
     }
     void End(){
+        navigationClock.SetEnabled(false);navigationSession=false;navigationMotion.Reset();
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
     }
@@ -169,9 +176,10 @@ public string AppName{get;private set;}="";
             Flush(device:device);
         }
     }
-    bool DirectPresentation(string device)=>NativeDelivery.Direct(device,ConfigStore.S(profile,"id"),native?.Version??0,mode,ConfigStore.B(cfg,"steadyCamera"),ConfigStore.B(cfg,"spaceMouseCruise"));
+    bool DirectPresentation(string device)=>!navigationSession&&NativeDelivery.Direct(device,ConfigStore.S(profile,"id"),native?.Version??0,mode,ConfigStore.B(cfg,"steadyCamera"),ConfigStore.B(cfg,"spaceMouseCruise"));
     bool CruiseActive=>native?.Version>=2&&HeldNavigation&&ConfigStore.B(cfg,"spaceMouseCruise")&&mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate;
     void Flush(bool finish=false,double? timeMilliseconds=null,string? device=null){
+        if(finish&&navigationSession){pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();return;}
         // Classify each newly sampled path once, even if a camera handshake delays delivery.
         var sample=motionSamples.Peek();motionSamples.ClearMove();bool consumed=false;
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
@@ -187,7 +195,13 @@ public string AppName{get;private set;}="";
         if(!consumed)pending.Move(sample.X,sample.Y);
         var frame=pending.Peek();
         bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate);
-        if((steady||cruise)&&native is {Version:>=2,Pose:null})return;
+        if((steady||cruise||navigationSession)&&native is {Version:>=2,Pose:null})return;
+        if(navigationSession){
+            cameraMotion.Reset();heldRate.Reset();glide.Reset();
+            var flight=navigationMotion.Step(frame.X,frame.Y,frame.Wheel+slimBladeTwist.Take(),timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency);
+            if(flight.Active&&native!=null)server.Fly(native,flight,PanGain);
+            pending.ClearPrimary();pending.ClearDial();return;
+        }
         MotionFrame output;
         if(direct){
             // Studio presents absolute poses on its display clock. Do not add a
@@ -410,6 +424,31 @@ public string AppName{get;private set;}="";
         }
         Console.WriteLine("Foreground browser tabs verified: same HWND entry/exit, title rename continuity, gesture release, re-entry and preview isolation.");
     }
+    internal void VerifyHeldNavigation(){
+        var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession;
+        try{
+            cfg=(JsonObject)cfg.DeepClone();cfg["panSens"]=27;cfg["steadyCamera"]=true;cfg["spaceMouseCruise"]=false;
+            var start=new CameraPose(new(0,0,10),System.Numerics.Vector3.Zero,System.Numerics.Vector3.UnitY,System.Numerics.Vector3.Zero,.8f,10,800,800,false,System.Numerics.Vector3.UnitY);
+            var client=new NativeServer.Client{App="chamfer3d",Version=2,Pose=start,BasePose=start};native=client;mode=NavMode.Navigate;navigationSession=true;
+            pending.Reset();motionSamples.Reset();navigationMotion.Reset();motionSamples.Move(12,-8);pending.Wheel(60);
+            Flush(timeMilliseconds:1000);var first=client.Pose!;
+            for(int i=1;i<=125;i++)Flush(timeMilliseconds:1000+i*8);
+            var after=client.Pose!;
+            if(after.Eye.X<=first.Eye.X||after.Eye.Y<=first.Eye.Y||after.Eye.Z>=first.Eye.Z||client.Out.Count!=1)throw new InvalidOperationException("Held navigation did not continue right/up/forward without new reports.");
+            if(System.Numerics.Vector3.Distance(after.Target-after.Eye,start.Target-start.Eye)>.0001f||after.Up!=start.Up)throw new InvalidOperationException("Drone translation changed orientation or lens distance.");
+            motionSamples.Move(20,20);pending.Wheel(120);var stopped=client.Pose;int queued=client.Out.Count;
+            Flush(finish:true,timeMilliseconds:2010);
+            if(client.Pose!=stopped||client.Out.Count!=queued||pending.Peek().HasPrimary||motionSamples.Peek().HasPrimary)throw new InvalidOperationException("Navigation release applied pending motion or emitted a catch-up pose.");
+            navigationMotion.Reset();client.Pose=null;motionSamples.Move(-12,8);Flush(timeMilliseconds:3000);
+            if(!pending.Peek().HasPrimary)throw new InvalidOperationException("Navigation lost its first command before the scene handshake.");
+            client.Pose=start;Flush(timeMilliseconds:3008);
+            if(client.Pose.Eye.X>=start.Eye.X||client.Pose.Eye.Y>=start.Eye.Y)throw new InvalidOperationException("Navigation handshake did not retain left/down direction.");
+        }finally{
+            pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();glide.Reset();
+            cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;
+        }
+        Console.WriteLine("Held navigation verified: independent screen right/up and twist-forward commands, continuing motion, unchanged orientation, first-handshake retention, one queued pose and immediate release without catch-up.");
+    }
     internal void VerifyImmediateStudioDelivery(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;var oldProfile=profile;var oldWindow=foregroundWindow;bool oldFocus=nativeFocusAllowed;
         double oldOx=ox,oldOy=oy,oldPx=px,oldPy=py,oldZoom=zoom,oldZoomLog=zoomLog;
@@ -539,5 +578,5 @@ public string AppName{get;private set;}="";
     }
     public JsonObject CalibrationClear(){CalibrationCancel();var result=store.SetTwistCalibration(null);cfg=store.Snapshot();learnedTwist=null;return result;}
     public void Pad(int x,int y,int w,int h,bool visible,Point origin){pad=new(x,y,w,h);padVisible=visible;padOrigin=origin;}
-    public void Dispose(){timer.Stop();timer.Dispose();macro?.Cancel();CalibrationCancel();End();}
+    public void Dispose(){timer.Stop();timer.Dispose();macro?.Cancel();CalibrationCancel();End();navigationClock.Dispose();}
 }

@@ -65,6 +65,12 @@ internal sealed class NativeServer:IDisposable {
             Queue(c,PoseMessage(c));return true;
         }
     }
+    public bool Fly(Client c,NavigationFrame motion,float gain){
+        lock(c.Gate){
+            if(c.Version<2||c.Pose==null)return false;
+            c.Pose=CameraMath.Fly(c.Pose,motion,gain);Queue(c,PoseMessage(c));return true;
+        }
+    }
     public bool PendingSnap(Client? c){if(c==null)return false;lock(c.Gate)return c.EstimateTwist&&c.EstimatedSnap.Pending;}
     public JsonObject SnapState(Client? c){
         if(c==null)return new(){["state"]="unavailable",["message"]="Face turns need a native 3D connection."};

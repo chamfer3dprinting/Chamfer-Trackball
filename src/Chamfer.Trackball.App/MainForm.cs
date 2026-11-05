@@ -333,7 +333,9 @@ internal sealed class MainForm:Form{
             input.VerifyMultipleTrackballs();controller.Status();
             controller.VerifyForegroundTitles();
             controller.VerifyCalibrationNavigation();
+            await MotionClockChecks.Run();
             controller.VerifyCameraResponse();
+            controller.VerifyHeldNavigation();
             controller.VerifyImmediateStudioDelivery();
             controller.VerifySnapWheelRouting();
             controller.VerifyKnobHandshake();
