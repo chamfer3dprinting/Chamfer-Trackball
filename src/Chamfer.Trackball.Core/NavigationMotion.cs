@@ -10,7 +10,9 @@ public sealed class NavigationMotion {
     struct Axis {
         public double Position;public bool Active;
         public void Add(double delta){
-            Position=Math.Clamp(Position+delta,-40,40);
+            // Limit speed in Rate. Keeping the full displacement makes an
+            // equal return stroke reach centre even after speed has saturated.
+            Position += delta;
             if(Active&&Math.Abs(Position)<=3){Position=0;Active=false;}
             else if(!Active&&Math.Abs(Position)>=4)Active=true;
         }
