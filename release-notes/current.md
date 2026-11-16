@@ -1,3 +1,7 @@
+# Camera walk centre stop
+
+- Return the ball to its starting position to stop after a large Backtick walk stroke. Equal opposite twists stop turning after several notches. Walk speed is still capped, and releasing Backtick stops immediately.
+
 - Match the owner's three-axis diagrams: Shift rotates (ball pitch/yaw, knob roll); Alt translates (ball pan, knob in/out); Backtick walks (ball forward/back/sideways, knob yaw).
 - Bind the top-right button (button 2) to one-click nearest-face snapping. The snap and normal rotation turn around the point under the cursor; show a click-through cursor-pivot marker.
 - Preserve cursor zoom, continuous walk, neutral/release stop, independent rotation/pan/zoom/twist sensitivity, Normal mouse inputs and saved presets. Three-axis controls are saved per program and preset. No curved gesture estimation or extra Alt hold is needed for camera walk.

@@ -38,6 +38,21 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-16 — Codex: Camera walk returns to centre after larger input
+
+The owner clarified that the problem is navigation. On this PC the 3D program
+had gone back to the older mapping while the Diagram controls preset was still
+saved. Restored the requested Shift, Alt, Backtick and button 2 mappings and
+verified the existing Studio WebView connects to the local Admin bridge.
+
+The walk integrator used the speed limit to truncate the accumulated ball or
+twist displacement. Returning an equal stroke after reaching that limit could
+then reverse travel or yaw instead of stopping. Keep the full displacement and
+limit the rate as before. Regression checks cover large forward and reverse
+diagonal rolls, two twist notches in both directions, and the actual controller's
+centre stop and stale pose discard. Physical trackball feel remains for owner
+evaluation.
+
 # 2026-11-05 — Codex: Installed Admin 1.5.50 diagram controls and cursor-pivot snapping
 
 Admin 1.5.50 is installed from main eb934d3007e935e0e920b2848ca7e8b4dce45e94.

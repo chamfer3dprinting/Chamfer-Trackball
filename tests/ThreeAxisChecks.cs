@@ -42,6 +42,27 @@ internal static class ThreeAxisChecks {
             var centre=rate.Step(-axis.Item1,-axis.Item2,0,1016,ballTwist:true);
             check(!centre.Active&&rate.Centered,"Returning the walk ball to centre stops its translation");
         }
+        var largeStroke = new NavigationMotion();
+        var atSpeedLimit = largeStroke.Step(0, -40, 0, 1000, ballTwist: true);
+        largeStroke.Reset();
+        var beyondSpeedLimit = largeStroke.Step(0, -96, 0, 1000, ballTwist: true);
+        check(beyondSpeedLimit.Forward == atSpeedLimit.Forward, "Large rolls do not exceed the walk speed limit");
+        var forwardCentre = largeStroke.Step(0, 96, 0, 1008, ballTwist: true);
+        check(!forwardCentre.Active && largeStroke.Centered, "Equal return after a full-speed forward roll stops at centre");
+        largeStroke.Step(-36, 44, 0, 1016, ballTwist: true);
+        largeStroke.Step(-36, 44, 0, 1024, ballTwist: true);
+        var diagonalCentre = largeStroke.Step(71, -86, 0, 1032, ballTwist: true);
+        check(!diagonalCentre.Active && largeStroke.Centered, "Batched reverse-diagonal roll stops within the centre dead zone");
+        largeStroke.Step(0, -96, 0, 1040, ballTwist: true);
+        largeStroke.Step(0, 108, 0, 1048, ballTwist: true);
+        // Allow the existing velocity response to settle after crossing centre.
+        var passedCentre = largeStroke.Step(0, 0, 0, 1120, ballTwist: true);
+        check(passedCentre.Forward < 0 && !largeStroke.Centered, "Rolling beyond the starting point still reverses travel");
+        largeStroke.Reset();
+        largeStroke.Step(0, 0, 120, 1000, ballTwist: true);
+        largeStroke.Step(0, 0, 120, 1008, ballTwist: true);
+        var twistCentre = largeStroke.Step(0, 0, -240, 1016, ballTwist: true);
+        check(!twistCentre.Active && largeStroke.Centered, "Two reverse twist notches cancel two forward notches without turning back");
         foreach(float wheel in new[]{-60f,60f}){
             var rate=new NavigationMotion();var frame=rate.Step(0,0,wheel,1000,ballTwist:true);
             check(frame.Up==0&&frame.Forward==0&&frame.Right==0&&Math.Sign(frame.Yaw)==Math.Sign(wheel)&&frame.Pitch==0,"Walk knob twist controls yaw instead of height or translation");
