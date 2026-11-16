@@ -38,6 +38,20 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-16 — Codex: Installed camera walk centre fix in Admin 1.5.51
+
+Installed and verified Admin 1.5.51 from 4087c97f46c260c217c611db2bbc1c1e88d7d56a. Release
+447072887 and main workflow 43874849820 passed 1,520 core checks and both Windows
+executable checks. Local bridge reports 1.5.51. The desktop Studio WebView
+reconnected after bringing its window forward. The user’s Diagram controls
+are active again with Backtick camera walk and tilt kept level. The user's
+other saved sensitivity values and eleven presets were retained.
+
+The exact Windows controller now has a regression check for returning to
+centre after a large ball stroke and two twist notches. Rate limits,
+out-of-centre reversal and Backtick release remain covered. Hardware feel has
+not yet been verified with a physical roll on the updated build.
+
 # 2026-11-16 — Codex: Camera walk returns to centre after larger input
 
 The owner clarified that the problem is navigation. On this PC the 3D program
