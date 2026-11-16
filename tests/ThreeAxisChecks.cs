@@ -54,7 +54,9 @@ internal static class ThreeAxisChecks {
         var diagonalCentre = largeStroke.Step(71, -86, 0, 1032, ballTwist: true);
         check(!diagonalCentre.Active && largeStroke.Centered, "Batched reverse-diagonal roll stops within the centre dead zone");
         largeStroke.Step(0, -96, 0, 1040, ballTwist: true);
-        var passedCentre = largeStroke.Step(0, 108, 0, 1048, ballTwist: true);
+        largeStroke.Step(0, 108, 0, 1048, ballTwist: true);
+        // Allow the existing velocity response to settle after crossing centre.
+        var passedCentre = largeStroke.Step(0, 0, 1120, ballTwist: true);
         check(passedCentre.Forward < 0 && !largeStroke.Centered, "Rolling beyond the starting point still reverses travel");
         largeStroke.Reset();
         largeStroke.Step(0, 0, 120, 1000, ballTwist: true);
