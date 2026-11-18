@@ -51,7 +51,19 @@ Travel remains independent while the heading changes. The floating guide shows
 ball reports, the actual applied turn or height, the current keyboard bindings
 and the relevant Kensington twist instructions.
 
-Verification and Admin installation are pending.
+PR #40 merged as ca629fe1c0891a6b5a9b95b9792dedffcba24bc5. Main workflow 44317953075
+passed 1,589 core checks, including continuous yaw, neutral and release stops.
+Both Windows editions passed the actual interface and native bridge checks.
+The Studio renderer passed 24 existing checks and eight moved-cursor Snap/Roll
+cases across desktop and web in both projections. The installed Studio v3.6.4
+bridge source matches the renderer under test.
+
+Installed Admin v1.5.55 from release 450057823 through its
+Update now control. The executable matches SHA-256
+ca562464e7acd0b00b1c7683848d77f0b04c941e02db39ebf690e13f2f97bd1c. Its window
+responds and its local bridge reports 1.5.55. Settings match the
+pre-update file byte for byte. Home renders the 3D test cube and shows the active
+3D modelling profile. Physical Kensington movement remains for owner testing.
 
 # 2026-11-18 — Codex: Live-view Alt snapping and continuous twist height
 
