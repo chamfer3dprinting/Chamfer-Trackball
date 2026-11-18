@@ -52,11 +52,18 @@ height independent. In Backtick + 1, use the ball travel rate curve for vertical
 twist, active until the virtual centre or key release. Use world height even
 when tilted and preserve latched ball travel across the look-layer transition.
 
-Core coverage adds tilted and off-centre snaps, fractional reports, retained
-live projection, both height directions, centre/release stops and exact binding
-selection. Native Windows, existing Studio renderer and physical validation are
-pending. Apply the new bindings to the owner's current program with a backup.
-Preserve saved presets and other programs. Keep source on GitHub.
+PR #39 merged as b56eabe3e1fca53f9abed5db227a7b65931821ff. Main workflow 44310423830
+passed 1,585 core checks and both Windows executable interface and native bridge
+tests. The Studio trackball renderer passed 24 checks plus a live-view snap
+replay that retained the off-centre pivot in perspective and orthographic views.
+
+Installed Admin v1.5.54 from release 450004841. The executable
+matches SHA-256 5645a79a3e60a160e0c6e2a3a6e6e35b2fce0dad603bb01db4c39a14ff98f956.
+The local bridge reports 1.5.54. Home shows 3D controls on and the
+expected live shortcuts. Updated Pan and Snap in the active 3D modelling program
+and backed up its previous settings and executable. Settings comparison preserved
+both device entries and all 13 presets. A physical Kensington test remains for
+the owner. The public candidate stays in draft.
 
 # 2026-11-17 — Codex: Installed Admin v1.5.53 twist controls
 
