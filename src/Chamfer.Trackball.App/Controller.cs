@@ -222,7 +222,11 @@ public string AppName{get;private set;}="";
     }
 
     void Flush(bool finish=false,double? timeMilliseconds=null,string? device=null){
-        if(finish&&navigationSession){pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();return;}
+        if(finish&&navigationSession){
+            pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();
+            navigationWasMoving=false;
+            return;
+        }
         // Classify each newly sampled path once, even if a camera handshake delays delivery.
         var sample=motionSamples.Peek();motionSamples.ClearMove();bool consumed=false;
         bool freeBall=ModeResolver.Resolve(cfg,input.Keys)==NavMode.Idle&&!pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
@@ -305,7 +309,7 @@ public string AppName{get;private set;}="";
         int twistSteps=0;
         if(output==NavMode.Navigate&&(UsesWalkTwist||navigationLayer==NavigationLayer.Height)&&native is {Version:>=2} client){
             if(ConfigStore.B(cfg,"invertTwist"))w=-w;
-            var frame=NavigationMotion.Direct(x,y,w,navigationLayer);
+            var frame=NavigationMotion.Direct(x,y,w,navigationLayer,ConfigStore.B(cfg,"threeAxisControls"));
             return ApplyNavigation(client,frame,navigationLayer==NavigationLayer.Look?OrbitGain:TwistGain);
         }
 
@@ -550,19 +554,29 @@ public string AppName{get;private set;}="";
             SendMotion(mode,0,0,120);
             if(preview.View.Up==rolled.Up)throw new InvalidOperationException("Shift + twist did not roll the Home view.");
 
-            var pan=Open(NavMode.PanZoom,NavigationLayer.Travel,18);
+            var pan=Open(NavMode.PanZoom,NavigationLayer.Travel,16,17);
             SendMotion(mode,26,-15,0);
             var panned=preview.View;
             if(panned.Eye==pan.Eye||Vector3.Distance(Direction(panned),Direction(pan))>.00001f)
-                throw new InvalidOperationException("Alt + roll did not pan the Home view.");
+                throw new InvalidOperationException("Ctrl + Shift + roll did not pan the Home view.");
             SendMotion(mode,0,0,120);
             if(Vector3.Distance(preview.View.Eye,preview.View.Target)>=Vector3.Distance(panned.Eye,panned.Target))
-                throw new InvalidOperationException("Alt + twist did not zoom the Home view.");
+                throw new InvalidOperationException("Ctrl + Shift + twist did not zoom the Home view.");
 
             var zoomStart=Open(NavMode.Zoom,NavigationLayer.Travel,17);
             SendMotion(mode,0,-26,0);
             if(Vector3.Distance(preview.View.Eye,preview.View.Target)>=Vector3.Distance(zoomStart.Eye,zoomStart.Target))
                 throw new InvalidOperationException("Ctrl + roll did not zoom the Home view.");
+
+            var snapStart=Open(NavMode.Snap,NavigationLayer.Travel,18);
+            SendMotion(mode,3,1,0);
+            SendMotion(mode,0,0,60);
+            if(preview.View!=snapStart)throw new InvalidOperationException("Alt started by jumping to a default face.");
+            SendMotion(mode,80,0,60);
+            var snapped=preview.View;
+            if(Vector3.Distance(Direction(snapped),Direction(snapStart))>.00001f||
+                Math.Abs(Vector3.Dot(snapped.Up,snapStart.Up))>.25f||snapped.Pivot!=snapStart.Pivot)
+                throw new InvalidOperationException("Alt twist did not turn the same tilted Home view around its cursor pivot.");
 
             var walk=Open(NavMode.Navigate,NavigationLayer.Travel,192);
             SendMotion(mode,16,-24,120);
@@ -610,7 +624,7 @@ public string AppName{get;private set;}="";
             cfg=oldCfg;profile=oldProfile;foregroundWindow=oldWindow;nativeFocusAllowed=oldFocus;
             pad=oldPad;padOrigin=oldOrigin;padVisible=oldVisible;Integration=oldIntegration;
         }
-        Console.WriteLine("Home cube verified: Shift rotate and roll, Alt pan and zoom, Ctrl zoom, Backtick walk and turn, look and height holds, button 2 snap, and 3D controls off.");
+        Console.WriteLine("Home cube verified: Shift rotate and roll, Alt live-view angle snap, Ctrl + Shift pan and zoom, Ctrl zoom, Backtick walk and turn, look and height holds, button 2 snap, and 3D controls off.");
     }
     
     internal void VerifyThreeAxisControls(){
@@ -624,7 +638,7 @@ public string AppName{get;private set;}="";
             var pose=client.Pose!;var heading=System.Numerics.Vector3.Normalize(pose.Target-pose.Eye);
             if(pose.Eye.X<=start.Eye.X||pose.Eye.Z>=start.Eye.Z||Math.Abs(heading.X)+Math.Abs(heading.Y)>.00001f||Math.Abs(pose.Eye.Y-start.Eye.Y)>.0001f)throw new InvalidOperationException("Camera-walk ball axes did not combine forward and sideways travel without turning.");
             pending.Wheel(240);for(int i=0;i<24;i++)Flush(timeMilliseconds:1256+i*8);
-            pose=client.Pose!;if(System.Numerics.Vector3.Normalize(pose.Target-pose.Eye).X<=0||Math.Abs(pose.Eye.Y-start.Eye.Y)>.0001f||client.Out.Count!=1)throw new InvalidOperationException("Walk twist did not turn while preserving level travel.");
+            pose=client.Pose!;if(Vector3.Normalize(pose.Target-pose.Eye).X>=0||Math.Abs(pose.Eye.Y-start.Eye.Y)>.0001f||client.Out.Count!=1)throw new InvalidOperationException("Walk twist did not turn in the corrected direction while preserving level travel.");
             motionSamples.Move(-96,80);Flush(timeMilliseconds:1456);
             if(client.Pose!=null||client.Out.Count!=2||ConfigStore.S(client.Out.First(),"t")!="end")throw new InvalidOperationException("Walk centre return did not discard queued camera motion and stop all axes.");
             client.Pose=client.BasePose=start;client.Out.Clear();Flush(timeMilliseconds:1464);
@@ -637,11 +651,11 @@ public string AppName{get;private set;}="";
             if(!MouseEvent(0x20a,120))throw new InvalidOperationException("Vertical twist scrolled through camera walk.");
             Flush(timeMilliseconds:1600);
             var turn=client.Pose!;
-            if(turn.Eye!=start.Eye||turn.Target.X<=start.Target.X)throw new InvalidOperationException("Scroll up did not turn the camera right.");
+            if(turn.Eye!=start.Eye||turn.Target.X>=start.Target.X)throw new InvalidOperationException("Walk kept the previous twist sign.");
             Flush(timeMilliseconds:1608);
             if(client.Pose!=turn||client.Out.Count!=1)throw new InvalidOperationException("Quiet ticks changed the turn or discarded its pending pose.");
             MouseEvent(0x20a,-120);Flush(timeMilliseconds:1616);
-            if(System.Numerics.Vector3.Distance(client.Pose!.Target,start.Target)>.0001f)throw new InvalidOperationException("Scroll down did not turn left after reversing the twist.");
+            if(System.Numerics.Vector3.Distance(client.Pose!.Target,start.Target)>.0001f)throw new InvalidOperationException("Opposite scroll did not reverse the walk twist.");
 
             navigationLayer=NavigationLayer.Look;navigationMotion.Reset();navigationWasMoving=false;
             client.Pose=client.BasePose=start;client.Out.Clear();motionSamples.Move(12,-12);Flush(timeMilliseconds:2000);
@@ -654,12 +668,25 @@ public string AppName{get;private set;}="";
             Flush(timeMilliseconds:2008);
             var rise=client.Pose!;
             if(rise.Eye.Y<=look.Eye.Y||rise.Eye.X!=look.Eye.X||rise.Eye.Z!=look.Eye.Z||
-                System.Numerics.Vector3.Distance(rise.Target-rise.Eye,look.Target-look.Eye)>.0001f)
+                Vector3.Distance(rise.Target-rise.Eye,look.Target-look.Eye)>.0001f)
                 throw new InvalidOperationException("Backtick + 1 did not raise the tilted camera without changing its aim.");
             Flush(timeMilliseconds:2016);
-            if(client.Pose!=rise||client.Out.Count!=1)throw new InvalidOperationException("Look twist continued or lost its final pose on a quiet tick.");
+            var higher=client.Pose!;
+            if(higher.Eye.Y<=rise.Eye.Y||client.Out.Count!=1)
+                throw new InvalidOperationException("Look height did not continue while the hold was active.");
             MouseEvent(0x20a,-120);Flush(timeMilliseconds:2024);
-            if(System.Numerics.Vector3.Distance(client.Pose!.Eye,look.Eye)>.0001f)throw new InvalidOperationException("Backtick + 1 scroll down did not lower the camera.");
+            if(client.Pose!=null||client.Out.Count!=2||ConfigStore.S(client.Out.First(),"t")!="end")
+                throw new InvalidOperationException("Returning height to centre did not freeze the displayed view.");
+            client.Pose=client.BasePose=higher;client.Out.Clear();
+            MouseEvent(0x20a,-120);Flush(timeMilliseconds:2032);
+            var lowered=client.Pose!;
+            Flush(timeMilliseconds:2040);
+            if(lowered.Eye.Y>=higher.Eye.Y||client.Pose!.Eye.Y>=lowered.Eye.Y)
+                throw new InvalidOperationException("Backtick + 1 scroll down did not lower continuously from centre.");
+            Flush(finish:true,timeMilliseconds:2048);
+            var released=client.Pose;
+            Flush(timeMilliseconds:2056);
+            if(client.Pose!=released)throw new InvalidOperationException("Look height continued after release.");
             cfg["navigationLevelFlight"]=true;
 
             navigationLayer=NavigationLayer.Height;navigationMotion.Reset();navigationWasMoving=false;
@@ -683,7 +710,7 @@ public string AppName{get;private set;}="";
             pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();glide.Reset();
             cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;navigationWasMoving=oldMoving;navigationLayer=oldLayer;
         }
-        Console.WriteLine("Three-axis controls verified through the actual controller: independent travel, twist yaw, centre/release stop, signed twist in walk and look, retained finite camera poses, and separate rotation/pan/zoom/twist gains.");
+        Console.WriteLine("Three-axis controls verified through the actual controller: independent travel, twist yaw, centre/release stop, corrected walk twist and continuous world height in look, and separate rotation/pan/zoom/twist gains.");
     }
     internal void VerifyFreeLook(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession,oldMoving=navigationWasMoving;

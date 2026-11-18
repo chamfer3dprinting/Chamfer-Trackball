@@ -64,7 +64,7 @@ internal sealed class MainForm:Form{
         try{
             var message=JsonNode.Parse(e.WebMessageAsJson)!.AsObject();id=message["id"]!.GetValue<long>();var args=message["args"]!.AsArray();object? result=null;
             switch(ConfigStore.S(message,"name")){
-                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Twist while holding Backtick to turn. Add 1 and twist to raise or lower the camera. Try all your 3D shortcuts on the Home cube.","Normal mouse reset and queued saving preserve your settings.","Updates now advance the application version; click Update to download, install and restart."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
+                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Alt snaps from your current view. Ctrl + Shift pans. Backtick twist turns, and Backtick + 1 twist moves the camera up or down continuously.","Normal mouse reset and queued saving preserve your settings.","Updates now advance the application version; click Update to download, install and restart."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
                 case "ctSave":store.Save(args[0]!.AsObject());result=store.Snapshot();break;
                 case "ctStatus":result=controller.Status();break;
                 case "ctResetAll":result=store.Reset();break;
@@ -242,11 +242,30 @@ internal sealed class MainForm:Form{
             foreach(var command in new[]{NavMode.Orbit,NavMode.Snap,NavMode.Navigate,NavMode.PanZoom,NavMode.Zoom}){
                 native.Begin(studio,command,240,120);var request=await BrowserRead("begin");
                 var browserScene=(JsonObject)scene.DeepClone();browserScene["session"]=ConfigStore.S(request,"session");
+                if(command==NavMode.Snap){
+                    // Studio's Snap handshake supplies the flat-face
+                    // projection, even when the live view is perspective.
+                    browserScene["orthographic"]=true;
+                    browserScene["eye"]=new JsonArray(12,7,20);
+                }
                 await BrowserSend(browserScene);
                 for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
-                if(studio.Pose==null||!native.Move(studio,command,30,20,120,command==NavMode.Navigate,1))throw new Exception("Studio camera command did not run: "+command);
-                if(command==NavMode.Snap&&studio.Pose!.WorldUp!=System.Numerics.Vector3.UnitY)throw new Exception("Studio snap did not use the host cube's Y-up convention.");
+                var startPose=studio.Pose??throw new Exception("Studio camera scene missing: "+command);
+                if(command==NavMode.Snap){
+                    if(startPose.WorldUp!=Vector3.UnitY||
+                       !native.Move(studio,command,30,20,60,false,1)||studio.Pose!=startPose)
+                        throw new Exception("Partial Alt twist jumped away from the current Studio view.");
+                    if(!native.Move(studio,command,0,0,60,false,1))
+                        throw new Exception("Studio did not accept the full Alt twist.");
+                }else if(!native.Move(studio,command,30,20,120,command==NavMode.Navigate,1))
+                    throw new Exception("Studio camera command did not run: "+command);
                 var result=await BrowserRead("camera");if(ConfigStore.S(result,"session")!=studio.Session)throw new Exception("Studio camera session mismatch.");
+                if(command==NavMode.Snap){
+                    var turned=studio.Pose!;
+                    if(turned==startPose||turned.Pivot!=startPose.Pivot||result.ContainsKey("orthographic")||
+                       Vector3.Distance(Vector3.Normalize(turned.Eye-turned.Target),Vector3.Normalize(startPose.Eye-startPose.Target))>.00001f)
+                        throw new Exception("Held Alt changed the view direction, cursor pivot or projection.");
+                }
                 if(command is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate){
                     string oldSession=studio.Session;
                     await BrowserSend(new(){["t"]="reanchor",["session"]="stale"});

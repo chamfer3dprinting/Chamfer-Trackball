@@ -16,8 +16,8 @@ Check(ConfigStore.S(defaults,"ball")=="pointer"&&ModeResolver.Resolve(defaults,n
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Zoom,"Ctrl and roll selects Zoom in the 3D program");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&ModeResolver.Resolve(defaults,new HashSet<int>{17,86})==NavMode.Idle,"Ctrl+C and Ctrl+V remain ordinary keyboard shortcuts");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.Idle,"Ctrl+Shift does not accidentally activate Shift rotation");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.PanZoom,"Alt selects object translation");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap,"Alt selects angle snapping");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom,"Ctrl + Shift selects translation without conflicting with Orbit or Zoom");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Backtick navigates");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{91})==NavMode.Idle,"Windows is no longer the default navigation key");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{192,18})==NavMode.Navigate,"Alt remains an optional modifier for Backtick navigation");
@@ -554,13 +554,16 @@ Check(acceptedOverlap.EstimatedTwist,"A mathematically identical horizontal roll
 var estimateDefaults=ConfigStore.Defaults();
 Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate"),"Normal mouse does not estimate 3D twist");
 ConfigStore.LoadProgram(estimateDefaults,1);
-Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="none"&&ConfigStore.S(estimateDefaults["buttons"]?["back"],"action")=="faceSnap","The 3D default uses the top-right button for one-click face snapping");
+Check(!ConfigStore.B(estimateDefaults,"altTwistEstimate")&&ConfigStore.S(estimateDefaults,"twistKeys")=="none"&&ConfigStore.S(estimateDefaults,"snapKeys")=="alt"&&ConfigStore.S(estimateDefaults["buttons"]?["back"],"action")=="faceSnap","Alt angle snapping and the one-click face button are both enabled in the default 3D profile");
 
 
 var obliqueEstimate=new EstimatedFaceSnap();var obliqueStart=studioView with{Eye=new Vector3(4,6,10)};
 obliqueEstimate.Reset(obliqueStart);var obliqueTurn=obliqueStart;
 for(int frame=0;frame<40;frame++)obliqueTurn=obliqueEstimate.Step(obliqueStart,60,0,0,.2f,1,"x",false,1000+frame*16);
-Check(obliqueEstimate.QuarterTurns==1&&IsFace(obliqueTurn),"Alt estimated twist first aligns an oblique starting view to a cube face before its 90-degree turn");
+var expectedObliqueTurn=CameraMath.Move(obliqueStart,NavMode.Roll,-obliqueEstimate.LastDirection*KnobSteps.QuarterDelta,0);
+ Check(obliqueEstimate.QuarterTurns==1&&Vector3.Distance(obliqueTurn.Eye,expectedObliqueTurn.Eye)<.0001f&&
+       Vector3.Distance(obliqueTurn.Up,expectedObliqueTurn.Up)<.0001f,
+       "Alt estimated twist turns the existing oblique view around its cursor pivot");
 
 
 var estimatedWheelInput=new EstimatedFaceSnap();estimatedWheelInput.Reset(studioView);var estimatedWheelPose=studioView;

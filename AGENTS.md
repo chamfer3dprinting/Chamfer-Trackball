@@ -6,13 +6,12 @@ on the owner's PC. Deliver only the executable as the user-facing download.
 
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
 mouse button swapping to implement app bindings. The owner's current 3D defaults
-match the supplied diagrams: Shift for rotation (ball pitch/yaw, Kensington twist
-roll); Alt for translation (ball pan, twist cursor depth zoom); Backtick for camera
-walk (ball forward/back/sideways, twist heading yaw). Walk continues while held and
-stops at virtual centre or key release. Top-right/button 2 is one-click nearest-face
-snapping. Rotation and face snaps use the exact cursor point as their pivot, with a
-click-through marker; zoom is cursor-centred. There is no default keyboard snap
-shortcut. Every held key and button binding remains customizable per program.
+use Shift for rotation, Ctrl + Shift for translation, Alt for angle snaps, and
+Backtick for camera walk. Alt roll snaps from the current view and twist turns it
+in quarter increments at the cursor. Top-right/button 2 selects the nearest flat
+face. Backtick roll travels and twist turns. Backtick + 1 roll looks and twist
+sets height. Continuous travel and height stop at virtual centre or release.
+Rotation and snaps use the cursor point as their pivot. Zoom is cursor-centred. Every held key and button binding remains customizable per program.
 Normal mouse keeps native clicks/wheel axes and ordinary Backtick typing. Ctrl
 remains an optional zoom hold and Ctrl keyboard shortcuts remain normal.
 
@@ -37,6 +36,27 @@ button numbers or the UI's descriptive labels; enable a correction only when
 a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
+
+# 2026-11-18 — Codex: Live-view Alt snapping and continuous twist height
+
+The owner restores Alt for angle snapping. Move standard translation to
+Ctrl + Shift. The first tiny roll or fractional notch previously aligned the
+camera to a canonical face. Wait for meaningful input, then step the current view
+to the next face from its screen axes or rotate the current view 90 degrees around
+the cursor on a complete twist notch. Suppress redundant pre-snap poses. Held Alt
+in Studio keeps the rendered projection. Button 2 uses the normal flat cube snap.
+
+The owner reports the Backtick twist turned in the opposite direction in use.
+Reverse the three-axis walk heading sign on direct and continuous paths, keeping
+height independent. In Backtick + 1, use the ball travel rate curve for vertical
+twist, active until the virtual centre or key release. Use world height even
+when tilted and preserve latched ball travel across the look-layer transition.
+
+Core coverage adds tilted and off-centre snaps, fractional reports, retained
+live projection, both height directions, centre/release stops and exact binding
+selection. Native Windows, existing Studio renderer and physical validation are
+pending. Apply the new bindings to the owner's current program with a backup.
+Preserve saved presets and other programs. Keep source on GitHub.
 
 # 2026-11-17 — Codex: Installed Admin v1.5.53 twist controls
 

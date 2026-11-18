@@ -68,9 +68,15 @@ internal sealed class NativeServer:IDisposable {
                 return true;
             }
             if(c.Pose==null)return false;
-            if(mode==NavMode.Snap)c.Pose=c.EstimateTwist?c.EstimatedSnap.Step(c.BasePose!,dx,dy,wheel,gain,c.TwistGain,c.TwistAxis,c.ReverseTwist,Environment.TickCount64,c.TwistCalibration):c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
-            else c.Pose=CameraMath.Move(c.Pose,mode,dx,dy,wheel,vertical,gain);
-            PublishPose(c);return true;
+            if(mode==NavMode.Snap){
+                var previous=c.Pose;
+                c.Pose=c.EstimateTwist?c.EstimatedSnap.Step(c.BasePose!,dx,dy,wheel,gain,c.TwistGain,c.TwistAxis,c.ReverseTwist,Environment.TickCount64,c.TwistCalibration):c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
+                if(c.Pose!=previous)PublishPose(c);
+            }else{
+                c.Pose=CameraMath.Move(c.Pose,mode,dx,dy,wheel,vertical,gain);
+                PublishPose(c);
+            }
+            return true;
         }
     }
     public void StopNavigation(Client c){
@@ -108,14 +114,25 @@ internal sealed class NativeServer:IDisposable {
             string message=state switch{
                 "waiting"=>"Waiting for the 3D view…",
                 "turned"=>snap.LastTurnDirection>0?"Clockwise 90°":"Counterclockwise 90°",
-                "ready"=>"Roll up/down/left/right to switch faces",
+                "ready"=>"Roll to snap faces · twist to turn this view 90°",
                 _=>"Switching cube faces"
             };
             return new(){["state"]=state,["message"]=message,["samples"]=snap.Samples,["turns"]=snap.TurnCount,["direction"]=snap.LastTurnDirection};
         }
     }
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
-    static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["pivot"]=V(p.Pivot),["zoomPivot"]=V(p.ZoomPivot??p.Pivot),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
+    static JsonObject PoseMessage(Client c){
+        var p=c.Pose!;
+        var message=new JsonObject{
+            ["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),
+            ["up"]=V(p.Up),["pivot"]=V(p.Pivot),["zoomPivot"]=V(p.ZoomPivot??p.Pivot),["orthoHeight"]=p.OrthoHeight
+        };
+        // Studio supplies a flat projection for cube snap requests. Held Alt
+        // rotates the view around the cursor without switching its projection.
+        // The one-click cube snap still uses Studio's normal flat-face view.
+        if(c.App!="chamfer3d"||c.Mode!=NavMode.Snap||c.OneShotSnap)message["orthographic"]=p.Orthographic;
+        return message;
+    }
     public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.Mode=NavMode.Idle;c.OneShotSnap=c.SnapTwist=c.EstimateTwist=false;c.TwistCalibration=null;}}
     static void PublishPose(Client c){
         if(!c.IsPreview)Queue(c,PoseMessage(c));

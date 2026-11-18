@@ -3,7 +3,7 @@ using System.Text.Json;
 using Chamfer.Trackball.Core;
 static class CameraOrientationChecks {
  static Vector3[] Faces=[Vector3.UnitX,-Vector3.UnitX,Vector3.UnitY,-Vector3.UnitY,Vector3.UnitZ,-Vector3.UnitZ];
- static Vector2 Screen(CameraPose c,Vector3 p){var back=Vector3.Normalize(c.Eye-c.Target);var right=Vector3.Normalize(Vector3.Cross(c.Up,back));var up=Vector3.Cross(back,right);var v=p-c.Eye;float depth=-Vector3.Dot(v,back),h=2*depth*MathF.Tan(c.VerticalFov/2);return new(Vector3.Dot(v,right)/h,Vector3.Dot(v,up)/h);}
+ static Vector2 Screen(CameraPose c,Vector3 p){var back=Vector3.Normalize(c.Eye-c.Target);var right=Vector3.Normalize(Vector3.Cross(c.Up,back));var up=Vector3.Cross(back,right);var v=p-c.Eye;float depth=-Vector3.Dot(v,back),h=c.Orthographic?c.OrthoHeight:2*depth*MathF.Tan(c.VerticalFov/2);return new(Vector3.Dot(v,right)/h,Vector3.Dot(v,up)/h);}
  static object Pose(CameraPose p)=>new{eye=new[]{p.Eye.X,p.Eye.Y,p.Eye.Z},target=new[]{p.Target.X,p.Target.Y,p.Target.Z},up=new[]{p.Up.X,p.Up.Y,p.Up.Z},pivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},zoomPivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},orthoHeight=p.OrthoHeight,orthographic=p.Orthographic};
  public static void Run(Action<bool,string> check){
   var root=new CameraPose(new(0,0,200),Vector3.Zero,Vector3.UnitY,new(15,-10,40),MathF.PI/4,160,1200,900,false,Vector3.UnitY,new(15,-10,40));
@@ -19,6 +19,33 @@ static class CameraOrientationChecks {
     for(int i=0;i<4;i++)next=snap.Step(start,direction.X,direction.Y,0,1,1000+i*200);
     check(Vector3.Distance(next.Eye,start.Eye)<.005&&Vector3.Distance(next.Up,start.Up)<.00003,"Four adjacent face changes preserve starting orientation: "+face+" / "+quarter+" / "+direction);
    }
+  }
+  var live=CameraMath.Move(root,NavMode.Orbit,85,-63,34);
+  foreach(bool orthographic in new[]{false,true}){
+   var start=live with{Orthographic=orthographic};
+   var snap=new FaceSnap();snap.Reset(start);
+   check(snap.Step(start,0,0,0,1,1000)==start&&snap.Step(start,1,1,0,1,1016)==start&&
+       snap.Step(start,0,0,60,1,1032)==start,
+       "Alt hold, a tiny roll and a partial notch preserve the current tilted view");
+   var quarter=snap.Step(start,150,0,60,1,1048);
+   var back=Vector3.Normalize(start.Eye-start.Target);
+   var rotatedUp=Vector3.Transform(start.Up,Quaternion.CreateFromAxisAngle(back,-MathF.PI/2));
+   check(Vector3.Distance(Vector3.Normalize(quarter.Eye-quarter.Target),back)<.00002f&&
+       Vector3.Distance(quarter.Up,rotatedUp)<.00002f&&quarter.Orthographic==orthographic&&
+       quarter.OrthoHeight==start.OrthoHeight&&quarter.Pivot==start.Pivot,
+       "A full twist rotates the tilted view itself by 90 degrees even if the sensor also reports roll");
+   check(Vector2.Distance(Screen(start,start.Pivot),Screen(quarter,quarter.Pivot))<.00001f&&
+       Math.Abs(Vector3.Distance(start.Eye,start.Target)-Vector3.Distance(quarter.Eye,quarter.Target))<.0001f,
+       "An off-centre angle snap retains the cursor projection and lens distance");
+   var restored=snap.Step(start,0,0,-120,1,1064);
+   check(Vector3.Distance(restored.Eye,start.Eye)<.0001f&&Vector3.Distance(restored.Up,start.Up)<.00002f,
+       "Reversing an angle snap restores the earlier view");
+   var face=snap.Step(start,50,0,0,1,1080);
+   var actual=Vector3.Normalize(face.Eye-face.Target);
+   var trial=Vector3.Transform(back,Quaternion.CreateFromAxisAngle(Vector3.Normalize(start.Up),-MathF.PI/2));
+   check(Vector3.Distance(actual,CameraMath.NearestFace(trial))<.00002f&&
+       Vector2.Distance(Screen(start,start.Pivot),Screen(face,face.Pivot))<.00001f,
+       "Directional snap starts from the current camera and uses the original cursor pivot");
   }
   var centre=root with{Pivot=Vector3.Zero,ZoomPivot=Vector3.Zero};
   var rightView=CameraMath.Move(centre,NavMode.Orbit,4,0);var downView=CameraMath.Move(centre,NavMode.Orbit,0,4);var marker=new Vector3(0,0,20);
