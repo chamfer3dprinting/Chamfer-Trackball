@@ -38,6 +38,23 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-17 — Codex: Installed Admin v1.5.53 twist controls
+
+PR38 is merged as 6dca6080e672354951e69a1ea246d5608ea45431. Release 449511847
+from main workflow 44234653186 passed 1,574 core checks and both Windows
+executable checks. The Admin asset and installed file match SHA-256
+35e4fc55c0738a697257815b37b3a8841b0dbe73418eb74514f67ed0a622ec76.
+The local camera bridge reports 1.5.53. The settings comparison
+matches the backup across both programs and all 13 presets.
+
+Verified the installed Home cube renders and shows “Try it here — 3D on”
+with the pointer over it. The actual Windows controller tests exercise Shift
+rotation and twist roll, Alt pan and twist zoom, Ctrl zoom, both Backtick twist
+directions, Look and Height holds, button 2 snap, and stopping on 3D switch-off.
+Native camera tests pass for Studio's desktop and hosted origins. Backtick
+twist follows each scroll report, and Backtick + 1 twist moves along world height.
+The owner can evaluate the physical Kensington feel from the open Home cube.
+
 # 2026-11-17 — Codex: Twist direction and full Home cube controls
 
 The owner confirms the walk/look bindings and requests Backtick twist scroll up
