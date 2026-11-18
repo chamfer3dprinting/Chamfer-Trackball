@@ -51,14 +51,18 @@ internal sealed class NativeServer:IDisposable {
         if(x.HasValue&&y.HasValue){message["x"]=x.Value;message["y"]=y.Value;}
         Queue(c,message);
     }
-    void FollowCursor(Client c,string session){
+    public bool FollowCursor(Client c,string session,Point? cursor=null,CameraPose? previewPose=null){
         lock(c.Gate){
-            if(c.App!="chamfer3d"||c.Version<2||!c.Focus||c.Pose==null||session!=c.Session||
-               c.Mode is not (NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate))return;
-            // Deliver the final old pose before asking for a new cursor
-            // anchor. The new session rejects delayed replies and frames.
+            if((c.IsPreview?previewPose==null:c.App!="chamfer3d")||c.Version<2||!c.Focus||
+               c.Pose==null||c.OneShotSnap||session.Length==0||session!=c.Session||
+               c.Mode is not (NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate or NavMode.Snap or NavMode.Roll))
+                return false;
+            // Finish the earlier pose before the viewport picks the surface at
+            // the new cursor. Delayed scene replies cannot replace the new pose.
             Queue(c,new(){["t"]="end",["session"]=c.Session});
-            StartSession(c,c.Mode);
+            StartSession(c,c.Mode,cursor?.X,cursor?.Y);
+            if(c.IsPreview&&previewPose!=null)SetScenePose(c,previewPose);
+            return true;
         }
     }
     public bool Move(Client c,NavMode mode,float dx,float dy,float wheel,bool vertical,float gain){
@@ -163,12 +167,15 @@ internal sealed class NativeServer:IDisposable {
         c.Seen=DateTime.UtcNow;
         if(ConfigStore.S(m,"t")=="focus"){c.Focus=ConfigStore.B(m,"on");return;}
         if(ConfigStore.S(m,"t")=="reanchor"){FollowCursor(c,ConfigStore.S(m,"session"));return;}
-        if(ConfigStore.S(m,"t")!="scene"||ConfigStore.S(m,"session")!=c.Session||c.Session.Length==0)return;
+        if(ConfigStore.S(m,"t")!="scene")return;
+        string session=ConfigStore.S(m,"session");
+        if(session.Length==0||session!=c.Session)return;
         try{
             Vector3 vec(string key){var a=m[key]!.AsArray();if(a.Count!=3)throw new FormatException();return new(a[0]!.GetValue<float>(),a[1]!.GetValue<float>(),a[2]!.GetValue<float>());}
             var p=new CameraPose(vec("eye"),vec("target"),vec("up"),vec("pivot"),(float)ConfigStore.D(m,"verticalFov",.785398),(float)ConfigStore.D(m,"orthoHeight",10),ConfigStore.I(m,"width",800),ConfigStore.I(m,"height",600),ConfigStore.B(m,"orthographic"));
             p=p with{ZoomPivot=m["zoomPivot"]!=null?vec("zoomPivot"):null,WorldUp=m["worldUp"] is JsonArray?vec("worldUp"):c.App=="chamfer3d"?Vector3.UnitY:Vector3.UnitZ};
             if(p.Valid&&CameraPose.Finite(p.WorldUp)&&p.WorldUp.LengthSquared()>1e-12f)lock(c.Gate){
+                if(session!=c.Session)return;
                 SetScenePose(c,p);
                 if(c.OneShotSnap){
                     if(c.Focus&&DateTime.UtcNow-c.Began<TimeSpan.FromSeconds(2)){

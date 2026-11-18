@@ -21,7 +21,15 @@ internal sealed class Controller:IDisposable{
     readonly CameraMotionFilter cameraMotion=new();readonly HeldRateMotion heldRate=new();
     readonly KnobSteps knobSteps=new();readonly CircleZoom circle=new();readonly MotionGlide glide=new();readonly PointerMotion pointer=new();
     double gx,gy;readonly MotionFrames pending=new(),motionSamples=new();readonly FractionalInput fractions=new();NavMode emulationMode=NavMode.Idle;
-    long snapPivotUntil;Point snapPivotPoint;
+    long snapPivotUntil;
+    Point snapPivotPoint,cameraCursor;
+    readonly MotionFrames guideMotion=new();
+
+    public MotionFrame ReadGuideMotion(){
+        var frame=guideMotion.Peek();
+        guideMotion.Reset();
+        return frame;
+    }
     bool stoppedByClick,emulating,knobHoldActive;float knobAngle;double rollLog;volatile bool nativeFocusAllowed=true;int foregroundPid;volatile nint foregroundWindow;
     readonly CameraPreview preview=new();
     Rectangle pad;bool padVisible;Point padOrigin;
@@ -31,7 +39,9 @@ internal sealed class Controller:IDisposable{
     public string Mode=>circle.Active?"Zoom":mode.ToString();
     public JsonObject GuideState(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
-        return new(){["pivotMarker"]=IsCad&&ConfigStore.B(cfg,"showPivot",true)&&(mode==NavMode.Orbit&&native?.Pose!=null||Environment.TickCount64<snapPivotUntil),["snapPivot"]=mode==NavMode.Idle&&Environment.TickCount64<snapPivotUntil,["pivotX"]=snapPivotPoint.X,["pivotY"]=snapPivotPoint.Y,["mode"]=Mode,["navigationActive"]=navigationSession,["navigationLayer"]=navigationLayer.ToString(),["threeAxisControls"]=ConfigStore.B(cfg,"threeAxisControls"),["freeLook"]=!ConfigStore.B(cfg,"threeAxisControls")&&ConfigStore.B(cfg,"navigationFreeLook"),["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+        bool cursorPivot=native?.Pose!=null&&mode is NavMode.Orbit or NavMode.Snap or NavMode.Roll;
+        bool slimBlade=SlimBladeTwist.IsDevice(input.ActiveDevice)||input.ActiveDeviceName.Contains("SlimBlade",StringComparison.OrdinalIgnoreCase);
+        return new(){["twistInput"]=slimBlade,["reverseTwist"]=ConfigStore.B(cfg,"invertTwist"),["pivotMarker"]=IsCad&&ConfigStore.B(cfg,"showPivot",true)&&(cursorPivot||Environment.TickCount64<snapPivotUntil),["snapPivot"]=mode==NavMode.Idle&&Environment.TickCount64<snapPivotUntil,["pivotX"]=snapPivotPoint.X,["pivotY"]=snapPivotPoint.Y,["mode"]=Mode,["navigationActive"]=navigationSession,["navigationLayer"]=navigationLayer.ToString(),["threeAxisControls"]=ConfigStore.B(cfg,"threeAxisControls"),["freeLook"]=!ConfigStore.B(cfg,"threeAxisControls")&&ConfigStore.B(cfg,"navigationFreeLook"),["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
     }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
@@ -151,6 +161,7 @@ public string AppName{get;private set;}="";
         navigationClock.SetEnabled(navigationSession);
     }
     void StartCamera(NativeServer.Client client,NavMode next,Point at){
+        cameraCursor=at;
         bool smooth=ConfigStore.B(cfg,"steadyCamera")||ConfigStore.B(cfg,"spaceMouseCruise");
         float response=DirectPresentation(input.ActiveDevice)||navigationSession?(float)ConfigStore.D(cfg,"cameraResponseMs",18):12;
         server.Begin(client,next,at.X,at.Y,knobHoldActive,ConfigStore.B(cfg,"altTwistEstimate"),TwistGain,
@@ -190,6 +201,7 @@ public string AppName{get;private set;}="";
     }
     void Motion(int x,int y,string device,bool captured){
         rawX+=x;rawY+=y;
+        guideMotion.Move(x,y);
         UpdateCalibrationForeground();
         if(calibration.Receiving){calibrationMotion.Move(x,y);timer.Interval=MotionPolicy.FrameIntervalMs;}
         if(!captured)return;
@@ -218,7 +230,14 @@ public string AppName{get;private set;}="";
     bool ApplyNavigation(NativeServer.Client client,NavigationFrame frame,float turnGain,bool coupledLook=false){
         bool looking=navigationLayer==NavigationLayer.Look;
         bool level=ConfigStore.B(cfg,"navigationLevelFlight")||navigationLayer==NavigationLayer.Height;
-        return server.Fly(client,frame,PanGain,turnGain,level,looking||coupledLook,worldHeight:looking);
+        float travelGain=PanGain;
+        if(!server.Fly(client,frame,travelGain,turnGain,level,looking||coupledLook,worldHeight:looking))return false;
+        bool threeAxes=ConfigStore.B(cfg,"threeAxisControls");
+        bool turning=!looking&&(threeAxes||navigationLayer==NavigationLayer.Height);
+        // Match the camera's resolved direction, including reverse twist and
+        // rate-based motion that continues after the last physical report.
+        guideMotion.Wheel(turning?frame.Yaw*(threeAxes?-1:1)*turnGain*8:frame.Up*travelGain*8);
+        return true;
     }
 
     void Flush(bool finish=false,double? timeMilliseconds=null,string? device=null){
@@ -254,8 +273,8 @@ public string AppName{get;private set;}="";
             var flight=navigationMotion.Step(frame.X,frame.Y,wheel,now,coupledLook:coupledLook,ballTwist:threeAxes,control:navigationLayer);
             if(flight.Active&&native!=null){
                 ApplyNavigation(native,flight,looking||!threeAxes?OrbitGain:TwistGain,coupledLook);
-                // A finite twist or look must get to the renderer even if
-                // there is no ongoing travel on the very next tick.
+                // A look nudge still reaches the renderer even when there
+                // is no active travel or turn on the next tick.
                 navigationWasMoving=!navigationMotion.Centered;
             }else if(navigationWasMoving&&navigationMotion.Centered&&native!=null){
                 navigationWasMoving=false;
@@ -263,7 +282,7 @@ public string AppName{get;private set;}="";
             }
             pending.ClearPrimary();pending.ClearDial();return;
         }
-        // Keep finite walk twists signed in the optional motion filters too.
+        // Keep direct walk twists signed when continuous navigation is off.
         float walkTwist=0;
         if(mode==NavMode.Navigate&&UsesWalkTwist&&native?.Version>=2){
             walkTwist=frame.Wheel;
@@ -303,9 +322,23 @@ public string AppName{get;private set;}="";
             pending.ClearDial();
         }
     }
-    bool SendMotion(NavMode output,float x,float y,float w){
-        // Keep a first small nudge intact until the host returns its camera.
-        if(native!=null&&native.Version>=2&&native.Pose==null)return false;
+    bool CameraMotionReady(NavMode output,Point? cursor){
+        var client=native;
+        if(client is not {Version:>=2})return true;
+        if(client.Pose==null)return false;
+        if(output!=mode||output is not (NavMode.Snap or NavMode.Roll)||
+           (!client.IsPreview&&client.App!="chamfer3d"))return true;
+        if(cursor==null&&Win32.GetCursorPos(out var current))cursor=new(current.X,current.Y);
+        if(cursor is not {} at||at==cameraCursor)return true;
+        var previewPose=client.IsPreview?preview.SceneAt(PadBounds,at):null;
+        if(server.FollowCursor(client,client.Session,at,previewPose))cameraCursor=at;
+        return client.Pose!=null;
+    }
+
+    bool SendMotion(NavMode output,float x,float y,float w,Point? cursor=null){
+        // Keep the new stroke buffered until the viewport returns its new
+        // cursor pivot. The Home preview can pick it synchronously.
+        if(!CameraMotionReady(output,cursor))return false;
         int twistSteps=0;
         if(output==NavMode.Navigate&&(UsesWalkTwist||navigationLayer==NavigationLayer.Height)&&native is {Version:>=2} client){
             if(ConfigStore.B(cfg,"invertTwist"))w=-w;
@@ -339,7 +372,12 @@ public string AppName{get;private set;}="";
             }catch(Exception ex){Log(ex.Message,"err");End();return false;}
         }
         if(output==NavMode.Orbit){ox+=x;oy+=y;}if(output is NavMode.PanZoom or NavMode.Navigate){px+=x;py+=y;}
-        if(output==NavMode.Roll){double angle=knobHoldActive?-twistSteps*Math.PI/2:-x*.005;rollLog+=angle;if(knobHoldActive)knobAngle+=(float)angle;}
+        if(output==NavMode.Roll){
+            double angle=knobHoldActive?-twistSteps*Math.PI/2:-x*.005;
+            rollLog+=angle;
+            if(knobHoldActive)knobAngle+=(float)angle;
+            guideMotion.Wheel((float)(angle*120/(Math.PI/2)));
+        }
         zoomLog+=MotionPolicy.ZoomAmount(output,y,w);
         zoom+=output==NavMode.Zoom?-y*5.6f+w:w;return true;
     }
@@ -360,6 +398,10 @@ public string AppName{get;private set;}="";
         UpdateCalibrationForeground();
         bool wheel=msg is 0x20a or 0x20e;
         if(wheel&&calibration.Receiving){if(msg==0x20a)calibrationMotion.Wheel(data);timer.Interval=MotionPolicy.FrameIntervalMs;return true;}
+        if(msg==0x20a&&mode is not (NavMode.Navigate or NavMode.Roll)){
+            bool reverse=mode==NavMode.Orbit&&ConfigStore.B(cfg,"invertTwist")&&ConfigStore.B(cfg,"threeAxisControls");
+            guideMotion.Wheel(reverse?-data:data);
+        }
         if(ConfigStore.B(cfg,"slimBladeSmoothTwist")&&native?.Version>=2&&
            SlimBladeTwist.Applies(input.ActiveDevice,mode,msg)&&ModeResolver.Resolve(cfg,input.Keys)==mode&&
            (mode!=NavMode.Orbit||ConfigStore.B(cfg,"twist",true))){
@@ -578,6 +620,20 @@ public string AppName{get;private set;}="";
                 Math.Abs(Vector3.Dot(snapped.Up,snapStart.Up))>.25f||snapped.Pivot!=snapStart.Pivot)
                 throw new InvalidOperationException("Alt twist did not turn the same tilted Home view around its cursor pivot.");
 
+            var nextCursor=new Point(cursor.X+67,cursor.Y-26);
+            var nextSnap=preview.SceneAt(PadBounds,nextCursor);
+            var firstSession=native!.Session;
+            SendMotion(mode,0,0,60,nextCursor);
+            if(native.Session==firstSession||preview.View!=nextSnap||nextSnap.Pivot==snapped.Pivot)
+                throw new InvalidOperationException("Alt did not pick the moved cursor before the next turn.");
+            SendMotion(mode,0,0,60,nextCursor);
+            if(preview.View.Pivot!=nextSnap.Pivot||preview.View==nextSnap)
+                throw new InvalidOperationException("Alt twist did not rotate about the moved cursor.");
+            var latest=preview.View;
+            SendMotion(mode,80,0,0,nextCursor);
+            if(preview.View.Pivot!=nextSnap.Pivot||Direction(preview.View)==Direction(latest))
+                throw new InvalidOperationException("Alt roll did not use the new pivot for the next face.");
+
             var walk=Open(NavMode.Navigate,NavigationLayer.Travel,192);
             SendMotion(mode,16,-24,120);
             if(preview.View.Eye==walk.Eye||Direction(preview.View)==Direction(walk))
@@ -639,23 +695,36 @@ public string AppName{get;private set;}="";
             if(pose.Eye.X<=start.Eye.X||pose.Eye.Z>=start.Eye.Z||Math.Abs(heading.X)+Math.Abs(heading.Y)>.00001f||Math.Abs(pose.Eye.Y-start.Eye.Y)>.0001f)throw new InvalidOperationException("Camera-walk ball axes did not combine forward and sideways travel without turning.");
             pending.Wheel(240);for(int i=0;i<24;i++)Flush(timeMilliseconds:1256+i*8);
             pose=client.Pose!;if(Vector3.Normalize(pose.Target-pose.Eye).X>=0||Math.Abs(pose.Eye.Y-start.Eye.Y)>.0001f||client.Out.Count!=1)throw new InvalidOperationException("Walk twist did not turn in the corrected direction while preserving level travel.");
-            motionSamples.Move(-96,80);Flush(timeMilliseconds:1456);
+            pending.Wheel(-240);motionSamples.Move(-96,80);Flush(timeMilliseconds:1456);
             if(client.Pose!=null||client.Out.Count!=2||ConfigStore.S(client.Out.First(),"t")!="end")throw new InvalidOperationException("Walk centre return did not discard queued camera motion and stop all axes.");
             client.Pose=client.BasePose=start;client.Out.Clear();Flush(timeMilliseconds:1464);
             if(client.Pose!=start||client.Out.Count!=0)throw new InvalidOperationException("Centred walk kept moving.");
             motionSamples.Move(100,100);pending.Wheel(120);Flush(finish:true,timeMilliseconds:1472);
             if(client.Pose!=start||pending.Peek().HasPrimary||motionSamples.Peek().HasPrimary)throw new InvalidOperationException("Walk release emitted buffered motion.");
             client.Pose=client.BasePose=start;client.Out.Clear();navigationMotion.Reset();
-            cfg["leftWheel"]="normal";cfg["rightWheel"]="normal";
+            cfg["leftWheel"]="normal";cfg["rightWheel"]="normal";ReadGuideMotion();
             if(MouseEvent(0x20e,120))throw new InvalidOperationException("Horizontal scrolling was consumed as walk twist.");
             if(!MouseEvent(0x20a,120))throw new InvalidOperationException("Vertical twist scrolled through camera walk.");
             Flush(timeMilliseconds:1600);
             var turn=client.Pose!;
             if(turn.Eye!=start.Eye||turn.Target.X>=start.Target.X)throw new InvalidOperationException("Walk kept the previous twist sign.");
             Flush(timeMilliseconds:1608);
-            if(client.Pose!=turn||client.Out.Count!=1)throw new InvalidOperationException("Quiet ticks changed the turn or discarded its pending pose.");
+            var continued=client.Pose!;
+            if(continued.Eye!=start.Eye||continued.Target.X>=turn.Target.X||
+                client.Out.Count!=1||ReadGuideMotion().Wheel<=0)
+                throw new InvalidOperationException("Walk did not keep turning or show the right direction in the guide.");
             MouseEvent(0x20a,-120);Flush(timeMilliseconds:1616);
-            if(System.Numerics.Vector3.Distance(client.Pose!.Target,start.Target)>.0001f)throw new InvalidOperationException("Opposite scroll did not reverse the walk twist.");
+            if(client.Pose!=null||client.Out.Count!=2||ConfigStore.S(client.Out.First(),"t")!="end")
+                throw new InvalidOperationException("Opposite scroll did not stop the continuous turn at neutral.");
+            client.Pose=client.BasePose=start;client.Out.Clear();
+            Flush(timeMilliseconds:1624);
+            if(client.Pose!=start)throw new InvalidOperationException("The neutral camera drifted after a turn.");
+            MouseEvent(0x20a,-120);Flush(timeMilliseconds:1632);
+            if(client.Pose!.Target.X<=start.Target.X||ReadGuideMotion().Wheel>=0)
+                throw new InvalidOperationException("Turning the other way did not match the guide.");
+            var leftTurn=client.Pose;
+            Flush(finish:true,timeMilliseconds:1640);Flush(timeMilliseconds:1648);
+            if(client.Pose!=leftTurn)throw new InvalidOperationException("Walk twist continued after release.");
 
             navigationLayer=NavigationLayer.Look;navigationMotion.Reset();navigationWasMoving=false;
             client.Pose=client.BasePose=start;client.Out.Clear();motionSamples.Move(12,-12);Flush(timeMilliseconds:2000);

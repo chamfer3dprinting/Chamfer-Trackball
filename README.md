@@ -14,7 +14,7 @@ Select **3D modelling**, turn **3D controls on**, and use the Home cube or a sup
 - **Backtick + 1** + roll looks up/down and left/right. Twist scroll up to raise the camera and scroll down to lower it.
 - **Backtick + Ctrl** + forward/back roll also raises and lowers the camera.
 
-A Backtick twist turns by a step in the scroll direction. With Continuous navigation enabled, ball travel and Backtick + 1 twist height continue while held. Return the ball or twist toward its starting point to stop that axis, or release Backtick to stop. Releasing 1 stops height. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
+With Continuous navigation enabled, a Backtick twist starts a turn in the scroll direction. Heading and travel continue independently while held. Backtick + 1 twist changes height, and Backtick + 1 roll looks around. Return the ball or twist to neutral to stop that axis, or release Backtick to stop. Releasing 1 stops height. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
 
 Change these extra holds under **Buttons & keys → Walk: look around / Walk: raise / lower**. Record only the additional key; the Camera walk hold is added automatically. Both save with programs and named presets. Existing saved programs/presets without them keep the previous controls until assigned. The owner update assigns 1 and Ctrl to the active 3D program after preserving its previous setup.
 

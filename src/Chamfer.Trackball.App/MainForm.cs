@@ -18,7 +18,7 @@ internal sealed class MainForm:Form{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer native;readonly Controller controller;
     readonly string settingsPath;readonly GuideForm guide;readonly AdminService admin;
     readonly System.Windows.Forms.Timer updateTimer=new(){Interval=900000};
-    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Hold Shift for rotation, Alt for translation, Backtick for camera walk; click the top-right button to snap a face. Release the keys for normal pointing.")};
+    bool quit;readonly bool smoke;JsonObject update=new(){["channel"]=BuildInfo.Edition,["stage"]="idle",["version"]=BuildInfo.Version,["history"]=new JsonArray(),["notes"]=new JsonArray("Hold Shift to orbit, Alt to snap around the cursor, Ctrl + Shift to pan and Backtick to walk or turn.")};
     string updateUrl="",updateHash="";
     readonly HttpClient http=new(){Timeout=TimeSpan.FromSeconds(30)};
     public MainForm(bool smoke=false,bool startTray=false){
@@ -64,7 +64,7 @@ internal sealed class MainForm:Form{
         try{
             var message=JsonNode.Parse(e.WebMessageAsJson)!.AsObject();id=message["id"]!.GetValue<long>();var args=message["args"]!.AsArray();object? result=null;
             switch(ConfigStore.S(message,"name")){
-                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Alt snaps from your current view. Ctrl + Shift pans. Backtick twist turns, and Backtick + 1 twist moves the camera up or down continuously.","Normal mouse reset and queued saving preserve your settings.","Updates now advance the application version; click Update to download, install and restart."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
+                case "ctState":result=new{version=BuildInfo.Version,edition=BuildInfo.Edition,publicVersion=BuildInfo.PublicVersion,build=BuildInfo.Revision,source=BuildInfo.Source,notes=new[]{new{version=BuildInfo.Version,notes=new[]{"Original Chamfer logo and floating control guide restored.","Identify the trackball once: corrections affect that device only.","Separate Admin build updates and explicit public release controls.","Alt snapping and roll follow the cursor. Backtick twist turns until neutral or release. The floating guide shows ball movement and turn direction.","Normal mouse reset and queued saving preserve your settings.","Updates now advance the application version; click Update to download, install and restart."}}},config=store.Snapshot(),defaults=ConfigStore.Defaults(),programDefaults=ConfigStore.Defaults()["programs"],settingsPath,startup=StartupEnabled(),pointerAccel=false,justUpdated=false};break;
                 case "ctSave":store.Save(args[0]!.AsObject());result=store.Snapshot();break;
                 case "ctStatus":result=controller.Status();break;
                 case "ctResetAll":result=store.Reset();break;
@@ -239,7 +239,7 @@ internal sealed class MainForm:Form{
             NativeServer.Client? studio=null;
             for(int tries=0;tries<50;tries++){studio=native.Find("chamfer3d",Environment.ProcessId);if(studio?.Version==2)break;await Task.Delay(10);}
             if(studio?.Version!=2||!native.Supports(studio,NavMode.Snap)||!native.Supports(studio,NavMode.Navigate))throw new Exception("Focused Studio browser did not support snap/navigation.");
-            foreach(var command in new[]{NavMode.Orbit,NavMode.Snap,NavMode.Navigate,NavMode.PanZoom,NavMode.Zoom}){
+            foreach(var command in new[]{NavMode.Orbit,NavMode.Snap,NavMode.Roll,NavMode.Navigate,NavMode.PanZoom,NavMode.Zoom}){
                 native.Begin(studio,command,240,120);var request=await BrowserRead("begin");
                 var browserScene=(JsonObject)scene.DeepClone();browserScene["session"]=ConfigStore.S(request,"session");
                 if(command==NavMode.Snap){
@@ -266,17 +266,27 @@ internal sealed class MainForm:Form{
                        Vector3.Distance(Vector3.Normalize(turned.Eye-turned.Target),Vector3.Normalize(startPose.Eye-startPose.Target))>.00001f)
                         throw new Exception("Held Alt changed the view direction, cursor pivot or projection.");
                 }
-                if(command is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate){
+                {
+                    bool angle=command is NavMode.Snap or NavMode.Roll;
                     string oldSession=studio.Session;
                     await BrowserSend(new(){["t"]="reanchor",["session"]="stale"});
                     await Task.Delay(20);
                     if(studio.Session!=oldSession)throw new Exception("A stale cursor request restarted navigation.");
-                    await BrowserSend(new(){["t"]="reanchor",["session"]=oldSession});
+                    if(angle){
+                        // Current Studio versions only send reanchor for the
+                        // earlier motion modes. Trackball detects the moved
+                        // cursor before applying the next snap or roll.
+                        if(!native.FollowCursor(studio,oldSession,new Point(480,230)))
+                            throw new Exception("Trackball could not request a new angle pivot.");
+                    }else await BrowserSend(new(){["t"]="reanchor",["session"]=oldSession});
                     var oldEnd=await BrowserRead("end");
                     var replacement=await BrowserRead("begin");
                     if(ConfigStore.S(oldEnd,"session")!=oldSession||ConfigStore.S(replacement,"session")==oldSession||
-                       ConfigStore.S(replacement,"mode")!=command.ToString()||studio.Pose!=null)
+                       ConfigStore.S(replacement,"mode")!=command.ToString()||studio.Pose!=null||
+                       angle&&(ConfigStore.I(replacement,"x")!=480||ConfigStore.I(replacement,"y")!=230))
                         throw new Exception("Cursor follow did not finish the old view before requesting its new anchor.");
+                    if(angle&&native.Move(studio,command,90,0,120,false,1))
+                        throw new Exception("Angle motion was consumed before the new cursor scene returned.");
                     await BrowserSend(browserScene);
                     await Task.Delay(20);
                     if(studio.Pose!=null)throw new Exception("An old scene replaced a following cursor gesture.");
@@ -287,11 +297,21 @@ internal sealed class MainForm:Form{
                     await BrowserSend(followed);
                     for(int tries=0;tries<50&&studio.Pose==null;tries++)await Task.Delay(10);
                     var followedPose=studio.Pose;
-                    if(followedPose==null||followedPose.Pivot!=new Vector3(3,2,0)||followedPose.ZoomPivot!=new Vector3(3,2,0)||
-                       !native.Move(studio,command,5,3,0,false,1))
+                    var newPivot=new Vector3(3,2,0);
+                    if(followedPose==null||followedPose.Pivot!=newPivot||followedPose.ZoomPivot!=newPivot||
+                       !native.Move(studio,command,command==NavMode.Snap?0:5,3,command==NavMode.Snap?120:0,false,1))
                         throw new Exception("Navigation did not resume about the new cursor point.");
                     var followedFrame=await BrowserRead("camera");
                     if(ConfigStore.S(followedFrame,"session")!=studio.Session)throw new Exception("An old camera frame escaped cursor retargeting.");
+                    if(angle&&(studio.Pose==followedPose||studio.Pose!.Pivot!=newPivot))
+                        throw new Exception("Snap or roll failed to turn around its new cursor pivot.");
+                    if(command==NavMode.Snap){
+                        if(!native.Move(studio,command,80,0,0,false,1))
+                            throw new Exception("Directional snapping did not resume after the cursor moved.");
+                        await BrowserRead("camera");
+                        if(studio.Pose!.Pivot!=newPivot)
+                            throw new Exception("Directional snapping lost the moved cursor pivot.");
+                    }
                 }
                 native.End(studio);await BrowserRead("end");
             }
@@ -372,6 +392,7 @@ internal sealed class MainForm:Form{
             controller.VerifyLevelFlight();
             controller.VerifyFreeLook();
             controller.VerifyThreeAxisControls();
+            guide.VerifyMotionAnimation();
             input.VerifyPreviewInput(controller.VerifyPreviewControls);
             using(var marker=new PivotForm()){var at=Cursor.Position;marker.UpdateMarker(true,at);if(!marker.Visible||Math.Abs(marker.Bounds.Left+marker.Width/2-at.X)>1||Math.Abs(marker.Bounds.Top+marker.Height/2-at.Y)>1)throw new Exception("Pivot marker did not appear under the cursor.");marker.UpdateMarker(false,at);if(marker.Visible)throw new Exception("Pivot marker did not hide on release.");}
             controller.VerifyImmediateStudioDelivery();
@@ -396,7 +417,7 @@ internal sealed class MainForm:Form{
             if(passed!="true"||ready!="true"||store.Snapshot()["programs"]?[0]?["combos"]?.AsArray().Any(c=>ConfigStore.S(c?["bind"],"keys")=="Ctrl+S")!=true)throw new Exception("UI bridge/persistence smoke test failed: "+check+" "+ready+" "+outcome+" "+diagnostic);
             var output=Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.png");
             using(var image=File.Create(output))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Remembered multi-trackball raw input, per-device corrections, select/rename UI and held-drag isolation, Cursor-anchored perspective/orthographic zoom over the real native scene handshake, malformed anchor rejection, Version, logo, edition, Home identification, trackball identity across UI saves, floating guide, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, tiny one-packet knob nudges and reverse nudges producing exact 90-degree steps, first-nudge handshake retention and one camera update per stroke, Alt left-wheel orientation with right-wheel pass-through and directional ball faces, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.ok"),"Remembered multi-trackball raw input, per-device corrections, select/rename UI and held-drag isolation, Cursor-anchored perspective/orthographic zoom over the real native scene handshake, malformed anchor rejection, Version, logo, edition, Home identification, trackball identity across UI saves, animated guide directions, continuous twist and neutral stop, moved-cursor snap and roll, held controls, input reconnect/registration and idle-pause recovery, raw sensor to controller delivery, calibration foreground/navigation recovery, Studio snap/navigation negotiation, quiet idle status, integration installer, saved presets, Normal mouse DPI/glide, fine 3D/Twist gains across program switches, tiny one-packet knob nudges and reverse nudges producing exact 90-degree steps, first-nudge handshake retention and one camera update per stroke, Alt left-wheel orientation with right-wheel pass-through and directional ball faces, held face/twist transitions, twist calibration review/test UI, bounded bridge commands, calibrated wheel/native camera path, clear estimated-twist labels, four directional face commands and saved combination verified.");
             Exit();
         }catch(Exception ex){File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("RUNNER_TEMP")??Path.GetTempPath(),"chamfer-ui-smoke.error"),ex.ToString());Console.Error.WriteLine(ex);Environment.Exit(1);}
     }
