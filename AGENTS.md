@@ -38,6 +38,33 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-17 — Codex: Separate camera walk look and height holds
+
+The owner reports missing vertical navigation and proposes Backtick + 1 for turning,
+then requests the Rotatrix behavior. The published free-camera guide uses separate
+look and height layers during travel. Keep Backtick ball travel and knob yaw; add
+customizable navigateLookKeys (1) and navigateHeightKeys (Ctrl) extras. Backtick + 1
+aims directly from the camera eye with pitch limits while retaining the travel
+centre and command. Backtick + Ctrl maps forward/back rolls to world height;
+release Ctrl clears height. Release Backtick/focus/device/config changes clears all.
+
+Use Rotation sensitivity for look, Pan sensitivity for height/travel and Twist
+sensitivity for knob yaw. Keep the same native navigation session through extra-key
+changes, preserve buffered movement's original meaning and support direct as well
+as continuous navigation. Exact combined-chord matching and validation prevent
+conflicts. A used two-key look hold never types a stray 1 or leaves held state.
+Show complete holds and active layer in Home, Controls and the floating guide.
+New fields save with programs/presets; missing fields in older programs/presets
+remain none. Apply the owner extras only after a local rollback preset/backup.
+
+46 focused in-memory direction, centre, layer transition, gain and persistence checks
+pass; interface syntax and shortcut recording checks pass.
+Full Windows core/persistence, actual keyboard/controller and executable/UI checks,
+Admin delivery and physical evaluation remain pending. The stock Kensington still
+reports X/Y plus twist scroll rather than custom Rotatrix firmware motion.
+Studio runtime, models, AI and publishing remain outside this change. Source stays
+on GitHub with no local Trackball development folder. No public stable promotion.
+
 # 2026-11-16 — Codex: Installed camera walk centre fix in Admin 1.5.51
 
 Installed and verified Admin 1.5.51 from 4087c97f46c260c217c611db2bbc1c1e88d7d56a. Release

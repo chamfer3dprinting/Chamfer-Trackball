@@ -605,6 +605,7 @@ ForegroundAppChecks.Run(Check);
 CameraResponseChecks.Run(Check);
 NativeDeliveryChecks.Run(Check);
 NavigationChecks.Run(Check);
+NavigationLayerChecks.Run(Check);
 ThreeAxisChecks.Run(Check);
 LevelFlightChecks.Run(Check);
 FreeLookChecks.Run(Check);

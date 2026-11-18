@@ -703,7 +703,9 @@
       "circleSize": 160,
       "twistKeys": "none",
       "altTwistEstimate": false,
-      "twistCalibration": null
+      "twistCalibration": null,
+      "navigateLookKeys": "none",
+      "navigateHeightKeys": "none"
     },
     {
       "name": "3D modelling",
@@ -768,7 +770,9 @@
       "circleSize": 160,
       "twistKeys": "none",
       "altTwistEstimate": false,
-      "twistCalibration": null
+      "twistCalibration": null,
+      "navigateLookKeys": "1",
+      "navigateHeightKeys": "ctrl"
     }
   ],
   "activeProgram": 0,
@@ -823,5 +827,7 @@
   "navigationCruise": false,
   "navigationLevelFlight": false,
   "navigationFreeLook": false,
-  "threeAxisControls": false
+  "threeAxisControls": false,
+  "navigateLookKeys": "none",
+  "navigateHeightKeys": "none"
 }

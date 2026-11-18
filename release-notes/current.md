@@ -1,3 +1,12 @@
+# Camera walk: look around and change height
+
+- Hold Backtick for forward/back and sideways travel; Kensington twist turns the heading.
+- Add 1 while holding Backtick to look up/down and left/right. Looking is direct; existing travel continues and the look strokes do not change its starting centre.
+- Add Ctrl while holding Backtick to raise/lower the camera with forward/back rolls. Releasing Ctrl stops height movement; release Backtick to stop everything.
+- Change both extra holds in Buttons & keys, save them per program or preset, and see the complete holds in Home and the floating guide.
+- Look uses Rotation speed; travel and height use Pan / 3D speed; knob heading uses Twist speed. Normal mouse, Shift rotation, Alt translation, Ctrl zoom and button 2 face snap stay available.
+- Existing programs and presets keep their previous controls until the new extra holds are assigned.
+
 # Camera walk centre stop
 
 - Return the ball to its starting position to stop after a large Backtick walk stroke. Equal opposite twists stop turning after several notches. Walk speed is still capped, and releasing Backtick stops immediately.

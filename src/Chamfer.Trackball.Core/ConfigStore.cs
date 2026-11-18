@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Chamfer.Trackball.Core;
 
 public sealed class ConfigStore {
-    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","altTwistEstimate","twistCalibration","navigateKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+    private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","altTwistEstimate","twistCalibration","navigateKeys","navigateLookKeys","navigateHeightKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
     private readonly object gate=new();
     private readonly string path;
     private JsonObject config;
@@ -218,12 +218,13 @@ public sealed class ConfigStore {
         if(c["programs"] is not JsonArray ps||ps.Count==0)throw new InvalidDataException("At least one program is required.");
         foreach(var node in ps){
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
-            foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "twistKeys" or "navigateKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
+            foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "twistKeys" or "navigateKeys" or "navigateLookKeys" or "navigateHeightKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
             if(p["feel"] is not JsonObject)p["feel"]=d["programs"]![0]!["feel"]!.DeepClone();
             foreach(var entry in d["programs"]![0]!["feel"]!.AsObject())if(!p["feel"]!.AsObject().ContainsKey(entry.Key))p["feel"]![entry.Key]=entry.Value?.DeepClone();
         }
         foreach(var preset in c["presets"] as JsonArray??new JsonArray()){
             if(preset?["settings"] is JsonObject settings){
+                settings["navigateLookKeys"]??="none";settings["navigateHeightKeys"]??="none";
                 settings["feel"]??=new JsonObject();
                 if(!settings["feel"]!.AsObject().ContainsKey("navigationLevelFlight"))settings["feel"]!["navigationLevelFlight"]=false;
                 if(!settings["feel"]!.AsObject().ContainsKey("navigationFreeLook"))settings["feel"]!["navigationFreeLook"]=false;
@@ -251,6 +252,7 @@ public sealed class ConfigStore {
                 if(binding.IsCtrlAlone&&key!="zoomKeys")throw new InvalidDataException("Ctrl by itself is available for Zoom. Choose another key for this navigation command.");
                 if(!used.Add(binding.Canonical))throw new InvalidDataException("Two navigation modes cannot use the same held keys. Pan and zoom share the Pan + zoom mode.");
             }
+            NavigationBindings.Validate(p,used);
             _=TwistCalibrationModel.FromNode(p["twistCalibration"]);
             if(S(p["feel"],"twistAxis","x") is not "x" and not "y")throw new InvalidDataException("Twist axis must be X or Y.");
             if(p["combos"] is JsonArray combos && combos.Count>64)throw new InvalidDataException("A program supports up to 64 combinations.");
