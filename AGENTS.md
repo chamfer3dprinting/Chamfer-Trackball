@@ -10,8 +10,9 @@ use Shift for rotation, Ctrl + Shift for translation, Alt for angle snaps, and
 Backtick for camera walk. Alt roll snaps from the current view and twist turns it
 in quarter increments at the cursor. Top-right/button 2 selects the nearest flat
 face. Backtick roll travels and twist turns. Backtick + 1 roll looks and twist
-sets height. Continuous travel and height stop at virtual centre or release.
-Rotation and snaps use the cursor point as their pivot. Zoom is cursor-centred. Every held key and button binding remains customizable per program.
+sets height. Continuous travel, turn and height stop at virtual centre or release.
+Rotation and held angle snaps use the current cursor point as their pivot. Zoom
+is cursor-centred. Held bindings are customizable per program.
 Normal mouse keeps native clicks/wheel axes and ordinary Backtick typing. Ctrl
 remains an optional zoom hold and Ctrl keyboard shortcuts remain normal.
 
@@ -36,6 +37,21 @@ button numbers or the UI's descriptive labels; enable a correction only when
 a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
+
+# 2026-11-18 — Codex: Cursor-following Alt, continuous turns and animated guide
+
+The owner wants held angle snapping and roll to pick the cursor point as orbit
+does. Reuse the native camera handshake after the pointer moves. Keep input
+buffered until the new scene returns and ignore earlier scene replies. This
+works with the existing Studio desktop and browser links and the Home cube.
+
+The owner confirms continuous Backtick twist yaw until neutral or release.
+Use the separate centred turn axis and retain the confirmed left/right sign.
+Travel remains independent while the heading changes. The floating guide shows
+ball reports, the actual applied turn or height, the current keyboard bindings
+and the relevant Kensington twist instructions.
+
+Verification and Admin installation are pending.
 
 # 2026-11-18 — Codex: Live-view Alt snapping and continuous twist height
 

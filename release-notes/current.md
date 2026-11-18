@@ -1,3 +1,9 @@
+# Follow your cursor and keep turning during camera walk
+
+- While holding Alt, move the pointer to set the pivot for the next face snap or 90° turn. The optional Twist hold and the Home cube follow the pointer too.
+- Hold Backtick and twist down to turn left or up to turn right. With Continuous navigation enabled, turning continues until you twist back to neutral or release the key. Forward and sideways travel can continue while the heading changes.
+- The floating guide shows ball roll and animates the twist direction, height or scroll action for the active mode.
+
 # Snap angles from the current view
 
 - Hold Alt and roll to snap from your current angle, or twist to turn that view by 90° around your cursor. A partial movement waits without changing the view.

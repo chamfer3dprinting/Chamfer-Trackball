@@ -62,15 +62,16 @@ public sealed class NavigationMotion {
             turn.Add(ballTwist?TwistHeading(scroll):scroll*ScrollToMotion);
         }else{
             forward.Add(-dy);
-            if(!ballTwist)up.Add(scroll*ScrollToMotion);
+            if(ballTwist)turn.Add(TwistHeading(scroll));
+            else up.Add(scroll*ScrollToMotion);
         }
 
         bool walking=control==NavigationLayer.Travel;
         double steer=walking&&!ballTwist&&forward.Active?Math.Clamp((Math.Abs(forward.Position)-3)/5,0,1):0;
-        double yawRate=walking?right.Rate*(coupledLook?1:steer):turn.Rate;
-        // Each twist changes heading by the signed scroll amount. Only ball
-        // travel uses the virtual centre in the three-axis walk layer.
-        float yaw=walking&&ballTwist?TwistHeading(scroll):Advance(ref vyaw,yawRate,dt);
+        // Twist owns a separate, centred heading command. Turning and ball
+        // travel can continue independently and either can return to neutral.
+        double yawRate=walking&&!ballTwist?right.Rate*(coupledLook?1:steer):turn.Rate;
+        float yaw=Advance(ref vyaw,yawRate,dt);
         float pitch=Advance(ref vpitch,walking&&coupledLook&&!ballTwist?forward.Rate:0,dt);
         return new(Advance(ref vr,right.Rate*(1-steer),dt),Advance(ref vu,up.Rate,dt),Advance(ref vf,forward.Rate,dt),yaw,pitch);
     }
