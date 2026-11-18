@@ -14,6 +14,7 @@ internal sealed class NativeServer:IDisposable {
         public string Id=Guid.NewGuid().ToString("N"),App="",Session="";
         public int Pid,Version=2;public DateTime Seen=DateTime.UtcNow;
         public NavMode Mode=NavMode.Idle;
+        public bool IsPreview {get;init;}
         public bool Focus=true,OneShotSnap,SnapTwist,EstimateTwist,SmoothPresentation;public float TwistGain=1,DisplayResponseMs=12;public string TwistAxis="x";public bool ReverseTwist;public TwistCalibrationModel? TwistCalibration;public DateTime Began;public CameraPose? Pose,BasePose;public readonly FaceSnap Snap=new();public readonly EstimatedFaceSnap EstimatedSnap=new();
         public ConcurrentQueue<JsonObject> Out=new();public WebSocket? Socket;
         public readonly SemaphoreSlim OutSignal=new(0,1);
@@ -29,11 +30,12 @@ internal sealed class NativeServer:IDisposable {
     public Client? Find(string app,int pid)=>clients.Values.FirstOrDefault(c=>Matches(c,app,pid)&&c.Focus);
     public bool AllowsNavigation(string app,int pid){var relevant=clients.Values.Where(c=>Matches(c,app,pid)).ToArray();return relevant.Length==0||relevant.Any(c=>c.Focus);}
     public bool Supports(Client? c,NavMode mode)=>c!=null&&(c.Version>=2||mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Roll);
-    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null,bool smoothPresentation=false,float displayResponseMs=12){
+    public void Begin(Client c,NavMode mode,int x,int y,bool snapTwist=false,bool estimateTwist=false,float twistGain=1,string twistAxis="x",bool reverseTwist=false,TwistCalibrationModel? calibration=null,bool smoothPresentation=false,float displayResponseMs=12,CameraPose? previewPose=null){
         lock(c.Gate){
             c.SmoothPresentation=smoothPresentation;c.DisplayResponseMs=NativeDelivery.DisplayResponse(displayResponseMs);c.TwistCalibration=calibration;c.SnapTwist=snapTwist;c.EstimateTwist=mode==NavMode.Snap&&estimateTwist;
             c.TwistGain=twistGain;c.TwistAxis=twistAxis;c.ReverseTwist=reverseTwist;c.EstimatedSnap.Reset();
             StartSession(c,mode,x,y);
+            if(c.IsPreview&&previewPose!=null)SetScenePose(c,previewPose);
         }
     }
     public void SnapFace(Client c,int x,int y){
@@ -68,12 +70,12 @@ internal sealed class NativeServer:IDisposable {
             if(c.Pose==null)return false;
             if(mode==NavMode.Snap)c.Pose=c.EstimateTwist?c.EstimatedSnap.Step(c.BasePose!,dx,dy,wheel,gain,c.TwistGain,c.TwistAxis,c.ReverseTwist,Environment.TickCount64,c.TwistCalibration):c.Snap.Step(c.BasePose!,dx,dy,wheel,gain);
             else c.Pose=CameraMath.Move(c.Pose,mode,dx,dy,wheel,vertical,gain);
-            Queue(c,PoseMessage(c));return true;
+            PublishPose(c);return true;
         }
     }
     public void StopNavigation(Client c){
         lock(c.Gate){
-            if(c.Mode!=NavMode.Navigate||c.Pose==null)return;
+            if(c.IsPreview||c.Mode!=NavMode.Navigate||c.Pose==null)return;
             // End freezes Studio at its displayed pose. A fresh scene starts
             // from there without releasing the physical navigation key.
             // Freeze at the host's displayed pose, not an undelivered travel pose.
@@ -85,10 +87,10 @@ internal sealed class NativeServer:IDisposable {
             Queue(c,new(){["t"]="end",["session"]=c.Session});StartSession(c,NavMode.Navigate);
         }
     }
-    public bool Fly(Client c,NavigationFrame motion,float gain,float turnGain=1,bool levelFlight=false,bool freeLook=false){
+    public bool Fly(Client c,NavigationFrame motion,float gain,float turnGain=1,bool levelFlight=false,bool freeLook=false,bool worldHeight=false){
         lock(c.Gate){
             if(c.Version<2||c.Pose==null)return false;
-            c.Pose=CameraMath.Fly(c.Pose,motion,gain,turnGain,levelFlight,freeLook);Queue(c,PoseMessage(c));return true;
+            c.Pose=CameraMath.Fly(c.Pose,motion,gain,turnGain,levelFlight,freeLook,worldHeight);PublishPose(c);return true;
         }
     }
     public bool PendingSnap(Client? c){if(c==null)return false;lock(c.Gate)return c.EstimateTwist&&c.EstimatedSnap.Pending;}
@@ -115,7 +117,11 @@ internal sealed class NativeServer:IDisposable {
     static JsonArray V(Vector3 v)=>new(v.X,v.Y,v.Z);
     static JsonObject PoseMessage(Client c){var p=c.Pose!;return new(){["t"]="camera",["session"]=c.Session,["eye"]=V(p.Eye),["target"]=V(p.Target),["up"]=V(p.Up),["pivot"]=V(p.Pivot),["zoomPivot"]=V(p.ZoomPivot??p.Pivot),["orthoHeight"]=p.OrthoHeight,["orthographic"]=p.Orthographic};}
     public void End(Client? c){if(c==null)return;lock(c.Gate){Queue(c,new(){["t"]="end",["session"]=c.Session});c.Pose=c.BasePose=null;c.Session="";c.Mode=NavMode.Idle;c.OneShotSnap=c.SnapTwist=c.EstimateTwist=false;c.TwistCalibration=null;}}
+    static void PublishPose(Client c){
+        if(!c.IsPreview)Queue(c,PoseMessage(c));
+    }
     static void Queue(Client c,JsonObject msg){
+        if(c.IsPreview)return;
         lock(c.Gate){
             if(ConfigStore.S(msg,"t")=="camera"){
                 var keep=new List<JsonObject>();var session=ConfigStore.S(msg,"session");
@@ -125,6 +131,15 @@ internal sealed class NativeServer:IDisposable {
             while(c.Out.Count>=64&&c.Out.TryDequeue(out _)){ }
             c.Out.Enqueue(msg);
             if(c.Socket!=null&&c.OutSignal.CurrentCount==0)c.OutSignal.Release();
+        }
+    }
+    static void SetScenePose(Client c,CameraPose pose){
+        c.Pose=c.BasePose=pose;
+        c.Snap.Reset(pose);
+        c.EstimatedSnap.Reset(pose);
+        if(c.SnapTwist){
+            c.Pose=c.BasePose=c.Snap.Step(pose,0,0);
+            PublishPose(c);
         }
     }
     void Receive(Client c,JsonObject m){
@@ -137,15 +152,14 @@ internal sealed class NativeServer:IDisposable {
             var p=new CameraPose(vec("eye"),vec("target"),vec("up"),vec("pivot"),(float)ConfigStore.D(m,"verticalFov",.785398),(float)ConfigStore.D(m,"orthoHeight",10),ConfigStore.I(m,"width",800),ConfigStore.I(m,"height",600),ConfigStore.B(m,"orthographic"));
             p=p with{ZoomPivot=m["zoomPivot"]!=null?vec("zoomPivot"):null,WorldUp=m["worldUp"] is JsonArray?vec("worldUp"):c.App=="chamfer3d"?Vector3.UnitY:Vector3.UnitZ};
             if(p.Valid&&CameraPose.Finite(p.WorldUp)&&p.WorldUp.LengthSquared()>1e-12f)lock(c.Gate){
-                c.Pose=c.BasePose=p;c.Snap.Reset(p);c.EstimatedSnap.Reset(p);
+                SetScenePose(c,p);
                 if(c.OneShotSnap){
                     if(c.Focus&&DateTime.UtcNow-c.Began<TimeSpan.FromSeconds(2)){
                         c.Pose=CameraMath.AlignFace(p,CameraMath.NearestFace(Vector3.Normalize(p.Eye-p.Target)));
-                        Queue(c,PoseMessage(c));
+                        PublishPose(c);
                     }
                     End(c);return;
                 }
-                if(c.SnapTwist){c.Pose=c.BasePose=c.Snap.Step(p,0,0);Queue(c,PoseMessage(c));}
             }
         }catch(Exception ex)when(ex is FormatException or InvalidOperationException or ArgumentException or NullReferenceException){ }
     }

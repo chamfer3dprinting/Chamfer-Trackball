@@ -59,16 +59,21 @@ internal static class ThreeAxisChecks {
         var passedCentre = largeStroke.Step(0, 0, 0, 1120, ballTwist: true);
         check(passedCentre.Forward < 0 && !largeStroke.Centered, "Rolling beyond the starting point still reverses travel");
         largeStroke.Reset();
-        largeStroke.Step(0, 0, 120, 1000, ballTwist: true);
-        largeStroke.Step(0, 0, 120, 1008, ballTwist: true);
-        var twistCentre = largeStroke.Step(0, 0, -240, 1016, ballTwist: true);
-        check(!twistCentre.Active && largeStroke.Centered, "Two reverse twist notches cancel two forward notches without turning back");
+        var rightTurn = largeStroke.Step(0, 0, 240, 1000, ballTwist: true);
+        var leftTurn = largeStroke.Step(0, 0, -120, 1008, ballTwist: true);
+        check(rightTurn.Yaw == 2 * -leftTurn.Yaw && leftTurn.Yaw < 0,
+            "One negative twist turns left immediately after two positive notches");
+        check(!largeStroke.Step(0, 0, 0, 1016, ballTwist: true).Active && largeStroke.Centered,
+            "Camera walk twist does not keep turning on quiet ticks");
         foreach(float wheel in new[]{-60f,60f}){
             var rate=new NavigationMotion();var frame=rate.Step(0,0,wheel,1000,ballTwist:true);
             check(frame.Up==0&&frame.Forward==0&&frame.Right==0&&Math.Sign(frame.Yaw)==Math.Sign(wheel)&&frame.Pitch==0,"Walk knob twist controls yaw instead of height or translation");
             var start=Pose();var turn=CameraMath.Fly(start,frame,.4f,.4f,true);
             check(turn.Eye==start.Eye&&Forward(turn).X*wheel>0&&Math.Abs(Forward(turn).Y)<.00001f,"Twist-only walk turns right/left in place without bobbing or pitching");
-            var centre=rate.Step(0,0,-wheel,1008,ballTwist:true);check(!centre.Active&&rate.Centered,"Reverse twist back to centre stops turning while Backtick stays held");
+            var reverse=rate.Step(0,0,-wheel,1008,ballTwist:true);
+            var returned=CameraMath.Fly(turn,reverse,.4f,.4f,true);
+            check(reverse.Yaw==-frame.Yaw&&Vector3.Distance(Forward(returned),Forward(start))<.00001f,
+                "The same-sized reverse twist turns the camera back by the same angle");
         }
         var combined=new NavigationMotion();var f=combined.Step(12,-12,60,2000,ballTwist:true);var view=CameraMath.Fly(Pose(),f,.4f,.4f,true);
         check(view.Eye.X>0&&view.Eye.Z<200&&view.Eye.Y==0&&Forward(view).X>0,"Ball travel and knob turning combine continuously and simultaneously");

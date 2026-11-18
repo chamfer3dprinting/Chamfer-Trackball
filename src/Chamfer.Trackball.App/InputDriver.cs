@@ -169,6 +169,26 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
             RefreshPresence();
         }
     }
+    internal void VerifyPreviewInput(Action<Action<int[]>> verify)=>WithIsolatedDevices(()=>{
+        var oldDevice=SelectedDevice;
+        bool wasConnected=connected,wasFailed=failed,wasLearning=learning;
+        int[] oldKeys;
+        lock(keysGate)oldKeys=physical.ToArray();
+        try{
+            SelectedDevice=()=>"preview-test-trackball";
+            connected=true;
+            failed=learning=false;
+            verify(keys=>{
+                lock(keysGate){physical.Clear();physical.UnionWith(keys);}
+                KeysChanged?.Invoke();
+            });
+        }finally{
+            SelectedDevice=oldDevice;
+            connected=wasConnected;failed=wasFailed;learning=wasLearning;
+            lock(keysGate){physical.Clear();physical.UnionWith(oldKeys);}
+        }
+    });
+
     internal void VerifyRecovery()=>WithIsolatedDevices(VerifyRecoveryFixture);
     void VerifyRecoveryFixture(){
         hooks?.VerifyResponsive();VerifyKeyDispatch();

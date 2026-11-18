@@ -8,9 +8,13 @@ Navigation requests an 8 ms WinForms timer interval. A standalone Windows timing
 
 ## Camera walk
 
-In the standard 3D modelling program, hold **Backtick (`)** and roll to travel forward/back and sideways. Kensington knob twist turns the heading. With Continuous navigation enabled, return the ball/twist near its starting position or release Backtick to stop.
+Select **3D modelling**, turn **3D controls on**, and use the Home cube or a supported 3D viewport.
 
-While holding Backtick, add **1** to look up/down and left/right with the ball, or add **Ctrl** to raise/lower the camera with forward/back rolls. Looking is direct and preserves the existing travel command; release 1 to steer travel again. Release Ctrl to stop changing height. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
+- **Backtick (`)** + roll travels forward/back and sideways. Twist scroll up to turn right and scroll down to turn left.
+- **Backtick + 1** + roll looks up/down and left/right. Twist scroll up to raise the camera and scroll down to lower it.
+- **Backtick + Ctrl** + forward/back roll also raises and lowers the camera.
+
+Each twist follows its scroll direction. With Continuous navigation enabled, a ball roll sets travel speed and rolling back toward its starting point stops travel. Release Backtick to stop. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
 
 Change these extra holds under **Buttons & keys → Walk: look around / Walk: raise / lower**. Record only the additional key; the Camera walk hold is added automatically. Both save with programs and named presets. Existing saved programs/presets without them keep the previous controls until assigned. The owner update assigns 1 and Ctrl to the active 3D program after preserving its previous setup.
 
