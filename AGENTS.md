@@ -38,6 +38,30 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-17 — Codex: Twist direction and full Home cube controls
+
+The owner confirms the walk/look bindings and requests Backtick twist scroll up
+for right, down for left, and Backtick + 1 twist scroll up for raising the camera,
+down for lowering it. Each scroll report now applies a signed amount so a reverse
+twist starts the opposite turn or height change immediately. Three-axis ball
+travel still uses its continuous rate and virtual centre. Keep Backtick + 1 ball
+look, the separate Backtick + Ctrl height hold, the saved sensitivities, custom
+bindings and ordinary desktop scroll. Look height follows the world vertical
+axis while the camera is tilted, including with level flight disabled.
+
+The owner asks that every 3D control work in the app. Give Home's Try it here cube
+the existing camera engine and actual selected-program commands while 3D controls
+are on. Use an in-process camera with a cursor pivot and present only changed
+poses. It shares rotation, translation, zoom, snap and continuous navigation with
+the connected Studio path. Update the held-key quick setup to use the standard
+3D profile. Stop a finite input from being dropped by the walk centre restart.
+
+Add checks for direction changes during one hold, height on a tilted camera,
+native wheel routing, finite pose retention, the full Home command set and its
+off switch, and rendering in the actual WebView. Windows build, Admin installation
+and physical Kensington evaluation remain pending. The change uses standard
+vertical scroll reports and leaves the public candidate in its draft channel.
+
 # 2026-11-17 — Codex: Installed independent walk look and height in Admin 1.5.52
 
 PR37 is merged as runtime 0847045b8ec5607278875acb28ef78971ce4d8e0. Main workflow

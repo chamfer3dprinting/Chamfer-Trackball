@@ -1,3 +1,10 @@
+# Camera walk twist controls and the Home cube
+
+- Hold Backtick and twist the Kensington ball. Scroll up turns right and scroll down turns left.
+- Hold Backtick + 1 and twist. Scroll up raises the camera and scroll down lowers it. Roll the ball to look around, or hold Backtick + Ctrl and roll to change height.
+- A twist moves the camera by the signed scroll amount. Ball travel still continues with Continuous navigation and stops at centre or on release.
+- Turn 3D controls on and select 3D modelling to try rotation, translation, zoom, camera walk, height and button 2 face snap on the Home cube.
+
 # Camera walk: look around and change height
 
 - Hold Backtick for forward/back and sideways travel; Kensington twist turns the heading.

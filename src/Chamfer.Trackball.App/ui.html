@@ -269,7 +269,7 @@ details .ver{margin-top:10px;font-weight:600}
       <div class="card welcome" id="welcome" hidden>
         <div style="flex:1">
           <b style="font-size:16px">Welcome to Chamfer Trackball</b>
-          <div class="steps" style="margin-top:6px"><span><b>1.</b> In Buttons &amp; keys, choose <b>Identify trackball</b>, then roll only its ball.</span><span><b>2.</b> btn1 = Middle (top-left), btn2 = Back (top-right), btn3 = Left click (bottom-left), btn4 = Right click (bottom-right). Left wheel = up / down; right wheel = horizontal.</span><span><b>3.</b> Hold <b>Shift</b> to orbit, <b>Ctrl + Shift</b> to pan, <b>Ctrl</b> to zoom, <b>Alt</b> to snap to a cube face, or <b>Backtick (`)</b> to navigate. Edit these held keys in Buttons &amp; keys.</span><span><b>4.</b> Install the Blender or Fusion integration from CAD apps for cursor pivot, aligned snapping and navigation. Other apps use their own editable mouse profiles.</span></div>
+          <div class="steps" style="margin-top:6px"><span><b>1.</b> In Buttons &amp; keys, choose <b>Identify trackball</b>, then roll only its ball.</span><span><b>2.</b> btn1 = Middle (top-left), btn2 = Back (top-right), btn3 = Left click (bottom-left), btn4 = Right click (bottom-right). Left wheel = up / down; right wheel = horizontal.</span><span><b>3.</b> Hold <b>Shift</b> to rotate, <b>Alt</b> to pan, <b>Ctrl</b> to zoom, or <b>Backtick</b> to walk. Add <b>1</b> to look and change height. Click <b>button 2</b> to snap to a face.</span><span><b>4.</b> Install the Blender or Fusion integration from CAD apps for cursor pivot, aligned snapping and navigation. Other apps use their own editable mouse profiles.</span></div>
         </div>
         <button class="btn primary" id="welcomeOk">Got it</button>
       </div>
@@ -288,8 +288,8 @@ details .ver{margin-top:10px;font-weight:600}
       <div class="grid g2">
         <div class="card">
           <div class="row" style="margin-bottom:10px"><h2 style="margin:0">Try it here</h2><span class="spacer"></span><button class="btn sm" id="padReset">Reset view</button></div>
-          <div class="pad" id="pad"><canvas id="padCanvas"></canvas><div class="mode" id="padMode">Move the pointer here, then hold a button and roll</div></div><div class="hintrow" id="padHint"></div>
-          <p class="mu" style="margin:10px 0 0;font-size:12.5px">The pad only takes over your trackball while the pointer is over it.</p>
+          <div class="pad" id="pad"><canvas id="padCanvas"></canvas><div class="mode" id="padMode">Move the pointer here and use a 3D shortcut</div></div><div class="hintrow" id="padHint"></div>
+          <p class="mu" style="margin:10px 0 0;font-size:12.5px">Select 3D modelling, turn 3D controls on, and try your shortcuts over the cube.</p>
         </div>
         <div class="card">
           <div class="row" style="margin-bottom:10px"><h2 style="margin:0">Your controls</h2><span class="spacer"></span><button class="btn sm" data-go="controls">Change</button></div>
@@ -353,7 +353,7 @@ details .ver{margin-top:10px;font-weight:600}
       <div class="card" style="margin-bottom:16px">
         <h2>Quick setups</h2>
         <div class="presets">
-          <button class="preset" data-preset="controller"><b>Your held-key setup</b><small>Shift + ball rotates. Ctrl+Shift + ball pans. Ctrl + ball up/down zooms. Alt + ball snaps to a cube face and Backtick (`) navigates with a native integration. Release the keys for a normal pointer.</small></button><button class="preset" data-preset="ballonly"><b>Normal mouse</b><small>Original mouse clicks, pointing and scrolling. Navigation keys, custom combinations and wheel remapping are off.</small></button>
+          <button class="preset" data-preset="controller"><b>Your held-key setup</b><small>Shift rotates, Alt translates, and Ctrl zooms. Backtick walks and twists to turn. Add 1 to look and twist to change height. Button 2 snaps to a face.</small></button><button class="preset" data-preset="ballonly"><b>Normal mouse</b><small>Original mouse clicks, pointing and scrolling. Navigation keys, custom combinations and wheel remapping are off.</small></button>
           <button class="preset" data-preset="ballnav"><b>Ball navigation</b><small>Select this for 3D apps: roll straight to orbit, tap the M512 Back button to switch to pan, then tap again for orbit. Draw an almost-full small circle over the 3D view to zoom: clockwise in, anticlockwise out. Keep circling to continue zooming.</small></button><button class="preset" data-preset="both"><b>Buttons + held keys</b><small>Hold Back + ball to orbit or Middle + ball to pan. Shift and Ctrl+Shift work too. Normal left and right clicks.</small></button>
           
           
@@ -427,7 +427,7 @@ details .ver{margin-top:10px;font-weight:600}
         <div class="opt"><div class="t">Show the pivot<small>While rotating, a dot marks the spot the model turns around: whatever is under your pointer when you start. In Chamfer3D Studio it's the surface you point at; other apps use their own orbit setting.</small></div><label class="sw"><input type="checkbox" data-k="showPivot"><span></span></label></div>
         <div class="opt"><div class="t">Three-axis trackball controls<small>Rotation: ball rolls rotate on two axes and Kensington knob twist rolls the view. Translation: ball rolls pan, twist moves in/out. Camera walk: ball rolls move forward/back and sideways, twist turns left/right. The configured hold key selects each mode. No curved gestures or extra keyboard modifier is needed. Saved per program and preset.</small></div><label class="sw"><input type="checkbox" data-k="threeAxisControls"><span></span></label></div>
         <div class="opt"><div class="t">Level flight (trial)<small>While navigating, forward/back and sideways travel stay level with the ground even when you look up or down. With three-axis controls, twist changes heading while travel stays level. Turn three-axis controls off for the previous scroll-height mapping. Turning preserves your viewing tilt. Turn this off to travel along the camera’s viewing direction. Saved with this program and its presets.</small></div><label class="sw"><input type="checkbox" data-k="navigationLevelFlight"><span></span></label></div>
-        <div class="opt"><div class="t">Continuous navigation<small>Hold your Navigate key (Backtick by default). Roll the ball forward/back/left/right to set movement in the view; scroll up/down (twist the Kensington ball) to move up/down. Diagonal forward-right/left rolls move forward and turn right/left. Diagonal back-right/left rolls move backward and turn right/left; a straight sideways roll strafes. A small roll sets speed, more roll increases it, and rolling back into the starting centre stops it. Roll farther past centre to reverse. All movement continues only while Navigate stays held. Release the key or click to stop immediately. Orbit and zoom keep their own controls. Saved with this program and its presets.</small></div><label class="sw"><input type="checkbox" data-k="navigationCruise"><span></span></label></div>
+        <div class="opt"><div class="t">Continuous navigation<small>Hold Camera walk and roll to set your travel speed. Roll back toward your starting point to stop, or past it to reverse. Release the key or click to stop. With three-axis controls, each twist turns the camera by a small amount. It follows the direction of the scroll. Saved with this program and its presets.</small></div><label class="sw"><input type="checkbox" data-k="navigationCruise"><span></span></label></div>
         <div class="opt"><div class="t">Hold to cruise (trial)<small>In a native 3D view, hold your orbit, pan, zoom or navigate keys. A small ball roll sets a gentle camera speed; roll farther to speed up or back toward centre to slow down. Motion continues while the keys stay held. Release the keys or click to stop immediately. Turn this off for direct ball movement. Saved with this program and its presets.</small></div><label class="sw"><input type="checkbox" data-k="spaceMouseCruise"><span></span></label></div>
         <div class="opt"><div class="t">Steady 3D motion<small>Smooths orbit, pan, zoom and scene navigation with the same response for ball movement and twist. Speeds stay as set. Turn it off to use your previous motion settings.</small></div><label class="sw"><input type="checkbox" data-k="steadyCamera"><span></span></label></div>
         <div class="opt"><div class="t">3D motion response<small>Lower values react faster; higher values smooth uneven rolls more. Used while Steady 3D motion is on.</small></div><input type="range" min="6" max="40" step="1" data-k="cameraResponseMs"><span class="val" data-v="cameraResponseMs"></span></div>
@@ -812,8 +812,8 @@ function renderBinds(){
     const warn=bs.length<2?'<div class="desc wn">Pick at least two buttons.</div>':"";
     out.push(`<div class="bind" data-row="combo-${ci}"><div class="nm"><b>${bs.length?bs.map(n=>"btn"+n).join(" + "):"New combination"}</b><small>Combination ${ci+1}</small></div><div class="opts"><div class="line">${boxes}</div><div class="line"><select data-cact="${ci}">${opts(CACT,bd.action)}</select><button class="btn sm" data-cdel="${ci}">Remove</button></div>${warn}${extra}</div></div>`)});
   $("#binds").innerHTML=out.join("");
-  $("#keyBinds").innerHTML=[["orbitKeys","Object rotation","Hold and roll forward/back to pitch, left/right to yaw, and twist the Kensington ball to roll the view. The pivot stays under your cursor. Shift is the default."],["panKeys","Object translation","Hold and roll left/right or forward/back to pan horizontally or vertically. Twist the Kensington ball to move in/out at the cursor. Alt is the default. Three-axis controls keep all ball rolls as pan, without circle-zoom recognition."],["zoomKeys","Zoom","Optional separate zoom hold. Hold and roll up/down to zoom at the cursor. Ctrl remains available by default."],["snapKeys","Face snapping","The top-right mouse button (button 2) snaps to the nearest flat face with one click around the cursor point. Edit it in the button bindings. No keyboard snap shortcut is assigned by default. For an optional keyboard hold: Hold and roll up, down, left or right to switch to a neighboring cube face. Continued rolling steps through adjacent faces; a pause starts a fresh stroke. This control only switches faces. Hold the same keys and turn the LEFT scroll wheel to rotate the current face by 90° per notch. Turn the wheel the other way to rotate back. The right wheel keeps its normal scrolling. Ball-only twist estimation is off by default because it can confuse face rolls and knob motion. Requires a native integration."],["twistKeys","Twist / face orientation","Optional separate 90-degree orientation hold; three-axis rotation already uses Kensington twist directly. Hold the keys and turn the ball in place clockwise or anticlockwise, like a volume knob. A small knob nudge triggers one complete 90° cube rotation; you do not need to turn the ball through 90°. Pause briefly or reverse direction for another step, like the cube’s rotate arrows. It keeps that face selected. Release to point normally. Twist speed, sensor direction and Reverse twist are separate in Speed & direction. Requires a native integration. The held keys select the meaning of the existing ball movement; this is not independent three-axis sensing."],["navigateKeys","Camera walk","Hold Backtick (`), or your assigned key. Roll forward/back to travel forward/back; roll left/right to move sideways. Diagonal rolls combine both travel axes. Twist the Kensington ball like a knob to turn left/right. With Continuous navigation on, movement continues until you return the ball/twist near their starting centre or release the key. No Alt is required. With three-axis controls off, the older navigation mapping applies. A quick Backtick tap types normally. Requires a native integration."],
-    ["navigateLookKeys","Walk: look around","Add these extra keys while holding Camera walk. Roll up/down to look up/down, left/right to turn. Existing travel continues while you aim. Release the extra keys to return to travel; release Camera walk to stop."],
+  $("#keyBinds").innerHTML=[["orbitKeys","Object rotation","Hold and roll forward/back to pitch, left/right to yaw, and twist the Kensington ball to roll the view. The pivot stays under your cursor. Shift is the default."],["panKeys","Object translation","Hold and roll left/right or forward/back to pan horizontally or vertically. Twist the Kensington ball to move in/out at the cursor. Alt is the default. Three-axis controls keep all ball rolls as pan, without circle-zoom recognition."],["zoomKeys","Zoom","Optional separate zoom hold. Hold and roll up/down to zoom at the cursor. Ctrl remains available by default."],["snapKeys","Face snapping","The top-right mouse button (button 2) snaps to the nearest flat face with one click around the cursor point. Edit it in the button bindings. No keyboard snap shortcut is assigned by default. For an optional keyboard hold: Hold and roll up, down, left or right to switch to a neighboring cube face. Continued rolling steps through adjacent faces; a pause starts a fresh stroke. This control only switches faces. Hold the same keys and turn the LEFT scroll wheel to rotate the current face by 90° per notch. Turn the wheel the other way to rotate back. The right wheel keeps its normal scrolling. Ball-only twist estimation is off by default because it can confuse face rolls and knob motion. Requires a native integration."],["twistKeys","Twist / face orientation","Optional separate 90-degree orientation hold; three-axis rotation already uses Kensington twist directly. Hold the keys and turn the ball in place clockwise or anticlockwise, like a volume knob. A small knob nudge triggers one complete 90° cube rotation; you do not need to turn the ball through 90°. Pause briefly or reverse direction for another step, like the cube’s rotate arrows. It keeps that face selected. Release to point normally. Twist speed, sensor direction and Reverse twist are separate in Speed & direction. Requires a native integration. The held keys select the meaning of the existing ball movement; this is not independent three-axis sensing."],["navigateKeys","Camera walk","Hold Backtick (`), or your assigned key. Roll forward/back to travel forward/back; roll left/right to move sideways. Diagonal rolls combine both travel axes. With three-axis controls on, Kensington twist scroll up turns right and scroll down turns left. With Continuous navigation on, roll back to the starting centre or release the key to stop travel. Try it on the Home cube or in a native 3D view."],
+    ["navigateLookKeys","Walk: look around","Add these extra keys while holding Camera walk. Roll up/down to look up/down, left/right to turn. Twist scroll up to raise the camera and scroll down to lower it. Existing travel continues while you aim. Release Camera walk to stop."],
     ["navigateHeightKeys","Walk: raise / lower","Add these extra keys while holding Camera walk. Roll forward to rise and backward to lower; roll left/right to move sideways. Return near centre or release the extra keys to stop changing height. Uses the saved Pan / 3D speed."]].map(([k,n,d])=>
     `<div class="bind"><div class="nm"><b>${n}</b></div><div class="opts"><div class="line">${cfg[k]&&cfg[k]!=="none"?kbd(holdLabel(walkHoldSpec(k)).replace(/ \+ /g,"+")):`<span class="mu">${k==="zoomKeys"&&cfg.panKeys&&cfg.panKeys!=="none"?"Included in Pan + zoom":"Off"}</span>` }<button class="btn sm" data-hold="${k}">${cfg[k]&&cfg[k]!=="none"?"Change":"Set keys"}</button>${cfg[k]&&cfg[k]!=="none"?`<button class="btn sm" data-holdoff="${k}">Turn off</button>`:""}</div><div class="desc">${d} ${isWalkExtra(k)?"Record only the extra keys; the Camera walk hold is added automatically.":""} Any keys: Ctrl, Shift, Alt and/or one other key (for example Space, Q or Ctrl+Q). Works only while a 3D app is in front; a quick tap still types the key, except Windows, which stays reserved for navigation.</div></div></div>`).join("");
   $$("[data-k]").forEach(i=>{const k=i.dataset.k;if(i.type==="checkbox")i.checked=!!cfg[k];else i.value=cfg[k]});
@@ -884,9 +884,16 @@ function selectRow(b,scroll){$$(".bind").forEach(r=>r.classList.toggle("sel",r.d
 function flashRow(b){[$(`.bind[data-row="${b}"]`),$(`.hot[data-b="${b}"]`)].forEach(el=>{if(!el)return;el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash");clearTimeout(el._f);el._f=setTimeout(()=>el.classList.remove("flash"),700)})}
 async function applyPreset(p){
   if(!await modal("Apply setup?","Your button, wheel and held-key choices for this program will be replaced.",[["Cancel","",false],["Apply","primary",true]]))return;
-  const d=JSON.parse(JSON.stringify(S.defaults));
   const buttons=Object.fromEntries(["middle","back","right","forward"].map(b=>[b,{action:"normal",tap:"click"}]));
-  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:p==="ballonly"?"none":"ctrl",snapKeys:p==="ballonly"?"none":"alt",twistKeys:"none",altTwistEstimate:false,navigateKeys:p==="ballonly"?"none":"backtick",ball:"pointer",circleZoom:false,circleSize:160});
+  Object.assign(cfg,{buttons,leftWheel:"normal",rightWheel:"normal",modeButtons:{},combos:[],orbitKeys:p==="ballonly"?"none":"shift",panKeys:p==="ballonly"?"none":"ctrl+shift",zoomKeys:p==="ballonly"?"none":"ctrl",snapKeys:p==="ballonly"?"none":"alt",twistKeys:"none",altTwistEstimate:false,navigateKeys:p==="ballonly"?"none":"backtick",navigateLookKeys:"none",navigateHeightKeys:"none",ball:"pointer",circleZoom:false,circleSize:160});
+  if(p==="controller"){
+    const standard=S.programDefaults[1];
+    for(const key of ["buttons","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys","navigateLookKeys","navigateHeightKeys"]){
+      cfg[key]=clone(standard[key]);
+    }
+    cfg.threeAxisControls=standard.feel.threeAxisControls;
+    cfg.navigationCruise=standard.feel.navigationCruise;
+  }
   if(p==="ballnav"){cfg.ball="orbit";cfg.circleZoom=true;cfg.buttons.back={action:"panToggle",tap:"click"};}
   if(p==="both"){cfg.buttons.back={action:"orbit",tap:"click"};cfg.buttons.middle={action:"pan",tap:"click"};}
   renderBinds();renderCheat();await doSave();toast("Setup saved");
@@ -994,7 +1001,15 @@ function renderCheat(){renderKeyboard();const items=[];const b=cfg.buttons;
   const z=[...who("zoom"),...(cfg.zoomKeys!=="none"?["hold "+holdLabel(cfg.zoomKeys)]:[])];
   const zw=["leftWheel","rightWheel"].filter(w=>cfg[w]==="zoom").map(w=>BTN[w].toLowerCase());
   if(z.length||zw.length)items.push(`<div class="it"><span class="k">Zoom</span><span>${[...z.map(x=>x+' <span class="mu">+ roll</span>'),...zw].join(" <span class='mu'>or</span> ")}</span></div>`);
-  for(const [key,name] of [["snapKeys","Snap"],["twistKeys","Twist"],["navigateKeys","Walk"],["navigateLookKeys","Look around"],["navigateHeightKeys","Raise / lower"]])if(cfg[key]&&cfg[key]!=="none")items.push('<div class="it"><span class="k">'+name+'</span><span>hold '+esc(holdLabel(walkHoldSpec(key)))+' + ball</span></div>');
+  const walk=cfg.threeAxisControls?["Walk","roll to travel · twist to turn"]:["Walk","roll to travel"];
+  for(const [key,name,action] of [["snapKeys","Snap","roll"],["twistKeys","Twist","roll"],
+      ["navigateKeys",...walk],["navigateLookKeys","Look around","roll to look · twist for height"],
+      ["navigateHeightKeys","Raise / lower","roll for height"]]){
+    if(cfg[key]&&cfg[key]!=="none"&&(!isWalkExtra(key)||cfg.navigateKeys&&cfg.navigateKeys!=="none")){
+      items.push('<div class="it"><span class="k">'+name+'</span><span>Hold '+esc(holdLabel(walkHoldSpec(key)))+'<br><span class="mu">'+action+'</span></span></div>');
+    }
+  }
+  if(b.back?.action==="faceSnap")items.push('<div class="it"><span class="k">Snap face</span><span>Click button 2 (top right)</span></div>');
   if(cfg.snapKeys&&cfg.snapKeys!=="none")items.push('<div class="it"><span class="k">Turn face 90°</span><span>hold '+esc(holdLabel(cfg.snapKeys))+' + left scroll wheel</span></div>');
   if(cfg.altTwistEstimate&&cfg.snapKeys&&cfg.snapKeys!=="none")items.push('<div class="it"><span class="k">Twist 90°</span><span>hold '+esc(holdLabel(cfg.snapKeys))+' + knob turn <span class="mu">(estimated)</span></span></div>');
   const fit=[...Object.keys(b).filter(k=>b[k].action==="fit").map(k=>"press "+BTN[k]),...Object.keys(b).filter(k=>["orbit","pan","zoom"].includes(b[k].action)&&b[k].tap==="fit").map(k=>"tap "+BTN[k])];
@@ -1117,32 +1132,76 @@ document.addEventListener("click",async e=>{const r=e.target.dataset.rel,w=e.tar
   if(w&&await modal("Withdraw v"+w+"?","Users won't be offered this version any more. People who already installed it keep it. Its release history and executable stay in GitHub as a draft.",[["Cancel","",false],["Withdraw","primary",true]])){call("adminWithdraw",w).catch(e=>toast(String(e.message||e),true));setTimeout(()=>refreshAdmin(true),100)}});
 
 /* ---------- test pad ---------- */
-const pad={rot:[1,0,0,0,1,0,0,0,1],px:0,py:0,s:1};
-function mul(a,b){const r=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++)r[i*3+j]=a[i*3]*b[j]+a[i*3+1]*b[3+j]+a[i*3+2]*b[6+j];return r}
-function rot(yaw,pitch){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);pad.rot=mul([1,0,0,0,cp,-sp,0,sp,cp],mul([cy,0,sy,0,1,0,-sy,0,cy],pad.rot))}
-function rotRoll(angle){const c=Math.cos(angle),s=Math.sin(angle);pad.rot=mul([c,-s,0,s,c,0,0,0,1],pad.rot)}
-function padReset(){pad.rot=[1,0,0,0,1,0,0,0,1];rot(-.6,.45);pad.px=pad.py=0;pad.s=1}
-padReset();$("#padReset").onclick=()=>{padReset();drawPad()};
-const V=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],F=[[4,5,6,7],[1,0,3,2],[0,4,7,3],[5,1,2,6],[7,6,2,3],[0,1,5,4]];
-let padColors=null;
+let padCamera=null,padColors=null;
+const V=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+const F=[[4,5,6,7],[1,0,3,2],[0,4,7,3],[5,1,2,6],[7,6,2,3],[0,1,5,4]];
+const subtract=(a,b)=>a.map((x,i)=>x-b[i]);
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const unit=v=>{const length=Math.hypot(...v);return v.map(x=>x/length)};
+$("#padReset").onclick=()=>call("ctPadReset").catch(err=>toast(err.message,true));
+
 function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
-function drawPad(){const c=$("#padCanvas"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;if(!r.width)return;
-  if(c.width!==Math.round(r.width*d)){c.width=Math.round(r.width*d);c.height=Math.round(r.height*d)}
-  if(!padColors)padColors={bg:cssv("--bg"),grid:cssv("--grid"),c1:cssv("--cube1"),c2:cssv("--cube2"),c3:cssv("--cube3"),line:cssv("--line")};
-  const g=c.getContext("2d"),W=c.width,H=c.height,R=pad.rot;g.fillStyle=padColors.bg;g.fillRect(0,0,W,H);
-  const xf=v=>[R[0]*v[0]+R[1]*v[1]+R[2]*v[2],R[3]*v[0]+R[4]*v[1]+R[5]*v[2],R[6]*v[0]+R[7]*v[1]+R[8]*v[2]];
-  const f=Math.min(W,H)*.78*pad.s,cx=W/2+pad.px*d,cy=H/2+pad.py*d,pr=v=>{const z=5.5-v[2];return[cx+v[0]*f/z,cy-v[1]*f/z]};
-  g.strokeStyle=padColors.grid;g.lineWidth=1*d;g.beginPath();
-  for(let i=-4;i<=4;i++){for(const[a,b]of[[[i*.5,-1,-2],[i*.5,-1,2]],[[-2,-1,i*.5],[2,-1,i*.5]]]){const p=pr(xf(a)),q=pr(xf(b));g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1])}}g.stroke();
-  const tv=V.map(xf),fs=[];
-  F.forEach((fc,i)=>{const a=tv[fc[0]],b=tv[fc[1]],cc=tv[fc[2]];const nz=(b[0]-a[0])*(cc[1]-a[1])-(b[1]-a[1])*(cc[0]-a[0]);if(nz<=0)return;fs.push({i,z:fc.reduce((s,k)=>s+tv[k][2],0),nz:nz/4})});
-  fs.sort((a,b)=>a.z-b.z);
-  for(const fc of fs){const col=fc.i===4?padColors.c1:fc.i%2?padColors.c3:padColors.c2;const L=.62+.38*Math.min(1,fc.nz);
-    g.beginPath();F[fc.i].forEach((k,j)=>{const p=pr(tv[k]);j?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])});g.closePath();
-    g.fillStyle=col;g.fill();g.fillStyle=`rgba(0,0,0,${(1-L).toFixed(3)})`;g.fill();g.strokeStyle="rgba(10,14,18,.85)";g.lineWidth=1.5*d;g.stroke()}
-  const ox=36*d,oy=H-36*d;[[[1,0,0],"#eb5050"],[[0,1,0],"#6ec86e"],[[0,0,1],"#5a96f0"]].forEach(([v,col])=>{const t=xf(v);g.strokeStyle=col;g.lineWidth=2.4*d;g.beginPath();g.moveTo(ox,oy);g.lineTo(ox+t[0]*22*d,oy-t[1]*22*d);g.stroke()})}
-function reportPad(){const p=$("#pad"),vis=page==="home"&&!document.hidden;if(!vis){call("ctPadRect",0,0,0,0,false).catch(()=>{});return}
-  const r=p.getBoundingClientRect(),d=devicePixelRatio||1;call("ctPadRect",r.left*d,r.top*d,r.width*d,r.height*d,true).catch(()=>{});drawPad()}
+function drawPad(){
+  const canvas=$("#padCanvas"),rect=canvas.getBoundingClientRect(),scale=devicePixelRatio||1;
+  if(!rect.width||!rect.height||!padCamera)return;
+  const width=Math.round(rect.width*scale),height=Math.round(rect.height*scale);
+  if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}
+  if(!padColors)padColors={bg:cssv("--bg"),grid:cssv("--grid"),c1:cssv("--cube1"),c2:cssv("--cube2"),c3:cssv("--cube3")};
+  const g=canvas.getContext("2d");
+  g.fillStyle=padColors.bg;g.fillRect(0,0,width,height);
+
+  const {eye,target,up,verticalFov,orthographic,orthoHeight}=padCamera;
+  const back=unit(subtract(eye,target)),right=unit(cross(up,back)),viewUp=cross(back,right);
+  const direction=v=>[dot(right,v),dot(viewUp,v),dot(back,v)];
+  const view=v=>direction(subtract(v,eye));
+  const focal=height/(2*Math.tan(verticalFov/2));
+  const project=v=>{
+    const factor=orthographic?height/orthoHeight:focal/-v[2];
+    return [width/2+v[0]*factor,height/2-v[1]*factor];
+  };
+  const inFront=v=>v[2]<-.08;
+
+  g.strokeStyle=padColors.grid;g.lineWidth=scale;g.beginPath();
+  for(let i=-4;i<=4;i++){
+    for(const [a,b] of [[[i*.5,-1,-2],[i*.5,-1,2]],[[-2,-1,i*.5],[2,-1,i*.5]]]){
+      const p=view(a),q=view(b);
+      if(inFront(p)&&inFront(q)){g.moveTo(...project(p));g.lineTo(...project(q))}
+    }
+  }
+  g.stroke();
+
+  const vertices=V.map(view),faces=[];
+  F.forEach((face,i)=>{
+    const points=face.map(k=>vertices[k]);
+    if(!points.every(inFront))return;
+    const [a,b,c]=points,normal=cross(subtract(b,a),subtract(c,a));
+    if(orthographic?normal[2]<=0:dot(normal,a)>=0)return;
+    faces.push({i,points,depth:points.reduce((sum,p)=>sum+p[2],0),brightness:Math.max(0,normal[2]/4)});
+  });
+  faces.sort((a,b)=>a.depth-b.depth);
+  for(const face of faces){
+    g.beginPath();
+    face.points.forEach((point,i)=>i?g.lineTo(...project(point)):g.moveTo(...project(point)));
+    g.closePath();
+    g.fillStyle=face.i===4?padColors.c1:face.i%2?padColors.c3:padColors.c2;g.fill();
+    g.fillStyle="rgba(0,0,0,"+(.38*(1-Math.min(1,face.brightness)))+")";g.fill();
+    g.strokeStyle="rgba(10,14,18,.85)";g.lineWidth=1.5*scale;g.stroke();
+  }
+  const ox=36*scale,oy=height-36*scale;
+  for(const [v,color] of [[[1,0,0],"#eb5050"],[[0,1,0],"#6ec86e"],[[0,0,1],"#5a96f0"]]){
+    const t=direction(v);
+    g.strokeStyle=color;g.lineWidth=2.4*scale;g.beginPath();g.moveTo(ox,oy);
+    g.lineTo(ox+t[0]*22*scale,oy-t[1]*22*scale);g.stroke();
+  }
+}
+function reportPad(){
+  const visible=page==="home"&&!document.hidden;
+  if(!visible){call("ctPadRect",0,0,0,0,false).catch(()=>{});return}
+  const r=$("#padCanvas").getBoundingClientRect(),d=devicePixelRatio||1;
+  call("ctPadRect",r.left*d,r.top*d,r.width*d,r.height*d,true).catch(()=>{});
+  drawPad();
+}
 addEventListener("resize",()=>{padColors=null;reportPad()});$("#main").addEventListener("scroll",()=>page==="home"&&reportPad(),{passive:true});
 document.addEventListener("visibilitychange",reportPad);
 
@@ -1166,18 +1225,15 @@ function liveAttr(el,name,value){if(el&&el.getAttribute(name)!==String(value))el
 const ACTIVE_STATUS_POLL_MS=50; // 20 Hz; navigation uses a separate timer tuned for Windows cadence.
 async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,500);return}
   if(cfgRev<0)cfgRev=s.cfgRev;else if(s.cfgRev!==cfgRev){cfgRev=s.cfgRev;if(!savePending&&!saveFlight)reloadConfig()}
-  let changed=false;if(s.ox||s.oy){rot(s.ox*.009,s.oy*.009);changed=true}if(s.px||s.py){pad.px+=s.px;pad.py+=s.py;changed=true}
-  if(s.rollLog){rotRoll(-s.rollLog);changed=true}
-  const amount=s.zoomLog===undefined?(s.zoom||0)/700:s.zoomLog;
-  if(amount){pad.s=Math.max(.15,Math.min(6,pad.s*Math.exp(amount)));changed=true}if(s.fit){padReset();changed=true}
+  if(s.padCamera)padCamera=s.padCamera;
   updateInputSignal(s.inputSignal);
   if(twistCalOpen)updateCalibration(s.twistCalibration);
   const focused=!document.hidden&&document.hasFocus();
   if(page==="home"&&!document.hidden)updateKeyboard(s);
   if((page==="home"||page==="controls")&&!document.hidden)updateFaceTurn(s);
   if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1)+" · twist "+gainLabel(s.twistGain??1));
-  if(changed&&page==="home"&&focused)drawPad();
-  const live=s.mode!=="Idle";liveText("#padMode",live?motionLabel(s):"Move the pointer here, then hold a button and roll");$("#padMode").classList.toggle("live",live);
+  if(s.padCamera&&page==="home"&&focused)drawPad();
+  const live=s.mode!=="Idle";liveText("#padMode",live?motionLabel(s):"Move the pointer here and use a 3D shortcut");$("#padMode").classList.toggle("live",live);
   const dirTxt=s.ballDir?" "+s.ballDir:"";
   liveText("#stMode",(s.lock3d?"3D mode · ":"")+motionLabel(s)+(live?dirTxt:""));liveClass("#stMode",live?"ok":"");
   if(page==="controls"&&focused)updateBall(s,live);

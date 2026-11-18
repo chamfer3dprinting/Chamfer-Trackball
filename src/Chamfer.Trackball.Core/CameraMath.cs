@@ -60,7 +60,7 @@ public static class CameraMath {
         float distance=Vector3.Distance(c.Target,c.Eye);
         return c with{Target=c.Eye+Unit(Vector3.Transform(aimed,tilt))*distance,Up=Unit(Vector3.Transform(up,tilt)),Pivot=c.Eye+Vector3.Transform(c.Pivot-c.Eye,rotation),ZoomPivot=c.ZoomPivot is Vector3 anchor?c.Eye+Vector3.Transform(anchor-c.Eye,rotation):null};
     }
-    public static CameraPose Fly(CameraPose c,NavigationFrame motion,float gain=1,float turnGain=1,bool levelFlight=false,bool freeLook=false){
+    public static CameraPose Fly(CameraPose c,NavigationFrame motion,float gain=1,float turnGain=1,bool levelFlight=false,bool freeLook=false,bool worldHeight=false){
         if(!c.Valid||!float.IsFinite(gain)||!float.IsFinite(turnGain)||!float.IsFinite(motion.Right)||!float.IsFinite(motion.Up)||!float.IsFinite(motion.Forward)||!float.IsFinite(motion.Yaw)||!float.IsFinite(motion.Pitch))throw new ArgumentException("Invalid navigation camera.");
         if(freeLook){
             c=Look(c,motion.Yaw,-motion.Pitch,turnGain);
@@ -69,7 +69,7 @@ public static class CameraMath {
         var back=Unit(c.Eye-c.Target);var right=Unit(Vector3.Cross(c.Up,back));var up=Unit(Vector3.Cross(back,right));
         float depth=MathF.Max(1e-5f,MathF.Abs(Vector3.Dot(c.Eye-c.Pivot,back)));
         float pixel=(c.Orthographic?c.OrthoHeight:2*depth*MathF.Tan(c.VerticalFov/2))/c.Height;
-        var travelRight=right;var travelBack=back;var travelUp=up;var turnAxis=up;
+        var travelRight=right;var travelBack=back;var travelUp=worldHeight?c.WorldUpAxis:up;var turnAxis=up;
         if(levelFlight){
             travelUp=turnAxis=c.WorldUpAxis;
             var horizontal=back-travelUp*Vector3.Dot(back,travelUp);

@@ -22,9 +22,9 @@ internal static class NavigationLayerChecks {
         check(overlap,"A look extra cannot repeat the base Camera walk key");
 
         var rate=new NavigationMotion();var start=Pose();
-        var look=rate.Step(12,-9,120,1000,ballTwist:true,control:NavigationLayer.Look);
+        var look=rate.Step(12,-9,0,1000,ballTwist:true,control:NavigationLayer.Look);
         var view=CameraMath.Fly(start,look,.3f,.2f,true,true);
-        check(look.Right==0&&look.Up==0&&look.Forward==0&&look.Yaw==12&&look.Pitch==9,"Look maps ball axes to heading and pitch without starting travel or using twist");
+        check(look.Right==0&&look.Up==0&&look.Forward==0&&look.Yaw==12&&look.Pitch==9,"Look maps ball axes to heading and pitch without starting travel");
         check(view.Eye==start.Eye&&(view.Target-view.Eye).X>0&&(view.Target-view.Eye).Y>0,"Looking right/up turns about the camera eye");
         check(Math.Abs(Vector3.Distance(view.Eye,view.Target)-Vector3.Distance(start.Eye,start.Target))<.0001f,"Look retains camera lens distance");
         check(!rate.Step(0,0,0,1008,ballTwist:true,control:NavigationLayer.Look).Active,"No new look movement means no continued unwanted turning");
@@ -37,7 +37,26 @@ internal static class NavigationLayerChecks {
         var stopped=rate.Step(0,12,0,2024,ballTwist:true);
         check(!stopped.Active&&rate.Centered,"A look stroke cannot move the travel centre needed to stop");
         rate.Reset();rate.Step(0,0,120,3000,ballTwist:true);var aimAfterTwist=rate.Step(0,0,0,3008,ballTwist:true,control:NavigationLayer.Look);
-        check(!aimAfterTwist.Active&&!rate.Step(0,0,0,3016,ballTwist:true).Active,"Entering and leaving look clears an old knob-turn rate");
+        check(!aimAfterTwist.Active&&!rate.Step(0,0,0,3016,ballTwist:true).Active,"A previous turn cannot leak into the look layer or restart after releasing 1");
+        var tiltedStart=CameraMath.Look(start,20,-80,.6f);
+        foreach(float wheel in new[]{120f,-120f}){
+            var height=rate.Step(0,0,wheel,3024+(wheel<0?8:0),ballTwist:true,control:NavigationLayer.Look);
+            var changed=CameraMath.Fly(tiltedStart,height,.3f,.2f,freeLook:true,worldHeight:true);
+            check(height.Up==wheel/4&&height.Yaw==0&&height.Pitch==0&&height.Forward==0&&height.Right==0,
+                "Look twist uses only the signed height axis");
+            var movement=changed.Eye-tiltedStart.Eye;
+            check(movement.X==0&&movement.Z==0&&movement.Y*wheel>0&&
+                Vector3.Distance(changed.Target-changed.Eye,tiltedStart.Target-tiltedStart.Eye)<.0001f,
+                "Positive and negative twist raise and lower in world height while the camera is tilted");
+        }
+        check(!rate.Step(0,0,0,3040,ballTwist:true,control:NavigationLayer.Look).Active,
+            "A Look twist stops after its scroll report");
+        var nextWalk=rate.Step(0,0,-120,3048,ballTwist:true);
+        check(nextWalk.Up==0&&nextWalk.Yaw<0,"Releasing 1 changes negative twist back to a left turn");
+        rate.Reset();rate.Step(0,-12,0,3100,ballTwist:true);
+        var combinedLook=rate.Step(5,-7,-120,3108,ballTwist:true,control:NavigationLayer.Look);
+        check(combinedLook.Forward>0&&combinedLook.Up<0&&combinedLook.Yaw>0&&combinedLook.Pitch>0,
+            "Travel, aiming and twist height can be combined while holding Backtick + 1");
         rate.Reset();var up=rate.Step(0,-12,0,4000,ballTwist:true,control:NavigationLayer.Height);
         var holdUp=rate.Step(0,0,0,4008,ballTwist:true,control:NavigationLayer.Height);
         check(up.Up>0&&up.Forward==0&&up.Pitch==0&&holdUp.Up>up.Up,"Height hold raises the camera continuously without pitching or starting forward travel");
@@ -60,7 +79,7 @@ internal static class NavigationLayerChecks {
         var tilted=CameraMath.Look(start,10,-80,.5f);var raised=CameraMath.Fly(tilted,new(0,10,0),.3f,0,true);
         check(raised.Eye.Y>tilted.Eye.Y&&Math.Abs(raised.Eye.X-tilted.Eye.X)<.0001f&&Math.Abs(raised.Eye.Z-tilted.Eye.Z)<.0001f&&Vector3.Distance(raised.Target-raised.Eye,tilted.Target-tilted.Eye)<.0001f,"Height follows world up and keeps the tilted camera direction");
         var direct=NavigationMotion.Direct(5,-7,120,NavigationLayer.Height);
-        check(direct==new NavigationFrame(5,7,0,30)&&NavigationMotion.Direct(5,-7,120,NavigationLayer.Look)==new NavigationFrame(0,0,0,5,7),"Non-continuous navigation supports the same height/look layers");
+        check(direct==new NavigationFrame(5,7,0,30)&&NavigationMotion.Direct(5,-7,120,NavigationLayer.Look)==new NavigationFrame(0,30,0,5,7),"Non-continuous navigation supports the same height/look layers");
         var previousAmount=0f;
         foreach(int speed in new[]{1,10,27,38,50,75,100}){
             float amount=Vector3.Distance(start.Eye,CameraMath.Fly(start,new(0,10,0),MotionPolicy.Gain(speed),0,true).Eye);
