@@ -820,6 +820,9 @@ public string AppName{get;private set;}="";
             if(zoomLog<=0||zoomLog>=.135)throw new InvalidOperationException("SlimBlade twist did not enter the shared native zoom response.");
             Flush(finish:true,timeMilliseconds:2008);Flush(timeMilliseconds:2024);
             if(Math.Abs(zoomLog-.135)>.0001||slimBladeTwist.Step()!=0)throw new InvalidOperationException("SlimBlade twist was double-smoothed, lost, or continued after release.");
+            // Each edition must exercise legacy movement even when the
+            // previous interface run saved the newer 3D modelling program.
+            cfg["threeAxisControls"]=false;
             mode=NavMode.Navigate;client.Pose=pose;cameraMotion.Reset();pending.Move(20,10);Flush(timeMilliseconds:3000);Flush(finish:true,timeMilliseconds:3008);
             var expected=CameraMath.Move(pose,NavMode.Navigate,20,10,0,input.Keys.Contains(18));
             if(System.Numerics.Vector3.Distance(client.Pose!.Eye,expected.Eye)>.001f)throw new InvalidOperationException("Scene navigation did not retain its configured travel through the response.");
