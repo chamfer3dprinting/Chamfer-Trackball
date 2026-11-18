@@ -736,7 +736,7 @@
         1
       ],
       "orbitKeys": "shift",
-      "panKeys": "alt",
+      "panKeys": "ctrl+shift",
       "zoomKeys": "ctrl",
       "gestures": {},
       "pointerSpeed": 10,
@@ -764,7 +764,7 @@
       },
       "modeButtons": {},
       "combos": [],
-      "snapKeys": "none",
+      "snapKeys": "alt",
       "navigateKeys": "backtick",
       "circleZoom": true,
       "circleSize": 160,

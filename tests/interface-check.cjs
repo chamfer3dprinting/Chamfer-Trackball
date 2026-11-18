@@ -334,7 +334,7 @@ vm.runInNewContext(html.slice(wheelHintStart,wheelHintEnd),wheelHintContext);
 wheelHintContext.updateFaceTurn({});
 assert.ok(wheelHintMessages['#homeFaceTurn'].includes('left scroll wheel')&&wheelHintMessages['#homeFaceTurn'].includes('90°')&&!wheelHintMessages['#homeFaceTurn'].includes('estimated'));
 assert.equal(wheelHintMessages['#homeFaceTurn'],wheelHintMessages['#controlFaceTurn']);
-assert.ok(html.includes('hold the same keys')||html.includes('Hold the same keys'));
+assert.ok(html.includes('rotate the current view by 90° per notch around the cursor')&&html.includes('A partial movement keeps the view in place'));
 console.log('Home and Controls describe Alt plus ball for faces and Alt plus left wheel for exact orientation snaps; quick setups keep guessing off.');
 
 const devicesStart=html.indexOf('let trackballListKey=""');

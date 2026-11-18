@@ -59,24 +59,24 @@ internal static class ThreeAxisChecks {
         var passedCentre = largeStroke.Step(0, 0, 0, 1120, ballTwist: true);
         check(passedCentre.Forward < 0 && !largeStroke.Centered, "Rolling beyond the starting point still reverses travel");
         largeStroke.Reset();
-        var rightTurn = largeStroke.Step(0, 0, 240, 1000, ballTwist: true);
-        var leftTurn = largeStroke.Step(0, 0, -120, 1008, ballTwist: true);
-        check(rightTurn.Yaw == 2 * -leftTurn.Yaw && leftTurn.Yaw < 0,
-            "One negative twist turns left immediately after two positive notches");
+        var firstTurn = largeStroke.Step(0, 0, 240, 1000, ballTwist: true);
+        var reverseTurn = largeStroke.Step(0, 0, -120, 1008, ballTwist: true);
+        check(firstTurn.Yaw == 2 * -reverseTurn.Yaw && reverseTurn.Yaw > 0,
+            "Reverse twist changes heading immediately using the corrected sign");
         check(!largeStroke.Step(0, 0, 0, 1016, ballTwist: true).Active && largeStroke.Centered,
             "Camera walk twist does not keep turning on quiet ticks");
         foreach(float wheel in new[]{-60f,60f}){
             var rate=new NavigationMotion();var frame=rate.Step(0,0,wheel,1000,ballTwist:true);
-            check(frame.Up==0&&frame.Forward==0&&frame.Right==0&&Math.Sign(frame.Yaw)==Math.Sign(wheel)&&frame.Pitch==0,"Walk knob twist controls yaw instead of height or translation");
+            check(frame.Up==0&&frame.Forward==0&&frame.Right==0&&Math.Sign(frame.Yaw)==-Math.Sign(wheel)&&frame.Pitch==0,"Walk knob twist controls yaw instead of height or translation");
             var start=Pose();var turn=CameraMath.Fly(start,frame,.4f,.4f,true);
-            check(turn.Eye==start.Eye&&Forward(turn).X*wheel>0&&Math.Abs(Forward(turn).Y)<.00001f,"Twist-only walk turns right/left in place without bobbing or pitching");
+            check(turn.Eye==start.Eye&&Forward(turn).X*wheel<0&&Math.Abs(Forward(turn).Y)<.00001f,"Twist-only walk turns right/left in place without bobbing or pitching");
             var reverse=rate.Step(0,0,-wheel,1008,ballTwist:true);
             var returned=CameraMath.Fly(turn,reverse,.4f,.4f,true);
             check(reverse.Yaw==-frame.Yaw&&Vector3.Distance(Forward(returned),Forward(start))<.00001f,
                 "The same-sized reverse twist turns the camera back by the same angle");
         }
         var combined=new NavigationMotion();var f=combined.Step(12,-12,60,2000,ballTwist:true);var view=CameraMath.Fly(Pose(),f,.4f,.4f,true);
-        check(view.Eye.X>0&&view.Eye.Z<200&&view.Eye.Y==0&&Forward(view).X>0,"Ball travel and knob turning combine continuously and simultaneously");
+        check(view.Eye.X>0&&view.Eye.Z<200&&view.Eye.Y==0&&Forward(view).X<0,"Ball travel and knob turning combine continuously and simultaneously");
         check(CameraMath.Fly(Pose(),f,0,0,true)==Pose(),"Zero walk translation and twist sensitivity stops the combined motion");
         check(!combined.Step(0,0,0,2008,finish:true,ballTwist:true).Active&&combined.Centered,"Backtick release clears all three walk commands");
         var low=CameraMath.Move(Pose(),NavMode.Orbit,0,0,60*MotionPolicy.Gain(10));var high=CameraMath.Move(Pose(),NavMode.Orbit,0,0,60*MotionPolicy.Gain(38));
@@ -92,8 +92,8 @@ internal static class ThreeAxisChecks {
         }
         var defaults=ConfigStore.Defaults();check(!ConfigStore.B(defaults,"threeAxisControls"),"Normal mouse keeps its ordinary inputs");
         ConfigStore.LoadProgram(defaults,1);
-        check(ConfigStore.B(defaults,"threeAxisControls")&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit&&ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.PanZoom&&ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Shift rotation, Alt translation and Backtick walk match the owner's diagrams");
-        check(ConfigStore.S(defaults,"snapKeys")=="none"&&ConfigStore.S(defaults["buttons"]?["back"],"action")=="faceSnap","Face snapping defaults to the top-right button rather than Alt");
+        check(ConfigStore.B(defaults,"threeAxisControls")&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit&&ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom&&ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Shift rotation, Ctrl + Shift translation and Backtick walk resolve independently");
+        check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap&&ConfigStore.S(defaults["buttons"]?["back"],"action")=="faceSnap","Alt selects angle snaps and the top-right button selects the nearest face");
         var file=Path.Combine(Path.GetTempPath(),"chamfer-three-axis-"+Guid.NewGuid().ToString("N")+".json");
         try{
             var store=new ConfigStore(file);store.Select(1);var cfg=store.Snapshot();var normal=cfg["programs"]![0]!.DeepClone();
@@ -109,7 +109,7 @@ internal static class ThreeAxisChecks {
     static object View(CameraPose p)=>new{eye=new[]{p.Eye.X,p.Eye.Y,p.Eye.Z},target=new[]{p.Target.X,p.Target.Y,p.Target.Z},up=new[]{p.Up.X,p.Up.Y,p.Up.Z},pivot=new[]{p.Pivot.X,p.Pivot.Y,p.Pivot.Z},zoomPivot=new[]{p.ZoomPivot!.Value.X,p.ZoomPivot.Value.Y,p.ZoomPivot.Value.Z},worldUp=new[]{p.WorldUpAxis.X,p.WorldUpAxis.Y,p.WorldUpAxis.Z},verticalFov=p.VerticalFov,orthoHeight=p.OrthoHeight,width=p.Width,height=p.Height,orthographic=p.Orthographic};
     public static string Export(){
         var cases=new List<object>();
-        foreach(var input in new[]{("rotation-pitch",NavMode.Orbit,0f,8f,0f),("rotation-yaw",NavMode.Orbit,12f,0f,0f),("rotation-roll",NavMode.Orbit,0f,0f,60f),("rotation-combined",NavMode.Orbit,12f,8f,60f),("translation-right",NavMode.PanZoom,12f,0f,0f),("translation-down",NavMode.PanZoom,0f,8f,0f),("translation-depth",NavMode.PanZoom,0f,0f,60f),("translation-combined",NavMode.PanZoom,12f,8f,60f),("walk-forward",NavMode.Navigate,0f,-12f,0f),("walk-back",NavMode.Navigate,0f,12f,0f),("walk-right",NavMode.Navigate,12f,0f,0f),("walk-left",NavMode.Navigate,-12f,0f,0f),("walk-twist-right",NavMode.Navigate,0f,0f,60f),("walk-twist-left",NavMode.Navigate,0f,0f,-60f),("walk-combined-right",NavMode.Navigate,12f,-12f,60f),("walk-combined-left",NavMode.Navigate,-12f,12f,-60f)}){
+        foreach(var input in new[]{("rotation-pitch",NavMode.Orbit,0f,8f,0f),("rotation-yaw",NavMode.Orbit,12f,0f,0f),("rotation-roll",NavMode.Orbit,0f,0f,60f),("rotation-combined",NavMode.Orbit,12f,8f,60f),("translation-right",NavMode.PanZoom,12f,0f,0f),("translation-down",NavMode.PanZoom,0f,8f,0f),("translation-depth",NavMode.PanZoom,0f,0f,60f),("translation-combined",NavMode.PanZoom,12f,8f,60f),("walk-forward",NavMode.Navigate,0f,-12f,0f),("walk-back",NavMode.Navigate,0f,12f,0f),("walk-right",NavMode.Navigate,12f,0f,0f),("walk-left",NavMode.Navigate,-12f,0f,0f),("walk-twist-right",NavMode.Navigate,0f,0f,-60f),("walk-twist-left",NavMode.Navigate,0f,0f,60f),("walk-combined-right",NavMode.Navigate,12f,-12f,-60f),("walk-combined-left",NavMode.Navigate,-12f,12f,60f)}){
             var start=Pose();var pose=start;var rate=new NavigationMotion();var poses=new List<object>();
             for(int i=0;i<32;i++){
                 if(input.Item2==NavMode.Navigate)pose=CameraMath.Fly(pose,rate.Step(i==0?input.Item3:0,i==0?input.Item4:0,i==0?input.Item5:0,1000+i*8,ballTwist:true),MotionPolicy.Gain(38),MotionPolicy.Gain(37),true);

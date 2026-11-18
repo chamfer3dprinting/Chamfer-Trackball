@@ -17,7 +17,8 @@ Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Zoom,"Ctrl an
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&ModeResolver.Resolve(defaults,new HashSet<int>{17,86})==NavMode.Idle,"Ctrl+C and Ctrl+V remain ordinary keyboard shortcuts");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.Idle,"Ctrl+Shift does not accidentally activate Shift rotation");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.PanZoom,"Alt selects object translation");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap,"Alt selects angle snapping");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom,"Ctrl + Shift selects translation without conflicting with Orbit or Zoom");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Backtick navigates");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{91})==NavMode.Idle,"Windows is no longer the default navigation key");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{192,18})==NavMode.Navigate,"Alt remains an optional modifier for Backtick navigation");

@@ -14,7 +14,7 @@ Select **3D modelling**, turn **3D controls on**, and use the Home cube or a sup
 - **Backtick + 1** + roll looks up/down and left/right. Twist scroll up to raise the camera and scroll down to lower it.
 - **Backtick + Ctrl** + forward/back roll also raises and lowers the camera.
 
-Each twist follows its scroll direction. With Continuous navigation enabled, a ball roll sets travel speed and rolling back toward its starting point stops travel. Release Backtick to stop. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
+A Backtick twist turns by a step in the scroll direction. With Continuous navigation enabled, ball travel and Backtick + 1 twist height continue while held. Return the ball or twist toward its starting point to stop that axis, or release Backtick to stop. Releasing 1 stops height. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
 
 Change these extra holds under **Buttons & keys → Walk: look around / Walk: raise / lower**. Record only the additional key; the Camera walk hold is added automatically. Both save with programs and named presets. Existing saved programs/presets without them keep the previous controls until assigned. The owner update assigns 1 and Ctrl to the active 3D program after preserving its previous setup.
 
@@ -22,7 +22,7 @@ These separate look/height layers follow the [Rotatrix free-camera control model
 
 ## Cube faces and orientation
 
-In the standard 3D modelling program, click the **top-right button (button 2)** for nearest-face snapping around the cursor pivot. No keyboard face-snap hold is assigned by default. An optional custom Snap hold retains ball directional faces and exact 90° left-wheel orientation turns. Ball-only twist estimation stays off. Shift rotates, Alt translates, Ctrl zooms, and button 1 remains a normal middle click.
+Hold **Alt** and roll to snap to a neighboring face from your current angle. While holding Alt, twist the Kensington ball or scroll with the left wheel to rotate the current view by 90° around the cursor. A partial movement keeps the view in place. Click the **top-right button (button 2)** for the nearest flat face. **Shift** rotates, **Ctrl + Shift** pans, and **Ctrl** zooms.
 
 Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds and verifies the single-file executables; no development folder is needed on the owner's PC.
 

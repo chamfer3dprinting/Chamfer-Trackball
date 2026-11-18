@@ -130,53 +130,86 @@ public static class CameraMath {
 
 
 public sealed class FaceSnap{
- CameraPose? lastAligned;Vector3 face,strokeAxis;float wheelRemainder,travel;int quarterTurns,axis=-1,heading;long lastMotion,lastFace;
- public long Samples{get;private set;}
- public int TurnCount{get;private set;}
- public int LastTurnDirection{get;private set;}
- public long LastTurnAt{get;private set;}
- public bool Turning=>false;
- public int Orientation=>quarterTurns;
- public void Reset(CameraPose? pose=null){
-  lastAligned=pose;face=pose==null?Vector3.Zero:CameraMath.NearestFace(Vector3.Normalize(pose.Eye-pose.Target));
-  quarterTurns=0;wheelRemainder=travel=0;axis=-1;heading=0;strokeAxis=Vector3.Zero;lastMotion=lastFace=0;Samples=0;TurnCount=LastTurnDirection=0;LastTurnAt=0;
-  if(pose!=null&&Vector3.Dot(Vector3.Normalize(pose.Eye-pose.Target),face)>.999f){
-   quarterTurns=CameraMath.FaceOrientation(pose,face);
-  }
- }
- public CameraPose Step(CameraPose start,float x,float y,float wheel=0,float gain=1,long now=0){
-  if(!float.IsFinite(x)||!float.IsFinite(y)||!float.IsFinite(wheel)||!float.IsFinite(gain)||gain<0)throw new ArgumentException("Invalid face movement.");
-  if(face==Vector3.Zero)face=CameraMath.NearestFace(Vector3.Normalize(start.Eye-start.Target));
-  var view=CameraMath.AlignFace(lastAligned??start,face,quarterTurns);
-  long time=now==0?Environment.TickCount64:now;
-  if(x!=0||y!=0){
-   if(lastMotion!=0&&(time<lastMotion||time-lastMotion>250)){axis=-1;heading=0;travel=0;}
-   lastMotion=time;Samples++;
-   // Alt only selects neighboring faces. An axis lock and a small repeat
-   // interval keep imperfect hand motion from curving, flickering or skipping.
-   float ax=MathF.Abs(x),ay=MathF.Abs(y);int nextAxis=axis;
-   if(nextAxis<0)nextAxis=ax>=ay?0:1;
-   else if(nextAxis==0&&ay>ax*1.4f)nextAxis=1;
-   else if(nextAxis==1&&ax>ay*1.4f)nextAxis=0;
-   float delta=nextAxis==0?x:y;int nextHeading=Math.Sign(delta);
-   if(nextAxis!=axis||nextHeading!=heading){
-    travel=0;axis=nextAxis;heading=nextHeading;var back=Vector3.Normalize(view.Eye-view.Target);
-    strokeAxis=axis==0?Vector3.Normalize(view.Up):Vector3.Normalize(Vector3.Cross(view.Up,back));
-   }
-   travel=Math.Min(40,travel+MathF.Abs(delta)*gain);
-   if(heading!=0&&travel>=40&&(lastFace==0||time<lastFace||time-lastFace>=140)){
-    // Retain the stroke's world rotation axis across upright cube faces.
-    // Recomputing it at a pole would reverse the continued roll and bounce.
-    var rotation=Quaternion.CreateFromAxisAngle(strokeAxis,-heading*MathF.PI/2);
-    var proposed=view with{Eye=view.Pivot+Vector3.Transform(view.Eye-view.Pivot,rotation),Target=view.Pivot+Vector3.Transform(view.Target-view.Pivot,rotation),Up=Vector3.Normalize(Vector3.Transform(view.Up,rotation)),ZoomPivot=CameraMath.RotateZoomPivot(view,rotation)};
-    face=CameraMath.NearestFace(Vector3.Normalize(proposed.Eye-proposed.Target));
-    quarterTurns=CameraMath.FaceOrientation(proposed,face);view=CameraMath.AlignFace(proposed,face,quarterTurns);travel=0;lastFace=time;
-   }
-  }
-  wheelRemainder+=Math.Clamp(wheel,-1200,1200);int wheelTurns=(int)(wheelRemainder/120);wheelRemainder-=wheelTurns*120;
-  quarterTurns=(quarterTurns+wheelTurns)%4;
-  lastAligned=CameraMath.AlignFace(view,face,quarterTurns);
-  if(wheelTurns!=0){travel=0;axis=-1;heading=0;TurnCount+=Math.Abs(wheelTurns);LastTurnDirection=-Math.Sign(wheelTurns);LastTurnAt=time;}
-  return lastAligned;
- }
+    CameraPose? view;
+    Vector3 strokeAxis;
+    float wheelRemainder,travel;
+    int quarterTurns,axis=-1,heading;
+    long lastMotion,lastFace;
+    public long Samples{get;private set;}
+    public int TurnCount{get;private set;}
+    public int LastTurnDirection{get;private set;}
+    public long LastTurnAt{get;private set;}
+    public bool Turning=>false;
+    public int Orientation=>quarterTurns;
+
+    public void Reset(CameraPose? pose=null){
+        view=pose;quarterTurns=0;wheelRemainder=0;ResetStroke();
+        lastMotion=lastFace=0;Samples=0;TurnCount=LastTurnDirection=0;LastTurnAt=0;
+        if(pose!=null){
+            var back=Vector3.Normalize(pose.Eye-pose.Target);
+            var face=CameraMath.NearestFace(back);
+            if(Vector3.Dot(back,face)>.999f)quarterTurns=CameraMath.FaceOrientation(pose,face);
+        }
+    }
+
+    void ResetStroke(){axis=-1;heading=0;travel=0;strokeAxis=Vector3.Zero;}
+
+    static CameraPose RotateView(CameraPose pose,Vector3 axis,float angle){
+        var rotation=Quaternion.CreateFromAxisAngle(axis,angle);
+        return pose with{
+            Eye=pose.Pivot+Vector3.Transform(pose.Eye-pose.Pivot,rotation),
+            Target=pose.Pivot+Vector3.Transform(pose.Target-pose.Pivot,rotation),
+            Up=Vector3.Normalize(Vector3.Transform(pose.Up,rotation)),
+            ZoomPivot=CameraMath.RotateZoomPivot(pose,rotation)
+        };
+    }
+
+    public CameraPose Step(CameraPose start,float x,float y,float wheel=0,float gain=1,long now=0){
+        if(!float.IsFinite(x)||!float.IsFinite(y)||!float.IsFinite(wheel)||!float.IsFinite(gain)||gain<0)
+            throw new ArgumentException("Invalid face movement.");
+        var current=view??start;
+        long time=now==0?Environment.TickCount64:now;
+        if(wheel!=0){
+            // Real twist scrolling takes precedence over incidental X/Y on the
+            // same frame. Rotate around the current view axis at the cursor.
+            ResetStroke();
+            wheelRemainder+=Math.Clamp(wheel,-1200,1200);
+            int turns=(int)(wheelRemainder/120);
+            wheelRemainder-=turns*120;
+            if(turns!=0){
+                var back=Vector3.Normalize(current.Eye-current.Target);
+                int angle=turns%4;
+                if(angle!=0)current=RotateView(current,back,-angle*MathF.PI/2);
+                quarterTurns=(quarterTurns+turns)%4;
+                TurnCount+=Math.Abs(turns);LastTurnDirection=-Math.Sign(turns);LastTurnAt=time;
+            }
+        }else if(x!=0||y!=0){
+            if(lastMotion!=0&&(time<lastMotion||time-lastMotion>250))ResetStroke();
+            lastMotion=time;Samples++;
+            float ax=MathF.Abs(x),ay=MathF.Abs(y);
+            int nextAxis=axis;
+            if(nextAxis<0)nextAxis=ax>=ay?0:1;
+            else if(nextAxis==0&&ay>ax*1.4f)nextAxis=1;
+            else if(nextAxis==1&&ax>ay*1.4f)nextAxis=0;
+            float delta=nextAxis==0?x:y;
+            int nextHeading=Math.Sign(delta);
+            if(nextAxis!=axis||nextHeading!=heading){
+                travel=0;axis=nextAxis;heading=nextHeading;
+                var back=Vector3.Normalize(current.Eye-current.Target);
+                var right=Vector3.Normalize(Vector3.Cross(current.Up,back));
+                strokeAxis=axis==0?Vector3.Cross(back,right):right;
+            }
+            travel=Math.Min(40,travel+MathF.Abs(delta)*gain);
+            if(heading!=0&&travel>=40&&(lastFace==0||time<lastFace||time-lastFace>=140)){
+                // Apply one directional step from the live camera first, then
+                // choose the flat face. Hold the stroke axis across cube poles.
+                var proposed=RotateView(current,strokeAxis,-heading*MathF.PI/2);
+                var face=CameraMath.NearestFace(Vector3.Normalize(proposed.Eye-proposed.Target));
+                quarterTurns=CameraMath.FaceOrientation(proposed,face);
+                current=CameraMath.AlignFace(proposed,face,quarterTurns);
+                travel=0;lastFace=time;
+            }
+        }
+        return view=current;
+    }
 }

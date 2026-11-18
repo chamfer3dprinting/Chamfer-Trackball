@@ -1,3 +1,10 @@
+# Snap angles from the current view
+
+- Hold Alt and roll to snap from your current angle, or twist to turn that view by 90° around your cursor. A partial movement waits without changing the view.
+- Use Ctrl + Shift for pan and twist zoom. Button 2 selects the nearest flat face.
+- Correct the Backtick twist direction reported on the Kensington. Scroll down turns left and scroll up turns right.
+- Backtick + 1 twist raises or lowers continuously with the same response as walking. Twist back to centre or release 1 to stop height.
+
 # Camera walk twist controls and the Home cube
 
 - Hold Backtick and twist the Kensington ball. Scroll up turns right and scroll down turns left.
