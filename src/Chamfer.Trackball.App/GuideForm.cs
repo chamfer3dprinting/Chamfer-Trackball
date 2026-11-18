@@ -8,7 +8,7 @@ internal sealed class GuideForm:Form{
  readonly Image logo=Brand.Image();bool compact,dragging;Point drag;string last="";long guideConfigRevision=-1;bool showGuide=true;
  public GuideForm(Controller controller,ConfigStore store){
   this.controller=controller;this.store=store;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;
-  DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,430);BackColor=Color.FromArgb(39,43,46);ForeColor=Color.FromArgb(220,225,230);
+  DoubleBuffered=true;AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,466);BackColor=Color.FromArgb(39,43,46);ForeColor=Color.FromArgb(220,225,230);
   Icon=Brand.Icon;Text="Chamfer Trackball guide";StartPosition=FormStartPosition.Manual;
   var area=Screen.PrimaryScreen!.WorkingArea;Location=new(area.Right-Width-18,area.Bottom-Height-18);
   var c=store.Snapshot();int x=ConfigStore.I(c,"guideX",Location.X),y=ConfigStore.I(c,"guideY",Location.Y);
@@ -16,7 +16,7 @@ internal sealed class GuideForm:Form{
   timer.Tick+=(_,_)=>{var state=controller.GuideState();Win32.GetCursorPos(out var cursor);pivot.UpdateMarker(ConfigStore.B(state,"pivotMarker"),ConfigStore.B(state,"snapPivot")?new(ConfigStore.I(state,"pivotX"),ConfigStore.I(state,"pivotY")):new(cursor.X,cursor.Y));var revision=store.Revision;if(revision!=guideConfigRevision){showGuide=ConfigStore.B(store.Snapshot(),"modePanel",true);guideConfigRevision=revision;}if(showGuide){if(!Visible)Show();var now=controller.GuideState().ToJsonString();if(now!=last){last=now;Invalidate();}}else if(Visible)Hide();};
   timer.Start();
  }
- protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ClientSize=new((int)(330*DeviceDpi/96f),(int)((compact?70:430)*DeviceDpi/96f));var a=Screen.FromPoint(Location).WorkingArea;Location=new(Math.Clamp(Left,a.Left,Math.Max(a.Left,a.Right-Width)),Math.Clamp(Top,a.Top,Math.Max(a.Top,a.Bottom-Height)));}
+ protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ClientSize=new((int)(330*DeviceDpi/96f),(int)((compact?70:466)*DeviceDpi/96f));var a=Screen.FromPoint(Location).WorkingArea;Location=new(Math.Clamp(Left,a.Left,Math.Max(a.Left,a.Right-Width)),Math.Clamp(Top,a.Top,Math.Max(a.Top,a.Bottom-Height)));}
  protected override bool ShowWithoutActivation=>true;
  protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x08000000|0x80;return p;}}
  protected override void OnPaint(PaintEventArgs e){
@@ -38,7 +38,7 @@ internal sealed class GuideForm:Form{
    string label=a=="normal"?defaults[i]:a switch{"keys"=>ConfigStore.S(s["bindings"]?[names[i]],"keys"),"faceSnap"=>"Snap face","panToggle"=>"Orbit / pan","lock3d"=>"3D on/off",_=>a};
    g.DrawString(label,tiny,text,new RectangleF(x+47,y+3,109,21));
   }
-  var mode=ConfigStore.S(s,"mode");bool drone=mode=="Navigate"&&ConfigStore.B(s,"navigationActive");bool threeAxes=ConfigStore.B(s,"threeAxisControls");bool freeLook=drone&&!threeAxes&&ConfigStore.B(s,"freeLook");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>drone&&threeAxes?"Camera walk":freeLook?"Look + travel":drone?(ConfigStore.B(s,"levelFlight")?"Level flight":"Drone navigation"):"Navigate","Snap"=>ConfigStore.S(s,"snapLabel","Snap faces"),"Roll"=>"Twist",_=>mode};
+  var layer=ConfigStore.S(s,"navigationLayer");bool looking=layer=="Look",height=layer=="Height";var mode=ConfigStore.S(s,"mode");bool drone=mode=="Navigate"&&ConfigStore.B(s,"navigationActive");bool threeAxes=ConfigStore.B(s,"threeAxisControls");bool freeLook=drone&&!threeAxes&&ConfigStore.B(s,"freeLook");var title=mode switch{"Idle"=>"Mouse","PanZoom"=>"Pan + zoom","Navigate"=>looking?"Look around":height?"Raise / lower":drone&&threeAxes?"Camera walk":freeLook?"Look + travel":drone?(ConfigStore.B(s,"levelFlight")?"Level flight":"Drone navigation"):"Navigate","Snap"=>ConfigStore.S(s,"snapLabel","Snap faces"),"Roll"=>"Twist",_=>mode};
   var measure=g.MeasureString(title,bold);g.DrawString(title,bold,mode=="Idle"?text:accent,(330-measure.Width)/2,99);
   string program="Program: "+ConfigStore.S(s,"program");var pm=g.MeasureString(program,font);g.DrawString(program,font,muted,(330-pm.Width)/2,123);
   using var ball=new SolidBrush(Color.FromArgb(12,16,18));
@@ -48,26 +48,26 @@ internal sealed class GuideForm:Form{
   foreach(int yy in new[]{218,227,236}){g.DrawLine(line,37-(yy-218)/2,yy,128+(yy-218)/2,yy);g.DrawLine(line,194-(yy-218)/2,yy,287+(yy-218)/2,yy);}
   string roll=mode switch{"Idle"=>"Pointer","Orbit"=>"Orbit","PanZoom"=>"Pan","Zoom"=>"Zoom","Snap"=>"Snap","Roll"=>"Turn face","Navigate"=>"Move",_=>mode};
   string wheel=mode=="Orbit"?"Roll":mode=="Idle"?"Scroll":mode=="Snap"?"Turn face":mode=="Navigate"?(drone?"Up / down":"Turn"):"Zoom";
-  g.DrawString(drone&&threeAxes?"Ball: Forward/back/sideways · Twist: turn":freeLook?"Ball: Travel + look · Scroll: height":drone?"Ball: Forward/back/sideways · Scroll: Up/down":mode=="Snap"?"Ball: Faces   ·   Left wheel: 90°":"Roll: "+roll+"   ·   Wheel: "+wheel,font,text,drone?13:mode=="Snap"?35:53,249);
-  if(drone)g.DrawString(threeAxes?"Twist right/left: turn · Ball: travel":freeLook?"Roll up/down: tilt · Left/right: turn":ConfigStore.B(s,"levelFlight")?"Forward: level travel · Scroll: height":"Diagonal: travel + turn · sideways: strafe",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
+  g.DrawString(mode=="Navigate"&&looking?"Ball: Look up/down/left/right":mode=="Navigate"&&height?"Ball: Up/down/sideways · Twist: turn":drone&&threeAxes?"Ball: Forward/back/sideways · Twist: turn":freeLook?"Ball: Travel + look · Scroll: height":drone?"Ball: Forward/back/sideways · Scroll: Up/down":mode=="Snap"?"Ball: Faces   ·   Left wheel: 90°":"Roll: "+roll+"   ·   Wheel: "+wheel,font,text,drone?13:mode=="Snap"?35:53,249);
+  if(mode=="Navigate")g.DrawString(looking?"Travel continues · release extra key to travel":height?"Roll forward to rise · back to lower":threeAxes?"Twist right/left: turn · Ball: travel":freeLook?"Roll up/down: tilt · Left/right: turn":ConfigStore.B(s,"levelFlight")?"Forward: level travel · Scroll: height":"Diagonal: travel + turn · sideways: strafe",tiny,muted,45,278);else{g.DrawString("Left wheel: Up / down",tiny,muted,13,278);g.DrawString("Right wheel: Horizontal",tiny,muted,177,278);}
   g.DrawLine(line,12,301,318,301);
   var keys=new HashSet<int>(s["keys"]!.AsArray().Select(key=>key!.GetValue<int>()));
   int shortcutRow=0;
   foreach(var item in s["shortcuts"]!.AsArray()){
    string chord=ConfigStore.S(item,"chord","none");if(chord is "" or "none")continue;
-   bool held=false;try{held=KeyChord.Parse(chord).Matches(keys);}catch(FormatException){}
+   bool held=ConfigStore.B(item,"held");try{held|=KeyChord.Parse(chord).Matches(keys);}catch(FormatException){}
    float y=307+shortcutRow++*18;string label=chord.Replace("win","Windows",StringComparison.OrdinalIgnoreCase).Replace("+"," + ");
    g.DrawString(label,tiny,held?accent:muted,new RectangleF(13,y,156,18));
    g.DrawString(ConfigStore.S(item,"label"),tiny,held?accent:text,180,y);
   }
   string footer=drone?"Roll back to centre or release Navigate: stop":ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";
-  g.DrawString(footer,tiny,mode is "Snap" or "Roll"?accent:muted,new RectangleF(13,412,304,18));
+  g.DrawString(footer,tiny,mode is "Snap" or "Roll"?accent:muted,new RectangleF(13,448,304,18));
 
  }
  protected override void OnMouseDown(MouseEventArgs e){
   base.OnMouseDown(e);float scale=DeviceDpi/96f;float x=e.X/scale,y=e.Y/scale;
   if(y<34&&x>302){var c=store.Snapshot();c["modePanel"]=false;store.Save(c);Hide();return;}
-  if(y<34&&x>275){compact=!compact;ClientSize=new((int)(330*scale),(int)((compact?70:430)*scale));Invalidate();return;}
+  if(y<34&&x>275){compact=!compact;ClientSize=new((int)(330*scale),(int)((compact?70:466)*scale));Invalidate();return;}
   if(y<34){dragging=true;drag=e.Location;Capture=true;}
  }
  protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(dragging)Location=new(Left+e.X-drag.X,Top+e.Y-drag.Y);}

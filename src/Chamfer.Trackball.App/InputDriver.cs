@@ -229,6 +229,21 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
             while(keyReplays.TryDequeue(out _)){ }
             RouteKey(192,true);lock(keysGate)usedDeferred.Add(192);RouteKey(192,false);
             if(Keys.Contains(192)||!keyReplays.IsEmpty)throw new InvalidOperationException("A used Backtick hold typed a stray character or stayed held.");
+            var walkConfig=ConfigStore.Defaults();ConfigStore.LoadProgram(walkConfig,1);IsNavigationChord=keys=>ModeResolver.Resolve(walkConfig,keys)!=NavMode.Idle;
+            foreach(bool baseReleasedFirst in new[]{false,true}){
+                if(!RouteKey(192,true)||!RouteKey(49,true))throw new InvalidOperationException("Backtick plus 1 was not held for camera look.");
+                lock(keysGate){usedDeferred.Add(192);usedDeferred.Add(49);}
+                if(baseReleasedFirst){RouteKey(192,false);RouteKey(49,false);}else{RouteKey(49,false);RouteKey(192,false);}
+                if(Keys.Count!=0||!keyReplays.IsEmpty)throw new InvalidOperationException("Navigation look typed a stray key or stayed held after either release order.");
+            }
+            RouteKey(192,true);RouteKey(49,true);RouteKey(49,false);RouteKey(192,false);
+            if(Keys.Count!=0||!keyReplays.IsEmpty)throw new InvalidOperationException("A brief explicit look chord typed a stray 1 before its first mouse report.");
+            RouteKey(192,true);RouteKey(17,true);
+            if(ModeResolver.Resolve(walkConfig,Keys)!=NavMode.Navigate)throw new InvalidOperationException("Ctrl height ended navigation.");
+            lock(keysGate)usedDeferred.Add(192);
+            RouteKey(17,false);RouteKey(192,false);
+            if(Keys.Count!=0||!keyReplays.IsEmpty)throw new InvalidOperationException("Height release replayed a navigation key or retained Ctrl.");
+            if(RouteKey(49,true)||RouteKey(49,false)||Keys.Count!=0)throw new InvalidOperationException("The extra look key was intercepted without the Camera walk hold.");
             if(RouteKey(91,true)||RouteKey(91,false)||!keyReplays.IsEmpty)throw new InvalidOperationException("Windows was reserved after changing navigation to Backtick.");
             IsCad=()=>false;
             if(RouteKey(192,true)||RouteKey(192,false))throw new InvalidOperationException("Backtick was intercepted outside the 3D context.");
@@ -312,7 +327,13 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                 ReplayKey(k,down);if(!down)delayedKeys.Remove(k);return true;
             }
             bool trigger=k is not (16 or 17 or 160 or 161 or 162 or 163)&&HookHealthy&&IsNavigationChord(Keys);
-            if(down&&trigger&&IsCad()&&Ready&&Enabled()){deferred.Add(k);if(k is 91 or 92||Keys.Contains(91))usedDeferred.Add(k);NotifyKeys();return true;}
+            if(down&&trigger&&IsCad()&&Ready&&Enabled()){
+                deferred.Add(k);
+                // A multi-key navigation hold is an explicit command. Do not
+                // type its extra key if it is released before the next raw report.
+                if(deferred.Count>1)foreach(var held in deferred)usedDeferred.Add(held);
+                if(k is 91 or 92||Keys.Contains(91))usedDeferred.Add(k);NotifyKeys();return true;
+            }
             if(down&&!trigger&&k is not (16 or 17 or 160 or 161 or 162 or 163)&&deferred.Count>0){
                 foreach(var old in deferred.ToArray()){
                     ReplayKey(old,true);delayedKeys.Add(old);deferred.Remove(old);usedDeferred.Remove(old);

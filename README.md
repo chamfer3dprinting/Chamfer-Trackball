@@ -6,9 +6,19 @@ In **Buttons & keys → Your trackballs**, use **Add or identify trackball** and
 
 Navigation requests an 8 ms WinForms timer interval. A standalone Windows timing test on the owner's PC measured roughly 31 ms for the former 16 ms request and 15.5 ms for the new request. This improves camera update cadence without changing the system timer resolution or adding smoothing delay. The standalone diagnostic is `tests/TimerCadenceProbe.ps1`. Physical motion feel and future SlimBlade reports still need testing on the device. Stock twist scrolling alone does not establish access to the full raw three-axis stream used by modified Rotatrix hardware; no stock-device polling-rate or simultaneous-axis guarantee is claimed.
 
+## Camera walk
+
+In the standard 3D modelling program, hold **Backtick (`)** and roll to travel forward/back and sideways. Kensington knob twist turns the heading. With Continuous navigation enabled, return the ball/twist near its starting position or release Backtick to stop.
+
+While holding Backtick, add **1** to look up/down and left/right with the ball, or add **Ctrl** to raise/lower the camera with forward/back rolls. Looking is direct and preserves the existing travel command; release 1 to steer travel again. Release Ctrl to stop changing height. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
+
+Change these extra holds under **Buttons & keys → Walk: look around / Walk: raise / lower**. Record only the additional key; the Camera walk hold is added automatically. Both save with programs and named presets. Existing saved programs/presets without them keep the previous controls until assigned. The owner update assigns 1 and Ctrl to the active 3D program after preserving its previous setup.
+
+These separate look/height layers follow the [Rotatrix free-camera control model](https://openaxis.rotatrix.com/guide/free-camera/), with the owner's Backtick mapping. They do not add Rotatrix custom-firmware sensor reports to a stock trackball.
+
 ## Cube faces and orientation
 
-In the 3D modelling program, hold **Alt + ball** to change cube faces. Hold **Alt + the left scroll wheel** for exact 90° orientation turns while keeping the current face and distance. Each notch is one turn; reverse the wheel to rotate back. The right wheel retains its normal/configured behavior. Ball-only twist estimation is off in the default setup. Button 1 remains a normal middle click.
+In the standard 3D modelling program, click the **top-right button (button 2)** for nearest-face snapping around the cursor pivot. No keyboard face-snap hold is assigned by default. An optional custom Snap hold retains ball directional faces and exact 90° left-wheel orientation turns. Ball-only twist estimation stays off. Shift rotates, Alt translates, Ctrl zooms, and button 1 remains a normal middle click.
 
 Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds and verifies the single-file executables; no development folder is needed on the owner's PC.
 

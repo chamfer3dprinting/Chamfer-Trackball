@@ -24,6 +24,40 @@ public sealed record KeyChord(int[] Keys,string Canonical) {
         return new(keys,string.Join("+",keys));
     }
 }
+public enum NavigationLayer { Travel,Look,Height }
+public static class NavigationBindings {
+    public static string ExtraField(NavigationLayer layer)=>layer==NavigationLayer.Look?"navigateLookKeys":"navigateHeightKeys";
+    public static KeyChord? Chord(System.Text.Json.Nodes.JsonObject config,NavigationLayer layer){
+        var spec=ConfigStore.S(config,"navigateKeys","none");
+        if(spec is "" or "none")return null;
+        var baseChord=KeyChord.Parse(spec);if(layer==NavigationLayer.Travel)return baseChord;
+        var extra=ConfigStore.S(config,ExtraField(layer),"none");if(extra is "" or "none")return null;
+        var additional=KeyChord.Parse(extra);
+        if(additional.Keys.Any(baseChord.Keys.Contains))throw new FormatException("Choose extra keys different from the Camera walk hold.");
+        var keys=baseChord.Keys.Concat(additional.Keys).Distinct().Order().ToArray();
+        return new(keys,string.Join("+",keys));
+    }
+    public static NavigationLayer? Resolve(System.Text.Json.Nodes.JsonObject config,IReadOnlySet<int> keys){
+        foreach(var layer in new[]{NavigationLayer.Look,NavigationLayer.Height,NavigationLayer.Travel}){
+            try{if(Chord(config,layer)?.Matches(keys)==true)return layer;}catch(FormatException){ }
+        }
+        return null;
+    }
+    public static string Label(System.Text.Json.Nodes.JsonObject config,NavigationLayer layer){
+        if(Chord(config,layer)==null)return "none";
+        var baseSpec=ConfigStore.S(config,"navigateKeys");
+        return layer==NavigationLayer.Travel?baseSpec:baseSpec+"+"+ConfigStore.S(config,ExtraField(layer));
+    }
+    public static void Validate(System.Text.Json.Nodes.JsonObject config,HashSet<string> used){
+        foreach(var layer in new[]{NavigationLayer.Look,NavigationLayer.Height}){
+            var extra=ConfigStore.S(config,ExtraField(layer),"none");
+            if(extra is "" or "none")continue;
+            _=KeyChord.Parse(extra);
+            var chord=Chord(config,layer);
+            if(chord!=null&&!used.Add(chord.Canonical))throw new System.IO.InvalidDataException("Camera walk look and height holds must be different from the other navigation shortcuts.");
+        }
+    }
+}
 public static class ModeResolver {
     public static NavMode Resolve(System.Text.Json.Nodes.JsonObject config,IReadOnlySet<int> keys){
         var options=new[]{("panKeys",NavMode.PanZoom),("navigateKeys",NavMode.Navigate),("snapKeys",NavMode.Snap),("twistKeys",NavMode.Roll),("zoomKeys",NavMode.Zoom),("orbitKeys",NavMode.Orbit)};
@@ -32,6 +66,7 @@ public static class ModeResolver {
             if(spec is "" or "none")continue;
             try{
                 var chord=KeyChord.Parse(spec);
+                if(mode==NavMode.Navigate&&NavigationBindings.Resolve(config,keys)!=null)return mode;
                 // Alt is an intentional navigation height modifier for the held chord.
                 if(mode==NavMode.Navigate&&keys.Contains(18)&&!chord.Keys.Contains(18)){
                     var withoutAlt=new HashSet<int>(keys);withoutAlt.Remove(18);
