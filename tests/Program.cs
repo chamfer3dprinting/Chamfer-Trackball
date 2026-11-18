@@ -16,7 +16,6 @@ Check(ConfigStore.S(defaults,"ball")=="pointer"&&ModeResolver.Resolve(defaults,n
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Zoom,"Ctrl and roll selects Zoom in the 3D program");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&ModeResolver.Resolve(defaults,new HashSet<int>{17,86})==NavMode.Idle,"Ctrl+C and Ctrl+V remain ordinary keyboard shortcuts");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.Idle,"Ctrl+Shift does not accidentally activate Shift rotation");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap,"Alt selects angle snapping");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16,17})==NavMode.PanZoom,"Ctrl + Shift selects translation without conflicting with Orbit or Zoom");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{192})==NavMode.Navigate,"Backtick navigates");
