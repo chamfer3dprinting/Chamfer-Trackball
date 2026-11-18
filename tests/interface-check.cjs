@@ -207,11 +207,37 @@ knobContext.updateFaceTurn({knobActive:true,knobDegrees:30});
 assert.equal(knobFeedback['#homeFaceTurn'],'Twist: Clockwise 30° · trigger 0%');
 knobContext.updateFaceTurn({knobActive:true,knobDegrees:-90});
 assert.equal(knobFeedback['#homeFaceTurn'],'Twist: Anticlockwise 90° · trigger 0%');
-const rotationStart=html.indexOf('function mul('),rotationEnd=html.indexOf('function padReset(',rotationStart);
-const rotationContext={pad:{rot:[1,0,0,0,1,0,0,0,1]},Math};
-vm.runInNewContext(html.slice(rotationStart,rotationEnd),rotationContext);
-rotationContext.rotRoll(-Math.PI/2);
-assert.ok(Math.abs(rotationContext.pad.rot[0])<.00001&&rotationContext.pad.rot[1]>.9999&&rotationContext.pad.rot[8]===1);
+const padStart=html.indexOf('let padCamera='),padEnd=html.indexOf('function reportPad(){',padStart);
+assert.ok(padStart>0&&padEnd>padStart);
+let contours=[],path=[];
+const context2d={
+ fillRect(){},beginPath(){path=[]},moveTo(x,y){path.push([x,y])},lineTo(x,y){path.push([x,y])},
+ closePath(){contours.push(path.slice())},fill(){},stroke(){}
+};
+const canvas={getBoundingClientRect:()=>({width:400,height:300}),getContext:()=>context2d};
+const padContext={
+ $:selector=>selector==='#padCanvas'?canvas:{},
+ getComputedStyle:()=>({getPropertyValue:()=>'#222'}),document:{documentElement:{}},devicePixelRatio:1
+};
+vm.runInNewContext(html.slice(padStart,padEnd)+';this.drawCamera=pose=>{padCamera=pose;drawPad()}',padContext);
+const frontCamera={eye:[0,0,5.5],target:[0,0,0],up:[0,1,0],verticalFov:1.14,orthographic:false,orthoHeight:6};
+function projectCube(pose){
+ contours=[];padContext.drawCamera(pose);
+ assert.ok(contours.length>0,'the Home camera must draw cube faces');
+ const vertices=contours.flat();
+ assert.ok(vertices.every(v=>v.every(Number.isFinite)),'projection must return finite pixels');
+ return vertices.reduce((center,v)=>[center[0]+v[0]/vertices.length,center[1]+v[1]/vertices.length],[0,0]);
+}
+const centered=projectCube(frontCamera);
+const raised=projectCube({...frontCamera,eye:[0,1,5.5],target:[0,1,0]});
+const lowered=projectCube({...frontCamera,eye:[0,-1,5.5],target:[0,-1,0]});
+const turned=projectCube({...frontCamera,target:[1,0,0]});
+assert.ok(raised[1]>centered[1]&&lowered[1]<centered[1]&&turned[0]<centered[0],
+ 'a right turn and signed height changes must move the projected cube in the expected directions');
+const unrolled=projectCube(frontCamera),firstCorner=contours[0][0];
+const rolled=projectCube({...frontCamera,up:[1,0,0]});
+assert.ok(Math.abs(unrolled[0]-rolled[0])<.00001&&Math.abs(unrolled[1]-rolled[1])<.00001&&
+ Math.abs(contours[0][0][0]-firstCorner[0])>1,'rolling the camera should rotate the projected cube around its centre');
 assert.ok(controller.includes('KnobTwist.CameraDelta(')&&controller.includes('float TwistGain=>'));
 assert.ok(controller.includes('!knobHoldActive&&ConfigStore.B(cfg,"smooth",true)'));
 console.log('Customizable held Twist, independent speed/direction, immediate stop, live feedback and the orientation preview are wired.');
