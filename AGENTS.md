@@ -38,6 +38,31 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-17 — Codex: Installed independent walk look and height in Admin 1.5.52
+
+PR37 is merged as runtime 0847045b8ec5607278875acb28ef78971ce4d8e0. Main workflow
+44228963553 passed all 1,566 core checks, interface/integration checks and both
+actual executable keyboard/controller/UI/native-camera checks. Admin release
+449480274 contains v1.5.52 with SHA-256
+7bca864e3de20e28f83ad32d1b859797ae73cdf7f48f2fce6551492fb993a3db.
+The installed executable and local bridge both verify 1.5.52 and the app responds.
+
+The owner's active 3D program now adds 1 to Backtick for direct camera looking and
+Ctrl to Backtick for world height. Preserve saved Rotation/Pan/Zoom/Twist speeds.
+A deep comparison before and after restart confirms every other setting, device,
+native click/wheel choice and all eleven existing presets remain unchanged, apart
+from inert none fields for old extra holds. Before walk look and height and Walk
+look and height bring the library to thirteen presets. Explicit settings/executable
+backups are saved locally for rollback. Normal mouse has neither extra assigned.
+
+The installed Admin Home displays both complete holds correctly. The existing
+desktop Studio 3.6.4 reconnects to the bridge and remains unchanged, at its Home
+screen. No model, AI, private web, public activation or tester delivery was changed.
+The public Trackball candidate is still unpublished. Physical ball/keyboard feel
+has not been exercised by the owner on this update; do not claim exact Rotatrix
+hardware reporting or SpaceMouse equivalence. Next: evaluate look/height with a
+3D model open; tune only the intended program if needed.
+
 # 2026-11-17 — Codex: Separate camera walk look and height holds
 
 The owner reports missing vertical navigation and proposes Backtick + 1 for turning,
