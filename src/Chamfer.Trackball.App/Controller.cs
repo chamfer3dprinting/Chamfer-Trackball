@@ -286,7 +286,13 @@ public string AppName{get;private set;}="";
         var frame=pending.Peek();
         bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate);
         if(orbitTwistDirection!=0&&(finish||!HeldOrbitTwist))StopOrbitTwist();
-        if((steady||cruise||navigationSession||orbitTwistDirection!=0)&&native is {Version:>=2,Pose:null})return;
+        if((steady||cruise||navigationSession||orbitTwistDirection!=0)&&native is {Version:>=2,Pose:null}){
+            // A cursor re-pick waits for the displayed camera. Resume the
+            // latched direction there without integrating the waiting time.
+            lastOrbitTwistFrame=double.NaN;
+            if(navigationSession&&navigationLayer==NavigationLayer.Look)navigationMotion.RestartFrameTime();
+            return;
+        }
         if(navigationSession){
             cameraMotion.Reset();heldRate.Reset();glide.Reset();
             bool threeAxes=ConfigStore.B(cfg,"threeAxisControls");
@@ -642,19 +648,26 @@ public string AppName{get;private set;}="";
             if(RollDirection(rolled,turned)>=0||RollDirection(turned,continued)>=0||
                continued.Pivot!=rolled.Pivot||Vector3.Distance(Direction(continued),Direction(rolled))>.00001f)
                 throw new InvalidOperationException("Shift twist did not keep rolling around the cursor.");
+            preview.Client.Pose=null;
+            Flush(timeMilliseconds:1184);
+            preview.Client.Pose=preview.Client.BasePose=continued;
+            Flush(timeMilliseconds:1192);
+            var resumed=preview.View;
+            if(Math.Abs(RollDirection(continued,resumed)-RollDirection(rolled,turned))>.00001f)
+                throw new InvalidOperationException("Continuous roll stopped or caught up during a new cursor scene.");
             MouseEvent(0x20a,120);MouseEvent(0x20a,-120);
-            Flush(timeMilliseconds:1016);
+            Flush(timeMilliseconds:1200);
             var reversed=preview.View;
-            Flush(timeMilliseconds:1024);
-            if(RollDirection(continued,reversed)<=0||RollDirection(reversed,preview.View)<=0)
+            Flush(timeMilliseconds:1208);
+            if(RollDirection(resumed,reversed)<=0||RollDirection(reversed,preview.View)<=0)
                 throw new InvalidOperationException("Shift twist did not reverse on the latest opposite report.");
             cfg["twistSens"]=0;
             var heldAtZeroSpeed=preview.View;
-            Flush(timeMilliseconds:1032);
+            Flush(timeMilliseconds:1216);
             if(preview.View!=heldAtZeroSpeed)throw new InvalidOperationException("Zero Twist speed still rolled the view.");
             cfg["twistSens"]=50;
             setKeys([]);
-            Flush(timeMilliseconds:1040);
+            Flush(timeMilliseconds:1224);
             if(preview.View!=heldAtZeroSpeed||orbitTwistDirection!=0||navigationClock.Enabled)
                 throw new InvalidOperationException("Shift release did not stop continuous roll.");
 
@@ -820,9 +833,16 @@ public string AppName{get;private set;}="";
             Flush(timeMilliseconds:2048);
             if(lifted.Eye.Y<=lower.Eye.Y||client.Pose!.Eye.Y<=lifted.Eye.Y||client.Out.Count!=1)
                 throw new InvalidOperationException("The latest up twist did not reverse the descent and keep climbing.");
-            Flush(finish:true,timeMilliseconds:2056);
+            var beforeReanchor=client.Pose!;
+            client.Pose=null;
+            Flush(timeMilliseconds:2232);
+            client.Pose=client.BasePose=beforeReanchor;
+            Flush(timeMilliseconds:2240);
+            if(client.Pose!.Eye.Y<=beforeReanchor.Eye.Y)
+                throw new InvalidOperationException("Look height did not resume after a new cursor scene.");
+            Flush(finish:true,timeMilliseconds:2248);
             var released=client.Pose;
-            Flush(timeMilliseconds:2064);
+            Flush(timeMilliseconds:2256);
             if(client.Pose!=released)throw new InvalidOperationException("Look height continued after release.");
             cfg["navigationLevelFlight"]=true;
 

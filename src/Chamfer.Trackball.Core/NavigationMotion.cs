@@ -81,5 +81,6 @@ public sealed class NavigationMotion {
         float pitch=Advance(ref vpitch,walking&&coupledLook&&!ballTwist?forward.Rate:0,dt);
         return new(Advance(ref vr,right.Rate*(1-steer),dt),Advance(ref vu,up.Rate,dt),Advance(ref vf,forward.Rate,dt),yaw,pitch);
     }
+    public void RestartFrameTime()=>previous=double.NaN;
     public void Reset(){layer=NavigationLayer.Travel;right=up=forward=turn=default;vr=vu=vf=vyaw=vpitch=0;previous=double.NaN;}
 }
