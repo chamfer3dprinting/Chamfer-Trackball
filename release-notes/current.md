@@ -1,3 +1,11 @@
+# Continuous twist zoom and version rollover
+
+- Hold Ctrl + Shift and twist the Kensington ball to keep zooming at the cursor. Roll the ball to pan during zoom. Twist the other way to reverse, or release either key to stop.
+- Shift twist rolls the visible model in the twist direction.
+- Backtick twist turns continuously. The first opposite twist reverses the turn. Release Backtick to stop turning. Ball travel stops at its own neutral point.
+- The guide shows the active directions. The saved Zoom speed and reversal setting apply to zoom.
+- Automatic versions advance through patch 9 and then roll over to the next minor version. The Admin version advances from v1.5.56 to v1.6.0.
+
 # Continuous twist roll and height
 
 - Hold Shift and twist the Kensington ball to keep rolling the view around the cursor. An opposite twist reverses the roll. Release Shift to stop.

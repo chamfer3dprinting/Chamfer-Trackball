@@ -60,14 +60,12 @@ internal static class ThreeAxisChecks {
         check(passedCentre.Forward < 0 && !largeStroke.Centered, "Rolling beyond the starting point still reverses travel");
         largeStroke.Reset();
         var firstTurn = largeStroke.Step(0, 0, 240, 1000, ballTwist: true);
-        var closerToCentre = largeStroke.Step(0, 0, -120, 1008, ballTwist: true);
-        check(firstTurn.Yaw < 0 && closerToCentre.Yaw < 0 &&
-            largeStroke.Step(0, 0, 0, 1016, ballTwist: true).Yaw < 0,
-            "An unfinished return to centre keeps turning in the original direction");
-        check(!largeStroke.Step(0, 0, -120, 1024, ballTwist: true).Active && largeStroke.Centered,
-            "The full reverse twist returns even a saturated turn to centre");
-        check(largeStroke.Step(0, 0, -120, 1032, ballTwist: true).Yaw > 0,
-            "Twisting past centre starts a turn in the other direction");
+        var opposite = largeStroke.Step(0, 0, -120, 1008, ballTwist: true);
+        check(firstTurn.Yaw < 0 && opposite.Yaw > 0 &&
+            largeStroke.Step(0, 0, 0, 1016, ballTwist: true).Yaw > 0,
+            "One smaller opposite twist immediately reverses a sustained Backtick turn");
+        check(largeStroke.Step(0, 0, 120, 1024, ballTwist: true).Yaw < 0,
+            "The next opposite twist switches the turn back on the first frame");
         foreach(float wheel in new[]{-60f,60f}){
             var rate=new NavigationMotion();var frame=rate.Step(0,0,wheel,1000,ballTwist:true);
             check(frame.Up==0&&frame.Forward==0&&frame.Right==0&&Math.Sign(frame.Yaw)==-Math.Sign(wheel)&&frame.Pitch==0,"Walk knob twist controls yaw instead of height or translation");
@@ -78,17 +76,22 @@ internal static class ThreeAxisChecks {
             check(Math.Sign(held.Yaw)==Math.Sign(frame.Yaw)&&continued.Eye==start.Eye&&
                 (Forward(continued).X-Forward(turn).X)*wheel<0,
                 "The camera continues turning in place with no further wheel reports");
-            var neutral=rate.Step(0,0,-wheel,1016,ballTwist:true);
-            check(!neutral.Active&&rate.Centered&&CameraMath.Fly(continued,neutral,.4f,.4f,true)==continued,
-                "Equal reverse twist stops yaw at the current heading");
+            var reversed=rate.Step(0,0,-wheel,1016,ballTwist:true);
+            var reversing=CameraMath.Fly(continued,reversed,.4f,.4f,true);
+            check(reversed.Yaw*frame.Yaw<0&&reversing.Eye==start.Eye&&
+                (Forward(reversing).X-Forward(continued).X)*wheel>0,
+                "An opposite twist reverses the rendered turn without moving the camera eye");
         }
         var combined=new NavigationMotion();var f=combined.Step(12,-12,60,2000,ballTwist:true);var view=CameraMath.Fly(Pose(),f,.4f,.4f,true);
         check(view.Eye.X>0&&view.Eye.Z<200&&view.Eye.Y==0&&Forward(view).X<0,"Ball travel and knob turning combine continuously and simultaneously");
-        var straight=combined.Step(0,0,-60,2008,ballTwist:true);
-        check(straight.Forward>0&&straight.Right>0&&straight.Yaw==0,
-            "Returning the turn to neutral leaves forward and sideways travel active");
+        var reverseHeading=combined.Step(0,0,-60,2008,ballTwist:true);
+        check(reverseHeading.Forward>0&&reverseHeading.Right>0&&reverseHeading.Yaw>0,
+            "Reversing the turn leaves forward and sideways travel active");
+        var stationaryTurn=combined.Step(-12,12,0,2016,ballTwist:true);
+        check(stationaryTurn.Forward==0&&stationaryTurn.Right==0&&stationaryTurn.Yaw>0,
+            "Returning ball travel to centre keeps the turn active");
         check(CameraMath.Fly(Pose(),f,0,0,true)==Pose(),"Zero walk translation and twist sensitivity stops the combined motion");
-        check(!combined.Step(0,0,0,2016,finish:true,ballTwist:true).Active&&combined.Centered,"Backtick release clears all three walk commands");
+        check(!combined.Step(0,0,0,2024,finish:true,ballTwist:true).Active&&combined.Centered,"Backtick release clears all three walk commands");
         var low=CameraMath.Move(Pose(),NavMode.Orbit,0,0,60*MotionPolicy.Gain(10));var high=CameraMath.Move(Pose(),NavMode.Orbit,0,0,60*MotionPolicy.Gain(38));
         check(Vector3.Distance(high.Up,Pose().Up)>Vector3.Distance(low.Up,Pose().Up)*10,"Twist speed has a useful range for third-axis rotation");
     }
