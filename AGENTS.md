@@ -52,7 +52,19 @@ active direction and stop instructions in the floating guide.
 
 Remove standalone Ctrl zoom from the built-in 3D program and the owner's
 active 3D program. Ctrl + Shift remains the pan/zoom hold. Preserve saved presets
-and other customized bindings. Verification and Admin installation are pending.
+and other customized bindings.
+
+PR #41 merged as 892b69bc8b4112bf2e8da9dbb7b8d1f839c008ac. Main workflow 44535928591
+passed 1,589 core checks and both Windows interface and bridge tests. These
+exercise continuous roll and height, direct reversal, delayed cursor scenes,
+release, zero Twist speed, the custom Zoom path and Ctrl + Shift. Studio passes
+24 existing renderer checks and six added replay cases for both projections.
+
+Installed Admin v1.5.56 from release 451402472 using Update now. Its SHA-256 is
+34e037964e6071b9c58c6c964c480e3a7ebea6ecfb7046f559152e4e82d4a805.
+The app responds and the camera bridge reports v1.5.56. The active 3D profile
+has Zoom off and Ctrl + Shift for pan/zoom. The only saved change was the
+standalone Zoom binding. Physical testing of the new gestures remains open.
 
 # 2026-11-18 — Codex: Cursor-following Alt, continuous turns and animated guide
 
