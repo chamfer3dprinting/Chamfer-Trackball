@@ -56,8 +56,21 @@ neutral independent.
 
 Automatic versions roll over after patch 9. The newest prior Admin tag is
 v1.5.56, so the next suitable version is v1.6.0. Continue to honor historical
-tags, updater ordering and explicitly chosen public versions. Build verification
-and Admin installation are pending.
+tags, updater ordering and explicitly chosen public versions.
+
+PR #42 merged as 8863866fee4c78eff2e96a0ce76e983a2a4c7387. Main workflow 44631936592
+passed 1,591 core checks, version rollover checks and both Windows interface and
+bridge checks. Coverage includes continuous cursor zoom and reverse, pan during
+zoom, corrected Shift roll, direct Backtick reversal, release and independent
+translation neutral. Studio renderer checks passed all 24 existing cases and
+eight focused replays in perspective and orthographic views.
+
+The v1.5.56 updater offered v1.6.0 on the owner PC. Installed Admin v1.6.0
+from release 452029311; its SHA-256 is
+dfd4805521fbf1b31d96dafe72f42ebf536acc0453e7204db2153169c6f5bc9a.
+The local bridge responds on v1.6.0 and Home renders the test cube with the
+owner's 3D modelling profile active. Settings match the pre-install file
+byte for byte. Physical testing of the updated Kensington gestures remains open.
 
 # 2026-11-19 — Codex: Continuous reversible twist roll and look height
 
