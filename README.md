@@ -14,7 +14,7 @@ Select **3D modelling**, turn **3D controls on**, and use the Home cube or a sup
 - **Backtick + 1** + roll looks up/down and left/right. Twist scroll up to raise the camera and scroll down to lower it.
 - **Backtick + Ctrl** + forward/back roll also raises and lowers the camera.
 
-With Continuous navigation enabled, a Backtick twist starts a turn in the scroll direction. Heading and travel continue independently while held. Backtick + 1 twist changes height, and Backtick + 1 roll looks around. Return the ball or twist to neutral to stop that axis, or release Backtick to stop. Releasing 1 stops height. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
+With Continuous navigation enabled, a Backtick twist starts a turn in the scroll direction. Heading and travel continue independently while held. Return the ball or twist to neutral to stop that axis, or release Backtick to stop. With Backtick + 1 held, the latest twist direction sets a continuous climb or descent. Twist the other way to reverse immediately. Release 1 or Backtick to stop changing height. Rotation speed controls looking, Pan / 3D speed controls travel and height, and Twist speed controls heading turns.
 
 Change these extra holds under **Buttons & keys → Walk: look around / Walk: raise / lower**. Record only the additional key; the Camera walk hold is added automatically. Both save with programs and named presets. Existing saved programs/presets without them keep the previous controls until assigned. The owner update assigns 1 and Ctrl to the active 3D program after preserving its previous setup.
 
@@ -22,7 +22,7 @@ These separate look/height layers follow the [Rotatrix free-camera control model
 
 ## Cube faces and orientation
 
-Hold **Alt** and roll to snap to a neighboring face from your current angle. While holding Alt, twist the Kensington ball or scroll with the left wheel to rotate the current view by 90° around the cursor. A partial movement keeps the view in place. Click the **top-right button (button 2)** for the nearest flat face. **Shift** rotates, **Ctrl + Shift** pans, and **Ctrl** zooms.
+Hold **Alt** and roll to snap to a neighboring face from your current angle. While holding Alt, twist the Kensington ball or scroll with the left wheel to rotate the current view by 90° around the cursor. A partial movement keeps the view in place. Click the **top-right button (button 2)** for the nearest flat face. **Shift** orbits and holds a continuous Kensington twist roll. **Ctrl + Shift** pans with ball roll and zooms with twist or the wheel.
 
 Editable Windows source for Chamfer Trackball lives here. GitHub Actions builds and verifies the single-file executables; no development folder is needed on the owner's PC.
 
@@ -50,9 +50,9 @@ The draggable, always-on-top guide shows the same four-button arrangement, curre
 
 ## 3D controls
 
-- Hold **Shift** and roll: orbit.
+- Hold **Shift** and roll to orbit. Twist the SlimBlade Pro ball to keep rolling the current view around the cursor. Twist the other way to reverse, or release Shift to stop.
 - Hold **Ctrl+Shift** and roll: pan; use the wheel simultaneously for zoom.
-- Hold **Ctrl** and roll up/down: zoom.
+- Assign an optional Zoom shortcut in Buttons & keys for zoom by rolling up/down.
 - Hold **Alt** and roll: snap to Top, Bottom, Left, Right, Front or Back. Diagonal edge and corner views are excluded.
 - Hold **Windows** and roll: navigate; add **Alt** for height. Release does not open Start in this 3D context.
 - The 3D modelling program starts with ordinary pointer movement. Hold a navigation key to move the camera; release it to point again. Ctrl+C, Ctrl+V and other typing shortcuts stay normal. Held orbit, pan and zoom bindings are editable and saved; complete and incomplete button combinations survive restart.
@@ -71,9 +71,8 @@ The Normal mouse program preserves the manufacturer's clicks and wheel axes. The
 
 | Hold with the ball | Action |
 | --- | --- |
-| Shift | Orbit |
+| Shift | Orbit with ball roll. Twist for continuous view roll, reverse with an opposite twist |
 | Ctrl + Shift | Pan; the wheel zooms |
-| Ctrl | Zoom in/out by rolling up/down |
 | Alt | Up/down/left/right selects neighboring faces; experimental knob estimation turns orientation in 90° steps |
 | Alt + wheel | Turn the aligned face by 90 degrees |
 | Optional Twist shortcut | Assign a separate hold for deterministic 90° knob steps if desired |

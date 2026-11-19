@@ -9,7 +9,7 @@ internal static class NavigationLayerChecks {
         check(ModeResolver.Resolve(cfg,Keys(192))==NavMode.Navigate&&NavigationBindings.Resolve(cfg,Keys(192))==NavigationLayer.Travel,"Backtick alone retains camera travel");
         check(ModeResolver.Resolve(cfg,Keys(192,49))==NavMode.Navigate&&NavigationBindings.Resolve(cfg,Keys(192,49))==NavigationLayer.Look,"Backtick plus 1 selects look without ending Navigate");
         check(ModeResolver.Resolve(cfg,Keys(192,17))==NavMode.Navigate&&NavigationBindings.Resolve(cfg,Keys(192,17))==NavigationLayer.Height,"Backtick plus Ctrl selects camera height");
-        check(ModeResolver.Resolve(cfg,Keys(49))==NavMode.Idle&&ModeResolver.Resolve(cfg,Keys(17))==NavMode.Zoom,"The extra key alone types and Ctrl alone retains Zoom");
+        check(ModeResolver.Resolve(cfg,Keys(49))==NavMode.Idle&&ModeResolver.Resolve(cfg,Keys(17))==NavMode.Idle,"The extra key alone types and Ctrl alone stays a regular modifier");
         check(ModeResolver.Resolve(cfg,Keys(192,49,65))==NavMode.Idle&&ModeResolver.Resolve(cfg,Keys(192,17,49))==NavMode.Idle,"Unassigned extra keys cannot ambiguously activate a navigation layer");
         check(ModeResolver.Resolve(cfg,Keys(16))==NavMode.Orbit&&ModeResolver.Resolve(cfg,Keys(16,17))==NavMode.PanZoom&&ModeResolver.Resolve(cfg,Keys(18))==NavMode.Snap,"Shift rotation, Ctrl + Shift translation and Alt snapping remain independent");
         check(NavigationBindings.Label(cfg,NavigationLayer.Look)=="backtick+1"&&NavigationBindings.Chord(cfg,NavigationLayer.Look)!.Matches(Keys(192,49)),"The keyboard guide combines the base hold and extra ordinary key");
@@ -52,11 +52,13 @@ internal static class NavigationLayerChecks {
             check(movement.X==0&&movement.Z==0&&movement.Y*wheel>0&&
                 Vector3.Distance(changed.Target-changed.Eye,tiltedStart.Target-tiltedStart.Eye)<.0001f,
                 "Look twist raises or lowers a tilted camera along world up");
-            check(!rate.Step(0,0,-wheel,3040,ballTwist:true,control:NavigationLayer.Look).Active&&rate.Centered,
-                "Opposite twist returns height to centre and stops");
+            var reversed=rate.Step(0,0,-wheel,3040,ballTwist:true,control:NavigationLayer.Look);
+            var continuing=rate.Step(0,0,0,3048,ballTwist:true,control:NavigationLayer.Look);
+            check(reversed.Up*wheel<0&&continuing.Up*wheel<reversed.Up*wheel&&!rate.Centered,
+                "One opposite twist reverses height immediately and continues with no further reports");
         }
-        rate.Step(0,0,120,3048,ballTwist:true,control:NavigationLayer.Look);
-        var nextWalk=rate.Step(0,0,-120,3056,ballTwist:true);
+        rate.Step(0,0,120,3056,ballTwist:true,control:NavigationLayer.Look);
+        var nextWalk=rate.Step(0,0,-120,3064,ballTwist:true);
         check(nextWalk.Up==0&&nextWalk.Yaw>0,"Releasing 1 stops elevation and restores signed heading control");
         rate.Reset();rate.Step(0,-12,0,3100,ballTwist:true);
         var combinedLook=rate.Step(5,-7,-120,3108,ballTwist:true,control:NavigationLayer.Look);

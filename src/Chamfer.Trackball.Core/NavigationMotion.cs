@@ -51,7 +51,13 @@ public sealed class NavigationMotion {
         previous=milliseconds;
         ChangeLayer(control);
         if(control==NavigationLayer.Look){
-            up.Add(scroll*ScrollToMotion);
+            // A full notch chooses the previous one-notch climb speed. Any
+            // opposite report selects the other direction instead of centring.
+            if(scroll!=0){
+                double position=Math.Sign(scroll)*(120*ScrollToMotion);
+                if(up.Position!=position)vu=0;
+                up=new Axis{Position=position,Active=true};
+            }
             return new(Advance(ref vr,right.Rate,dt),Advance(ref vu,up.Rate,dt),
                 Advance(ref vf,forward.Rate,dt),dx,-dy);
         }

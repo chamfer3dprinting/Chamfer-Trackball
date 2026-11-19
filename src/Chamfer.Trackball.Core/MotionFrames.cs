@@ -10,6 +10,7 @@ public sealed class MotionFrames{
  public MotionFrame Peek()=>new(x,y,wheel,dial);
  public void Move(float dx,float dy){x=Add(x,dx);y=Add(y,dy);}
  public void Wheel(float delta)=>wheel=Add(wheel,delta);
+ public void SetWheel(float delta)=>wheel=Add(0,delta);
  public void Dial(float delta)=>dial=Add(dial,delta);
  public void ClearMove()=>x=y=0;
  public void ClearPrimary(){x=y=wheel=0;}

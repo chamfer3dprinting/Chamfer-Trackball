@@ -8,6 +8,8 @@ internal sealed class Controller:IDisposable{
     readonly ConfigStore store;readonly InputDriver input;readonly NativeServer server;
     readonly System.Windows.Forms.Timer timer=new(){Interval=MotionPolicy.FrameIntervalMs};
     readonly MotionClock navigationClock;readonly NavigationMotion navigationMotion=new();NavigationLayer navigationLayer;bool navigationSession,navigationWasMoving;
+    int orbitTwistDirection;
+    double lastOrbitTwistFrame=double.NaN;
     volatile JsonObject cfg;volatile JsonObject? profile;NativeServer.Client? native;
     readonly ForegroundApps foregroundApps=new();string foregroundExe="";
     readonly ComboTracker combos=new();readonly HashSet<int> pressed=[];readonly HashSet<int> comboUsed=[];
@@ -40,8 +42,7 @@ internal sealed class Controller:IDisposable{
     public JsonObject GuideState(){
         var snap=mode==NavMode.Snap?server.SnapState(native):null;
         bool cursorPivot=native?.Pose!=null&&mode is NavMode.Orbit or NavMode.Snap or NavMode.Roll;
-        bool slimBlade=SlimBladeTwist.IsDevice(input.ActiveDevice)||input.ActiveDeviceName.Contains("SlimBlade",StringComparison.OrdinalIgnoreCase);
-        return new(){["twistInput"]=slimBlade,["reverseTwist"]=ConfigStore.B(cfg,"invertTwist"),["pivotMarker"]=IsCad&&ConfigStore.B(cfg,"showPivot",true)&&(cursorPivot||Environment.TickCount64<snapPivotUntil),["snapPivot"]=mode==NavMode.Idle&&Environment.TickCount64<snapPivotUntil,["pivotX"]=snapPivotPoint.X,["pivotY"]=snapPivotPoint.Y,["mode"]=Mode,["navigationActive"]=navigationSession,["navigationLayer"]=navigationLayer.ToString(),["threeAxisControls"]=ConfigStore.B(cfg,"threeAxisControls"),["freeLook"]=!ConfigStore.B(cfg,"threeAxisControls")&&ConfigStore.B(cfg,"navigationFreeLook"),["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
+        return new(){["twistInput"]=HasSlimBladeTwist,["continuousOrbitTwist"]=HeldOrbitTwist,["reverseTwist"]=ConfigStore.B(cfg,"invertTwist"),["pivotMarker"]=IsCad&&ConfigStore.B(cfg,"showPivot",true)&&(cursorPivot||Environment.TickCount64<snapPivotUntil),["snapPivot"]=mode==NavMode.Idle&&Environment.TickCount64<snapPivotUntil,["pivotX"]=snapPivotPoint.X,["pivotY"]=snapPivotPoint.Y,["mode"]=Mode,["navigationActive"]=navigationSession,["navigationLayer"]=navigationLayer.ToString(),["threeAxisControls"]=ConfigStore.B(cfg,"threeAxisControls"),["freeLook"]=!ConfigStore.B(cfg,"threeAxisControls")&&ConfigStore.B(cfg,"navigationFreeLook"),["levelFlight"]=ConfigStore.B(cfg,"navigationLevelFlight"),["knobActive"]=knobHoldActive,["knobProgress"]=Math.Round(knobSteps.Progress*100),["knobDegrees"]=Math.Round(knobAngle*180/Math.PI,1),["snapTurn"]=snap,["snapLabel"]=snap==null?"":ConfigStore.S(snap,"label",SnapLabels.For(ConfigStore.S(snap,"state"))),["program"]=ConfigStore.S(cfg["programs"]?[ConfigStore.I(cfg,"activeProgram")],"name","Normal mouse"),["app"]=AppName,["keys"]=KeysState(),["shortcuts"]=ShortcutState(),["buttons"]=new JsonArray(Enumerable.Range(1,4).Select(i=>(JsonNode?)JsonValue.Create(pressed.Contains(i))).ToArray()),["bindings"]=cfg["buttons"]!.DeepClone()};
     }
 public string AppName{get;private set;}="";
     public string Integration{get;private set;}="Normal mouse";
@@ -62,7 +63,7 @@ public string AppName{get;private set;}="";
     public JsonArray LogAfter(long s)=>new(logs.Where(x=>ConfigStore.D(x,"seq")>s).Select(x=>x.DeepClone()).ToArray());
     void Tick(object? sender,EventArgs e){
         const int idleInterval=50;
-        int interval=(mode==NavMode.Idle&&!pointer.Active&&!calibration.Receiving)||navigationSession&&navigationClock.Enabled?idleInterval:MotionPolicy.FrameIntervalMs;
+        int interval=(mode==NavMode.Idle&&!pointer.Active&&!calibration.Receiving)||navigationClock.Enabled?idleInterval:MotionPolicy.FrameIntervalMs;
         if(timer.Interval!=interval)timer.Interval=interval;
         if(revision!=store.Revision){End();cfg=store.Snapshot();learnedTwist=TwistCalibrationModel.FromNode(cfg["twistCalibration"]);input.ConfigureDevices(cfg);revision=store.Revision;foregroundApps.Invalidate();foregroundWindow=0;latched=NavMode.Idle;combos.Clear();}
         if(calibration.Active&&(calibrationProgram!=ConfigStore.I(cfg,"activeProgram")||calibrationProgramName!=ConfigStore.S(cfg["programs"]?[calibrationProgram],"name")||calibrationDevice!=input.ActiveDevice||!ConfigStore.B(cfg,"enabled"))){
@@ -100,7 +101,7 @@ public string AppName{get;private set;}="";
             if(native.Version>=2&&native.Pose==null&&DateTime.UtcNow-native.Began>TimeSpan.FromMilliseconds(300)){End();stoppedByClick=true;Integration="Place the pointer over a 3D viewport, release the keys, and try again.";return;}
             if(!native.IsPreview&&server.Find(ConfigStore.S(profile,"id"),foregroundPid)!=native){End();Integration="Integration disconnected";return;}
         }
-        if(mode!=NavMode.Idle&&!(navigationSession&&navigationClock.Enabled))Flush();
+        if(mode!=NavMode.Idle&&!navigationClock.Enabled)Flush();
     }
     void RefreshForeground(nint window,int pid,string exe,string title){
         var next=ForegroundApps.Match(cfg["profiles"]!.AsArray(),exe,title);
@@ -121,7 +122,13 @@ public string AppName{get;private set;}="";
         return ConfigStore.S(cfg,"ball","pointer") switch{"orbit"=>NavMode.Orbit,"pan"=>NavMode.PanZoom,"zoom"=>NavMode.Zoom,_=>NavMode.Idle};
     }
     bool HeldNavigation=>ModeResolver.Resolve(cfg,input.Keys)!=NavMode.Idle||pressed.Any(b=>ConfigStore.S(cfg["buttons"]?[ButtonName(b)],"action") is "orbit" or "pan" or "zoom");
+    bool HasSlimBladeTwist=>SlimBladeTwist.IsDevice(input.ActiveDevice)||
+        input.ActiveDeviceName.Contains("SlimBlade",StringComparison.OrdinalIgnoreCase);
+    bool HeldOrbitTwist=>mode==NavMode.Orbit&&native?.Version>=2&&
+        ConfigStore.B(cfg,"threeAxisControls")&&ConfigStore.B(cfg,"twist",true)&&HasSlimBladeTwist&&
+        ModeResolver.Resolve(cfg,input.Keys)==NavMode.Orbit;
     void KeysChanged(){
+        if(orbitTwistDirection!=0&&!HeldOrbitTwist)StopOrbitTwist();
         if(!IsCad||!input.Ready)return;
         var n=Resolve();if(n==NavMode.Idle)stoppedByClick=false;n=MotionPolicy.WhilePaused(n,stoppedByClick,HeldNavigation);
         if(n!=mode||WantsKnob(n)!=knobHoldActive)Change(n);
@@ -169,12 +176,29 @@ public string AppName{get;private set;}="";
             client.IsPreview?preview.SceneAt(PadBounds,at):null);
     }
     void NavigationTick(){
-        if(!navigationSession||!HeldNavigation||!IsCad||!input.Ready||native==null||!native.IsPreview&&server.Find(ConfigStore.S(profile,"id"),foregroundPid)!=native){End();return;}
+        if(!navigationSession&&(orbitTwistDirection==0||!HeldOrbitTwist)){StopOrbitTwist();return;}
+        if((navigationSession&&!HeldNavigation)||!IsCad||!input.Ready||native==null||
+           !native.IsPreview&&server.Find(ConfigStore.S(profile,"id"),foregroundPid)!=native){End();return;}
         Flush();
     }
+
+    void StopOrbitTwist(){
+        orbitTwistDirection=0;lastOrbitTwistFrame=double.NaN;
+        if(!navigationSession)navigationClock.SetEnabled(false);
+    }
+
+    float OrbitTwistDelta(double now){
+        if(orbitTwistDirection==0)return 0;
+        double elapsed=double.IsNaN(lastOrbitTwistFrame)?8:now-lastOrbitTwistFrame;
+        if(elapsed<0||elapsed>100){StopOrbitTwist();return 0;}
+        lastOrbitTwistFrame=now;
+        const double scrollCountsPerMillisecond=1.2;
+        return orbitTwistDirection*(float)(elapsed*scrollCountsPerMillisecond);
+    }
+
     void End(){
         snapPivotUntil=0;
-        navigationClock.SetEnabled(false);navigationSession=false;navigationWasMoving=false;navigationLayer=NavigationLayer.Travel;navigationMotion.Reset();
+        navigationSession=false;StopOrbitTwist();navigationWasMoving=false;navigationLayer=NavigationLayer.Travel;navigationMotion.Reset();
         if(native==preview.Client)preview.Remember();
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
         ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
@@ -261,7 +285,8 @@ public string AppName{get;private set;}="";
         if(!consumed)pending.Move(sample.X,sample.Y);
         var frame=pending.Peek();
         bool steady=ConfigStore.B(cfg,"steadyCamera")&&(mode is NavMode.Orbit or NavMode.PanZoom or NavMode.Zoom or NavMode.Navigate);
-        if((steady||cruise||navigationSession)&&native is {Version:>=2,Pose:null})return;
+        if(orbitTwistDirection!=0&&(finish||!HeldOrbitTwist))StopOrbitTwist();
+        if((steady||cruise||navigationSession||orbitTwistDirection!=0)&&native is {Version:>=2,Pose:null})return;
         if(navigationSession){
             cameraMotion.Reset();heldRate.Reset();glide.Reset();
             bool threeAxes=ConfigStore.B(cfg,"threeAxisControls");
@@ -313,8 +338,11 @@ public string AppName{get;private set;}="";
             output=new(smooth.X,smooth.Y,frame.Wheel+twist,0);
         }
         if(walkTwist!=0)output=output with{Wheel=walkTwist};
+        float orbitTwist=orbitTwistDirection==0?0:OrbitTwistDelta(timeMilliseconds??Stopwatch.GetTimestamp()*1000.0/Stopwatch.Frequency);
+        if(orbitTwist!=0)output=output with{Wheel=output.Wheel+orbitTwist};
         if(frame.HasPrimary||output.HasPrimary||mode==NavMode.Snap&&server.PendingSnap(native)){
             if(!SendMotion(mode,output.X,output.Y,output.Wheel))return;
+            if(orbitTwist!=0)guideMotion.Wheel(orbitTwist*TwistGain*(ConfigStore.B(cfg,"invertTwist")?-1:1));
             pending.ClearPrimary();
         }
         if(frame.HasDial){
@@ -398,6 +426,15 @@ public string AppName{get;private set;}="";
         UpdateCalibrationForeground();
         bool wheel=msg is 0x20a or 0x20e;
         if(wheel&&calibration.Receiving){if(msg==0x20a)calibrationMotion.Wheel(data);timer.Interval=MotionPolicy.FrameIntervalMs;return true;}
+        if(msg==0x20a&&HeldOrbitTwist&&IsCad){
+            if(data!=0&&Math.Sign(data)!=orbitTwistDirection){
+                orbitTwistDirection=Math.Sign(data);
+                lastOrbitTwistFrame=double.NaN;
+                guideMotion.SetWheel(0);
+                navigationClock.SetEnabled(true);
+            }
+            return true;
+        }
         if(msg==0x20a&&mode is not (NavMode.Navigate or NavMode.Roll)){
             bool reverse=mode==NavMode.Orbit&&ConfigStore.B(cfg,"invertTwist")&&ConfigStore.B(cfg,"threeAxisControls");
             guideMotion.Wheel(reverse?-data:data);
@@ -411,7 +448,9 @@ public string AppName{get;private set;}="";
         }
         if(wheel&&SnapWheelPolicy.Captures(mode,msg)&&!(mode==NavMode.Navigate&&UsesWalkTwist&&msg==0x20e)){
             if(circle.Active||(mode==NavMode.Orbit&&!ConfigStore.B(cfg,"twist",true)))pending.Dial(data);
-            else pending.Wheel(data);
+            else if(navigationSession&&navigationLayer==NavigationLayer.Look&&msg==0x20a){
+                if(data!=0)pending.SetWheel(data);
+            }else pending.Wheel(data);
             return true;
         }
         if(wheel){
@@ -593,8 +632,31 @@ public string AppName{get;private set;}="";
             SendMotion(mode,24,0,0);
             var rolled=preview.View;
             if(rolled.Eye==orbit.Eye)throw new InvalidOperationException("Shift + roll did not rotate the Home cube.");
-            SendMotion(mode,0,0,120);
-            if(preview.View.Up==rolled.Up)throw new InvalidOperationException("Shift + twist did not roll the Home view.");
+            float RollDirection(CameraPose before,CameraPose after)=>
+                Vector3.Dot(Vector3.Cross(before.Up,after.Up),-Direction(before));
+            if(!MouseEvent(0x20a,120))throw new InvalidOperationException("The SlimBlade twist scrolled through the orbit hold.");
+            Flush(timeMilliseconds:1000);
+            var turned=preview.View;
+            Flush(timeMilliseconds:1008);
+            var continued=preview.View;
+            if(RollDirection(rolled,turned)>=0||RollDirection(turned,continued)>=0||
+               continued.Pivot!=rolled.Pivot||Vector3.Distance(Direction(continued),Direction(rolled))>.00001f)
+                throw new InvalidOperationException("Shift twist did not keep rolling around the cursor.");
+            MouseEvent(0x20a,120);MouseEvent(0x20a,-120);
+            Flush(timeMilliseconds:1016);
+            var reversed=preview.View;
+            Flush(timeMilliseconds:1024);
+            if(RollDirection(continued,reversed)<=0||RollDirection(reversed,preview.View)<=0)
+                throw new InvalidOperationException("Shift twist did not reverse on the latest opposite report.");
+            cfg["twistSens"]=0;
+            var heldAtZeroSpeed=preview.View;
+            Flush(timeMilliseconds:1032);
+            if(preview.View!=heldAtZeroSpeed)throw new InvalidOperationException("Zero Twist speed still rolled the view.");
+            cfg["twistSens"]=50;
+            setKeys([]);
+            Flush(timeMilliseconds:1040);
+            if(preview.View!=heldAtZeroSpeed||orbitTwistDirection!=0||navigationClock.Enabled)
+                throw new InvalidOperationException("Shift release did not stop continuous roll.");
 
             var pan=Open(NavMode.PanZoom,NavigationLayer.Travel,16,17);
             SendMotion(mode,26,-15,0);
@@ -605,10 +667,14 @@ public string AppName{get;private set;}="";
             if(Vector3.Distance(preview.View.Eye,preview.View.Target)>=Vector3.Distance(panned.Eye,panned.Target))
                 throw new InvalidOperationException("Ctrl + Shift + twist did not zoom the Home view.");
 
-            var zoomStart=Open(NavMode.Zoom,NavigationLayer.Travel,17);
+            setKeys([]);ResetPad();setKeys([17]);
+            if(mode!=NavMode.Idle)throw new InvalidOperationException("Ctrl alone still activates a 3D control by default.");
+            cfg["zoomKeys"]="z";
+            var zoomStart=Open(NavMode.Zoom,NavigationLayer.Travel,90);
             SendMotion(mode,0,-26,0);
             if(Vector3.Distance(preview.View.Eye,preview.View.Target)>=Vector3.Distance(zoomStart.Eye,zoomStart.Target))
-                throw new InvalidOperationException("Ctrl + roll did not zoom the Home view.");
+                throw new InvalidOperationException("The custom Zoom shortcut did not zoom the Home view.");
+            setKeys([]);cfg["zoomKeys"]="none";
 
             var snapStart=Open(NavMode.Snap,NavigationLayer.Travel,18);
             SendMotion(mode,3,1,0);
@@ -680,7 +746,7 @@ public string AppName{get;private set;}="";
             cfg=oldCfg;profile=oldProfile;foregroundWindow=oldWindow;nativeFocusAllowed=oldFocus;
             pad=oldPad;padOrigin=oldOrigin;padVisible=oldVisible;Integration=oldIntegration;
         }
-        Console.WriteLine("Home cube verified: Shift rotate and roll, Alt live-view angle snap, Ctrl + Shift pan and zoom, Ctrl zoom, Backtick walk and turn, look and height holds, button 2 snap, and 3D controls off.");
+        Console.WriteLine("Home cube verified: Shift orbit and continuous reversible SlimBlade roll, Alt angle snap, Ctrl + Shift pan and zoom, Ctrl left free, custom Zoom, Backtick walk and look, button 2 snap, and 3D controls off.");
     }
     
     internal void VerifyThreeAxisControls(){
@@ -743,18 +809,20 @@ public string AppName{get;private set;}="";
             var higher=client.Pose!;
             if(higher.Eye.Y<=rise.Eye.Y||client.Out.Count!=1)
                 throw new InvalidOperationException("Look height did not continue while the hold was active.");
-            MouseEvent(0x20a,-120);Flush(timeMilliseconds:2024);
-            if(client.Pose!=null||client.Out.Count!=2||ConfigStore.S(client.Out.First(),"t")!="end")
-                throw new InvalidOperationException("Returning height to centre did not freeze the displayed view.");
-            client.Pose=client.BasePose=higher;client.Out.Clear();
-            MouseEvent(0x20a,-120);Flush(timeMilliseconds:2032);
+            MouseEvent(0x20a,120);MouseEvent(0x20a,-120);Flush(timeMilliseconds:2024);
             var lowered=client.Pose!;
-            Flush(timeMilliseconds:2040);
-            if(lowered.Eye.Y>=higher.Eye.Y||client.Pose!.Eye.Y>=lowered.Eye.Y)
-                throw new InvalidOperationException("Backtick + 1 scroll down did not lower continuously from centre.");
-            Flush(finish:true,timeMilliseconds:2048);
+            Flush(timeMilliseconds:2032);
+            var lower=client.Pose!;
+            if(lowered.Eye.Y>=higher.Eye.Y||lower.Eye.Y>=lowered.Eye.Y||client.Out.Count!=1)
+                throw new InvalidOperationException("The latest down twist did not reverse the climb and keep descending.");
+            MouseEvent(0x20a,-120);MouseEvent(0x20a,120);Flush(timeMilliseconds:2040);
+            var lifted=client.Pose!;
+            Flush(timeMilliseconds:2048);
+            if(lifted.Eye.Y<=lower.Eye.Y||client.Pose!.Eye.Y<=lifted.Eye.Y||client.Out.Count!=1)
+                throw new InvalidOperationException("The latest up twist did not reverse the descent and keep climbing.");
+            Flush(finish:true,timeMilliseconds:2056);
             var released=client.Pose;
-            Flush(timeMilliseconds:2056);
+            Flush(timeMilliseconds:2064);
             if(client.Pose!=released)throw new InvalidOperationException("Look height continued after release.");
             cfg["navigationLevelFlight"]=true;
 
@@ -779,7 +847,7 @@ public string AppName{get;private set;}="";
             pending.Reset();motionSamples.Reset();navigationMotion.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();glide.Reset();
             cfg=oldCfg;native=oldNative;mode=oldMode;navigationSession=oldSession;navigationWasMoving=oldMoving;navigationLayer=oldLayer;
         }
-        Console.WriteLine("Three-axis controls verified through the actual controller: independent travel, twist yaw, centre/release stop, corrected walk twist and continuous world height in look, and separate rotation/pan/zoom/twist gains.");
+        Console.WriteLine("Three-axis controls verified through the actual controller: independent travel, twist yaw, centre/release stop, corrected walk twist and directly reversible continuous world height in look, and separate rotation/pan/zoom/twist gains.");
     }
     internal void VerifyFreeLook(){
         var oldCfg=cfg;var oldNative=native;var oldMode=mode;bool oldSession=navigationSession,oldMoving=navigationWasMoving;

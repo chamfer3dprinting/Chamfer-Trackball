@@ -13,7 +13,7 @@ Check(ConfigStore.I(defaults,"activeProgram")==0&&ModeResolver.Resolve(defaults,
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Normal mouse keeps Ctrl as an ordinary modifier");
 ConfigStore.LoadProgram(defaults,1);
 Check(ConfigStore.S(defaults,"ball")=="pointer"&&ModeResolver.Resolve(defaults,new HashSet<int>())==NavMode.Idle,"The 3D program points normally until a navigation key is held");
-Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Zoom,"Ctrl and roll selects Zoom in the 3D program");
+Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Ctrl stays a regular modifier in the default 3D program");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&ModeResolver.Resolve(defaults,new HashSet<int>{17,86})==NavMode.Idle,"Ctrl+C and Ctrl+V remain ordinary keyboard shortcuts");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Orbit,"Shift orbits");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{18})==NavMode.Snap,"Alt selects angle snapping");
@@ -133,14 +133,14 @@ try{
  store.Select(0);
  var migrated=Legacy3DDefaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
  Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==32,"Legacy config migrates without Ctrl-only orbit");
- Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="ctrl","Legacy 3D defaults migrate to held navigation and Ctrl zoom");
+ Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="none","Legacy 3D defaults migrate to held navigation without creating a standalone Zoom binding");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=Legacy3DDefaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
   old["programs"]![1]!["ball"]="orbit";old["programs"]![1]!["zoomKeys"]=zoomBinding;
   old["programs"]![1]!["orbitKeys"]="Alt+Q";old["programs"]![1]!["panKeys"]="Ctrl+Space";
   File.WriteAllText(path,old.ToJsonString());var upgraded=new ConfigStore(path).Snapshot();
   Check(ConfigStore.S(upgraded,"ball")=="pointer"&&ConfigStore.S(upgraded,"selectedDevice")=="retained-trackball","Held-navigation migration keeps the trackball and restores pointing for "+zoomBinding);
-  Check(ConfigStore.S(upgraded,"zoomKeys")==(zoomBinding=="none"?"ctrl":zoomBinding)&&ConfigStore.S(upgraded,"orbitKeys")=="Alt+Q"&&ConfigStore.S(upgraded,"panKeys")=="Ctrl+Space","Migration preserves custom held keys for "+zoomBinding);
+  Check(ConfigStore.S(upgraded,"zoomKeys")==zoomBinding&&ConfigStore.S(upgraded,"orbitKeys")=="Alt+Q"&&ConfigStore.S(upgraded,"panKeys")=="Ctrl+Space","Migration preserves custom held keys for "+zoomBinding);
  }
 }finally{Directory.Delete(dirPath,true);}
 
@@ -430,7 +430,7 @@ var twistDefaults=ConfigStore.Defaults();
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Normal mouse keeps Alt+Shift as ordinary keyboard input");
 ConfigStore.LoadProgram(twistDefaults,1);twistDefaults["panKeys"]="ctrl+shift";twistDefaults["snapKeys"]="alt";
 Check(!ConfigStore.B(twistDefaults,"altTwistEstimate")&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Idle,"Legacy 3D profiles retain Alt faces and wheel orientation without requiring Shift");
-twistDefaults["twistKeys"]="alt+shift";
+twistDefaults["twistKeys"]="alt+shift";twistDefaults["zoomKeys"]="ctrl";
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,18})==NavMode.Roll,"Alt+Shift selects the new held Twist mode");
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{18})==NavMode.Snap&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{16})==NavMode.Orbit,"Alt face switching and Shift orbit stay separate from Twist");
 Check(ModeResolver.Resolve(twistDefaults,new HashSet<int>{16,17})==NavMode.PanZoom&&ModeResolver.Resolve(twistDefaults,new HashSet<int>{17})==NavMode.Zoom,"Existing pan and zoom chords are preserved");

@@ -49,10 +49,7 @@ public sealed class ConfigStore {
         }
         if(oldVersion<24){
             var navigation=nodeProgram(config,"3D");
-            if(navigation!=null){
-                navigation["ball"]="pointer";
-                if(S(navigation,"zoomKeys","none") is "" or "none")navigation["zoomKeys"]="ctrl";
-            }
+            if(navigation!=null)navigation["ball"]="pointer";
             LoadProgram(config,I(config,"activeProgram",0));config["configVersion"]=24;
         }
         if(oldVersion<25){
