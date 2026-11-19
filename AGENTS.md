@@ -6,15 +6,18 @@ on the owner's PC. Deliver only the executable as the user-facing download.
 
 Preserve standard mouse clicks and wheels by default. Never change Windows-wide
 mouse button swapping to implement app bindings. The owner's current 3D defaults
-use Shift for rotation, Ctrl + Shift for translation, Alt for angle snaps, and
+use Shift for rotation, Ctrl + Shift for pan and zoom, Alt for angle snaps, and
 Backtick for camera walk. Alt roll snaps from the current view and twist turns it
 in quarter increments at the cursor. Top-right/button 2 selects the nearest flat
 face. Backtick roll travels and twist turns. Backtick + 1 roll looks and twist
-sets height. Continuous travel, turn and height stop at virtual centre or release.
+sets height. Continuous travel and Backtick-only heading stop at virtual centre
+or release. Shift twist roll and Backtick + 1 height reverse on the next opposite
+twist and stop when their keys are released.
 Rotation and held angle snaps use the current cursor point as their pivot. Zoom
 is cursor-centred. Held bindings are customizable per program.
-Normal mouse keeps native clicks/wheel axes and ordinary Backtick typing. Ctrl
-remains an optional zoom hold and Ctrl keyboard shortcuts remain normal.
+Normal mouse keeps native clicks/wheel axes and ordinary Backtick typing. The
+3D default leaves Ctrl alone available for normal keyboard shortcuts. Users can
+assign an optional separate zoom hold.
 
 Keep existing release history. Advance the real application version for a delivered
 update; do not reuse a release tag for a different executable. Build and test before
@@ -37,6 +40,19 @@ button numbers or the UI's descriptive labels; enable a correction only when
 a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
+
+# 2026-11-19 — Codex: Continuous reversible twist roll and look height
+
+The owner wants Shift + Kensington twist to keep rolling around the cursor
+and Backtick + 1 twist to keep climbing or descending. Choose direction from
+the latest scroll report, reverse without a neutral stop and clear the command
+on key release. Preserve the original centred Backtick-only yaw and travel.
+Use the existing camera clock, pivot and sensitivity settings. Show the
+active direction and stop instructions in the floating guide.
+
+Remove standalone Ctrl zoom from the built-in 3D program and the owner's
+active 3D program. Ctrl + Shift remains the pan/zoom hold. Preserve saved presets
+and other customized bindings. Verification and Admin installation are pending.
 
 # 2026-11-18 — Codex: Cursor-following Alt, continuous turns and animated guide
 

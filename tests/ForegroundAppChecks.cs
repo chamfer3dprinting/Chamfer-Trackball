@@ -3,7 +3,7 @@ using Chamfer.Trackball.Core;
 static class ForegroundAppChecks{
  public static void Run(Action<bool,string> check){
   var cfg=ConfigStore.Defaults();var profiles=cfg["profiles"]!.AsArray();
-  cfg["programs"]![1]!["panKeys"]="alt";cfg["programs"]![1]!["snapKeys"]="none";
+  cfg["programs"]![1]!["panKeys"]="alt";cfg["programs"]![1]!["snapKeys"]="none";cfg["programs"]![1]!["zoomKeys"]="ctrl";
   var browser=(nint)501;var watcher=new ForegroundApps();
   check(watcher.ProbeDue(browser,1000),"Foreground title is inspected on the first browser observation");
   check(!watcher.ProbeDue(browser,1008)&&!watcher.ProbeDue(browser,1049),"Navigation frames do not repeatedly inspect browser titles");

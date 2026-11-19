@@ -175,7 +175,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         int[] oldKeys;
         lock(keysGate)oldKeys=physical.ToArray();
         try{
-            SelectedDevice=()=>"preview-test-trackball";
+            SelectedDevice=()=>@"\\?\HID#VID_047D&PID_80D6&preview-test-trackball";
             connected=true;
             failed=learning=false;
             verify(keys=>{

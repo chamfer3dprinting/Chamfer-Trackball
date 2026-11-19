@@ -51,7 +51,13 @@ public sealed class NavigationMotion {
         previous=milliseconds;
         ChangeLayer(control);
         if(control==NavigationLayer.Look){
-            up.Add(scroll*ScrollToMotion);
+            // A full notch chooses the previous one-notch climb speed. Any
+            // opposite report selects the other direction instead of centring.
+            if(scroll!=0){
+                double position=Math.Sign(scroll)*(120*ScrollToMotion);
+                if(up.Position!=position)vu=0;
+                up=new Axis{Position=position,Active=true};
+            }
             return new(Advance(ref vr,right.Rate,dt),Advance(ref vu,up.Rate,dt),
                 Advance(ref vf,forward.Rate,dt),dx,-dy);
         }
@@ -75,5 +81,6 @@ public sealed class NavigationMotion {
         float pitch=Advance(ref vpitch,walking&&coupledLook&&!ballTwist?forward.Rate:0,dt);
         return new(Advance(ref vr,right.Rate*(1-steer),dt),Advance(ref vu,up.Rate,dt),Advance(ref vf,forward.Rate,dt),yaw,pitch);
     }
+    public void RestartFrameTime()=>previous=double.NaN;
     public void Reset(){layer=NavigationLayer.Travel;right=up=forward=turn=default;vr=vu=vf=vyaw=vpitch=0;previous=double.NaN;}
 }

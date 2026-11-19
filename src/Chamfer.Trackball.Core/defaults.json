@@ -737,7 +737,7 @@
       ],
       "orbitKeys": "shift",
       "panKeys": "ctrl+shift",
-      "zoomKeys": "ctrl",
+      "zoomKeys": "none",
       "gestures": {},
       "pointerSpeed": 10,
       "ball": "pointer",

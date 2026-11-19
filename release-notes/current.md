@@ -1,3 +1,10 @@
+# Continuous twist roll and height
+
+- Hold Shift and twist the Kensington ball to keep rolling the view around the cursor. An opposite twist reverses the roll. Release Shift to stop.
+- With Continuous navigation on, Backtick + 1 twist scroll up keeps climbing and scroll down keeps descending. Twist the other way to reverse immediately, or release the keys to stop changing height.
+- The default 3D profile uses Ctrl + Shift for pan and zoom. Ctrl on its own is a regular keyboard modifier.
+- The floating guide shows the direction of the continuous roll and climb or descent.
+
 # Follow your cursor and keep turning during camera walk
 
 - While holding Alt, move the pointer to set the pivot for the next face snap or 90° turn. The optional Twist hold and the Home cube follow the pointer too.
