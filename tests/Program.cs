@@ -202,6 +202,9 @@ Check(ConfigStore.S(ReleasePolicy.Latest(releases,true,9999,"1.5.7"),"tag_name")
 Check(ReleasePolicy.VersionText("admin-v1.5.10",true)=="1.5.10","Update notifications display only the application version");
 Check(ReleasePolicy.VersionText("admin-v1.5.10-build.19",true)=="","Internal build alias is not shown as an update");
 Check(ReleasePolicy.Latest(releases,true,0,"invalid")==null,"Invalid installed version cannot select an update");
+releases.Add(Rel("admin-v1.5.56",preview:true));releases.Add(Rel("admin-v1.6.0",preview:true));
+Check(ConfigStore.S(ReleasePolicy.Latest(releases,true,169,"1.5.56"),"tag_name")=="admin-v1.6.0","The updater accepts a rolled-over Admin version");
+Check(ReleasePolicy.Latest(releases,true,170,"1.6.0")==null,"A rolled-over Admin version cannot reinstall or downgrade");
 Check(ReleasePolicy.Latest(releases,false,0,"1.0.0")==null,"Public channel still ignores Admin semantic versions");
 releases.Add(Rel("public-v1.0.1"));
 Check(ConfigStore.S(ReleasePolicy.Latest(releases,false,0,"1.0.0"),"tag_name")=="public-v1.0.1","Public updater offers explicitly published public versions");

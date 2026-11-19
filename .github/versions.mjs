@@ -4,7 +4,12 @@ export function parseVersion(value){
  const parts=match.slice(1).map(Number);return parts.every(n=>Number.isSafeInteger(n)&&n<=65534)?parts:null;
 }
 export function compareVersions(a,b){for(let i=0;i<3;i++){if(a[i]!==b[i])return a[i]-b[i];}return 0;}
-function nextPatch(parts){const result=[...parts];result[2]++;if(result[2]>65534)throw Error('Choose a new minor version before exceeding the assembly patch range');return result.join('.');}
+function nextVersion([major,minor,patch]){
+ if(patch<9)return [major,minor,patch+1].join('.');
+ if(minor<65534)return [major,minor+1,0].join('.');
+ if(major<65534)return [major+1,0,0].join('.');
+ throw Error('The next version exceeds the Windows assembly version range');
+}
 export function chooseVersions(releases,tags=[]){
  let admin=[1,5,6],publicVersion=[1,0,1],hasPublic=false,hasSemanticAdmin=false;
  // Include reserved tags so an existing executable/tag is never overwritten,
@@ -20,5 +25,5 @@ export function chooseVersions(releases,tags=[]){
   const match=/^public-v(\d+\.\d+\.\d+)$/.exec(tag),parsed=match&&parseVersion(match[1]);
   if(parsed&&compareVersions(parsed,publicVersion)>=0){publicVersion=parsed;hasPublic=true;}
  }
- return {admin:nextPatch(admin),public:hasPublic?nextPatch(publicVersion):'1.0.1',legacyBridge:!hasSemanticAdmin||releases.some(r=>/^admin-v\d+\.\d+\.\d+-build\.\d+$/.test(r.tag_name))};
+ return {admin:nextVersion(admin),public:hasPublic?nextVersion(publicVersion):'1.0.1',legacyBridge:!hasSemanticAdmin||releases.some(r=>/^admin-v\d+\.\d+\.\d+-build\.\d+$/.test(r.tag_name))};
 }

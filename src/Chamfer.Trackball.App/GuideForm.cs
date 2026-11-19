@@ -99,10 +99,11 @@ internal sealed class GuideForm:Form{
   var measure=g.MeasureString(title,bold);g.DrawString(title,bold,mode=="Idle"?text:accent,(330-measure.Width)/2,99);
   string program="Program: "+ConfigStore.S(s,"program");var pm=g.MeasureString(program,font);g.DrawString(program,font,muted,(330-pm.Width)/2,123);
   bool reverseTwist=ConfigStore.B(s,"reverseTwist");
-  bool continuousRoll=ConfigStore.B(s,"continuousOrbitTwist");
+  bool heldTwist=ConfigStore.B(s,"continuousTwist");
   var (ballAction,wheelAction,rotary,detail)=mode switch{
-   "Orbit" when continuousRoll=>("Orbit","Roll view",true,"Twist the other way to reverse the roll"),
+   "Orbit" when heldTwist=>("Orbit","Roll view",true,"Twist the other way to reverse the roll"),
    "Orbit"=>("Orbit","Roll view",true,"The pivot follows the cursor"),
+   "PanZoom" when heldTwist=>("Pan","Zoom",false,"Twist the other way to reverse zoom"),
    "PanZoom"=>("Pan","Zoom",false,"Zoom follows the cursor"),
    "Zoom"=>("Zoom","Zoom",false,"Zoom follows the cursor"),
    "Snap"=>("Snap faces","Turn 90°",true,"The pivot follows the cursor"),
@@ -130,9 +131,10 @@ internal sealed class GuideForm:Form{
    g.DrawString(label,tiny,held?accent:muted,new RectangleF(13,y,156,18));
    g.DrawString(ConfigStore.S(item,"label"),tiny,held?accent:text,180,y);
   }
-  string footer=continuousRoll?"Release the orbit key to stop rolling":
+  string footer=heldTwist?(mode=="Orbit"?"Release the orbit key to stop rolling":"Release a pan/zoom key to stop zooming"):
    drone&&looking?"Opposite twist reverses · release look to stop":
-   drone?(threeAxes?"Return to neutral or release to stop":"Roll back to centre or release to stop"):ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";
+   drone&&threeAxes&&!height?"Opposite twist reverses · release to stop turning":
+   drone?"Roll back to centre or release to stop":ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";
   g.DrawString(footer,tiny,mode is "Snap" or "Roll"?accent:muted,new RectangleF(13,448,304,18));
 
  }

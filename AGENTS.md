@@ -10,9 +10,9 @@ use Shift for rotation, Ctrl + Shift for pan and zoom, Alt for angle snaps, and
 Backtick for camera walk. Alt roll snaps from the current view and twist turns it
 in quarter increments at the cursor. Top-right/button 2 selects the nearest flat
 face. Backtick roll travels and twist turns. Backtick + 1 roll looks and twist
-sets height. Continuous travel and Backtick-only heading stop at virtual centre
-or release. Shift twist roll and Backtick + 1 height reverse on the next opposite
-twist and stop when their keys are released.
+sets height. Continuous ball travel stops at virtual centre or release.
+Shift twist roll, Ctrl + Shift twist zoom, Backtick turns and Backtick + 1
+height reverse on the next opposite twist and stop on release.
 Rotation and held angle snaps use the current cursor point as their pivot. Zoom
 is cursor-centred. Held bindings are customizable per program.
 Normal mouse keeps native clicks/wheel axes and ordinary Backtick typing. The
@@ -20,8 +20,10 @@ Normal mouse keeps native clicks/wheel axes and ordinary Backtick typing. The
 assign an optional separate zoom hold.
 
 Keep existing release history. Advance the real application version for a delivered
-update; do not reuse a release tag for a different executable. Build and test before
-publishing. Treat a prerelease as distinct from a public stable release.
+update; do not reuse a release tag for a different executable. Automatic release
+versions increase the minor component and reset patch to zero after patch 9.
+Explicitly chosen public versions still use numeric version order. Build and test
+before publishing. Treat a prerelease as distinct from a public stable release.
 
 Do not claim that the M512's ordinary X/Y input measures independent three-axis ball
 rotation. Native cursor pivots, snap and camera navigation require host camera/scene
@@ -40,6 +42,22 @@ button numbers or the UI's descriptive labels; enable a correction only when
 a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
+
+# 2026-11-19 — Codex: Continuous twist zoom and version rollover
+
+The owner wants Ctrl + Shift twist zoom to continue like Shift twist roll. Reuse
+the held twist direction and camera clock for native Pan + zoom. Apply the saved
+Zoom speed and reversal setting. Ball pan remains independent. Buffer the
+direction during cursor re-picks and resume without catch-up. The floating guide
+shows zoom direction and how to reverse or stop. Reverse the applied Shift
+camera roll so the visible model follows the physical twist. For Backtick
+turns, select the latest twist direction immediately and keep ball travel
+neutral independent.
+
+Automatic versions roll over after patch 9. The newest prior Admin tag is
+v1.5.56, so the next suitable version is v1.6.0. Continue to honor historical
+tags, updater ordering and explicitly chosen public versions. Build verification
+and Admin installation are pending.
 
 # 2026-11-19 — Codex: Continuous reversible twist roll and look height
 
