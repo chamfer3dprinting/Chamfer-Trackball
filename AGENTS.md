@@ -69,8 +69,18 @@ Admin v1.6.0 recognized and verified the v1.6.1 download from GitHub. The
 installer then reported a sharing violation after the old app closed. Stage
 the downloaded executable beside the target and retry transient sharing
 violations on replacement. Keep a rollback copy and add a Windows smoke test
-that releases a lock during replacement in both editions. Test the updated
-in-app installer before delivery. No public stable promotion.
+that releases a lock during replacement in both editions. The final main run
+44720852693 passed 1,611 core checks and both Windows interface, input bridge
+and update smoke suites. Admin v1.6.2 from ce2b16a866fced318e8926cf0dc4b2fb7a1b2311
+installed through Update now. The running version and executable digest
+matched the GitHub prerelease and the previous executable was backed up.
+Normal mouse was selected with the controls switch on. On the owner PC the
+SlimBlade Pro diagram was visible, a separate Zoom shortcut stored only in
+3D modelling, and Normal mouse sensitivity selected the 0.50× setting. Both
+test changes were restored. All 13 presets and both remembered devices match
+the pre-update settings. Physical roll and twist in Fusion were unavailable
+during verification. Keep native camera features scoped to compatible
+integrations. Public stable is public-v1.0.1. No PC source folder was created.
 
 # 2026-11-19 — Codex: Continuous twist zoom and version rollover
 
