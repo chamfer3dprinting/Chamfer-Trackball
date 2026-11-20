@@ -255,7 +255,8 @@ public sealed class ConfigStore {
             var standard=d["programs"]![modelling?1:0]!;
             p["defaultKind"]??=S(standard,"name");
             foreach(var k in ProgramFields)if(!p.ContainsKey(k))
-                p[k]=migrating&&k is ("snapKeys" or "twistKeys" or "navigateKeys" or "navigateLookKeys" or "navigateHeightKeys")?JsonValue.Create("none"):standard[k]?.DeepClone();
+                p[k]=k is "orbitKeys" or "panKeys" or "zoomKeys" or "snapKeys" or "twistKeys" or "navigateKeys" or "navigateLookKeys" or "navigateHeightKeys"
+                    ?JsonValue.Create("none"):standard[k]?.DeepClone();
             if(p["feel"] is not JsonObject)p["feel"]=new JsonObject();
             foreach(var entry in standard["feel"]!.AsObject()){
                 if(p["feel"]!.AsObject().ContainsKey(entry.Key))continue;
