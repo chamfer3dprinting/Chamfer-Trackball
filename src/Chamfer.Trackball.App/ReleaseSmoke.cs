@@ -11,7 +11,29 @@ internal static class ReleaseSmoke{
  static void Check(bool pass,string message){if(!pass)throw new Exception("Release smoke: "+message);}
  static async Task Denied(Func<Task> operation){bool denied=false;try{await operation();}catch{denied=true;}Check(denied,"operation should be rejected");}
  static AdminService Service(MemoryGitHub api,string credential="smoke-test-credential")=>new(new HttpClient(api){Timeout=TimeSpan.FromSeconds(10)},credential);
+ static async Task VerifyLockedExecutableUpdate(){
+  var temp=Path.Combine(Path.GetTempPath(),"chamfer-update-"+Guid.NewGuid().ToString("N"));
+  var source=temp+".download";
+  var target=temp+".exe";
+  var backup=target+".previous";
+  try{
+   File.WriteAllText(source,"new verified executable");File.WriteAllText(target,"current executable");
+   File.WriteAllText(backup,"older backup");
+   Task replacement;
+   using(var locked=File.Open(target,FileMode.Open,FileAccess.Read,FileShare.Read)){
+    replacement=Task.Run(()=>Program.ReplaceExecutable(source,target));
+    await Task.Delay(400);
+    Check(!replacement.IsCompleted,"updater stopped instead of waiting for a transient lock");
+    Check(File.ReadAllText(target)=="current executable","updater changed a locked file");
+   }
+   await replacement;
+   Check(File.ReadAllText(target)=="new verified executable"&&File.ReadAllText(backup)=="current executable","locked update did not install with a rollback file");
+   Check(File.ReadAllText(source)=="new verified executable","installer modified the staged download");
+   Console.WriteLine("Transient Windows executable lock, verified replacement and rollback file passed.");
+  }finally{File.Delete(source);File.Delete(target);File.Delete(backup);}
+ }
  public static async Task Run(){
+  await VerifyLockedExecutableUpdate();
   using(var api=new MemoryGitHub())using(var service=Service(api)){
    if(!BuildInfo.Admin){await Denied(()=>service.Release("1.0.1"));await Denied(()=>service.RequestPublicVersion("9.8.7"));Check(api.Requests==0,"public app contacted release API");Console.WriteLine("Public app rejects release operations.");return;}
   }

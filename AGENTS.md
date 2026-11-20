@@ -60,8 +60,17 @@ Existing settings keep their saved programs, presets and trackballs. The
 former factory left/right rotation combination is removed from Normal mouse.
 
 The tests cover the two roles, saved shortcut changes, hardware identity,
-CAD profile matching, and scroll steps. Run both Windows smoke tests before
-delivering the Admin update. Physical trackball motion in CAD needs a live check.
+CAD profile matching, and scroll steps. The main build (44718983894) passed
+1,611 core regression checks, both actual Windows interfaces and the native
+bridge. Autodesk Fusion accepted scroll zoom in its empty desktop viewport.
+Physical trackball motion in CAD still needs a live check.
+
+Admin v1.6.0 recognized and verified the v1.6.1 download from GitHub. The
+installer then reported a sharing violation after the old app closed. Stage
+the downloaded executable beside the target and retry transient sharing
+violations on replacement. Keep a rollback copy and add a Windows smoke test
+that releases a lock during replacement in both editions. Test the updated
+in-app installer before delivery. No public stable promotion.
 
 # 2026-11-19 — Codex: Continuous twist zoom and version rollover
 
