@@ -1101,7 +1101,10 @@ $("#openFile").onclick=()=>call("ctOpenSettingsFile");
 $("#hideNow").onclick=()=>call("ctHide");
 $("#quitNow").onclick=async()=>{if(await modal("Quit Chamfer Trackball?","Your trackball goes back to a normal mouse until you start the app again.",[["Cancel","",false],["Quit","primary",true]]))call("ctQuit")};
 $("#enabled").addEventListener("change",e=>{cfg.enabled=e.target.checked;renderEnabled();save(true)});
-function renderEnabled(){$("#enabled").checked=cfg.enabled;$("#enabledTxt").textContent=cfg.enabled?"3D controls on":"3D controls off"}
+function renderEnabled(){
+  $("#enabled").checked=cfg.enabled;
+  $("#enabledTxt").textContent=(using3D()?"3D controls":"Trackball controls")+(cfg.enabled?" on":" off");
+}
 $("#welcomeOk").onclick=()=>{cfg.welcomeDone=true;$("#welcome").hidden=true;save(true)};
 
 /* ---------- about & updates ---------- */

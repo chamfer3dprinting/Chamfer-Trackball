@@ -650,6 +650,8 @@ public string AppName{get;private set;}="";
         try{
             cfg=ConfigStore.Defaults();ConfigStore.LoadProgram(cfg,1);
             cfg["enabled"]=true;cfg["navigationCruise"]=false;cfg["steadyCamera"]=false;
+            cfg["navigationLevelFlight"]=false;cfg["slimBladeSmoothTwist"]=false;
+            foreach(var gain in new[]{"orbitSens","panSens","zoomSens","twistSens"})cfg[gain]=50;
             profile=new(){["id"]="demo"};foregroundWindow=Win32.GetForegroundWindow();nativeFocusAllowed=true;
             Win32.GetCursorPos(out var cursor);Pad(0,0,400,300,true,new(cursor.X-200,cursor.Y-150));
 

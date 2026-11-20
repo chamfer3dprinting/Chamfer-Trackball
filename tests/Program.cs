@@ -326,7 +326,7 @@ Check(ModeResolver.Resolve(defaults,new HashSet<int>{91,68})==NavMode.Idle,"Wind
 Check(ModeResolver.Resolve(ConfigStore.Defaults(),new HashSet<int>{192})==NavMode.Idle,"Normal mouse keeps Backtick available for ordinary typing");
 var mouseDefaults=ConfigStore.Defaults();
 Check(ModeResolver.Resolve(mouseDefaults,new HashSet<int>{91})==NavMode.Idle,"Normal mouse does not reserve Windows");
-Check(mouseDefaults["combos"]!.AsArray().Any(n=>n?["buttons"]?.ToJsonString()=="[3,4]"&&ConfigStore.S(n?["bind"],"action")=="lockRotate"),"Confirmed btn3+btn4 combination is a default without swapping clicks");
+Check(mouseDefaults["combos"]!.AsArray().Count==0,"Normal mouse has no factory combination that intercepts standard click pairs");
 Check(PointerPolicy.Gain(1)==1f/32&&PointerPolicy.Gain(10)==1&&PointerPolicy.Gain(20)==3.5f,"Pointer gain matches every displayed DPI endpoint and neutral speed");
 Check(!PointerPolicy.Capture(10,false)&&PointerPolicy.Capture(1,false)&&PointerPolicy.Capture(10,true),"Neutral pointing can pass through; speed and glide request device routing");
 foreach(int step in new[]{1,6,10,15,20}){
