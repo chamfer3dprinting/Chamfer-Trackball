@@ -1,3 +1,7 @@
+## Install updates through temporary Windows file locks
+
+- Update now waits briefly for Windows to release the app file, then replaces it and keeps a rollback copy of the previous version.
+
 ## Normal mouse and 3D modelling
 
 - Normal mouse is the factory program, with its own pointer sensitivity, glide, button assignments and scroll shortcuts.
