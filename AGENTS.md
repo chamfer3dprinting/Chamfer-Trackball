@@ -43,6 +43,26 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-20 — Codex: Normal mouse, 3D modelling and trackball layouts
+
+Normal mouse starts with pointing and the device’s original click and scroll
+actions. Pointer sensitivity, glide, button actions, combinations and assigned
+shortcuts remain editable. The 3D modelling program uses the approved holds,
+sensitivity and motion response. Only programs based on 3D modelling activate
+CAD navigation. Each hold can be recorded or entered, and applying a preset
+keeps the selected program’s role. The controls diagram follows the active
+SlimBlade Pro or M512.
+
+Fusion’s executable profile takes precedence over title matches. CAD mouse
+emulation sends full wheel steps with the synthetic drag released. Fusion and
+Blender offer their native camera controls when the host add-ins are enabled.
+Existing settings keep their saved programs, presets and trackballs. The
+former factory left/right rotation combination is removed from Normal mouse.
+
+The tests cover the two roles, saved shortcut changes, hardware identity,
+CAD profile matching, and scroll steps. Run both Windows smoke tests before
+delivering the Admin update. Physical trackball motion in CAD needs a live check.
+
 # 2026-11-19 — Codex: Continuous twist zoom and version rollover
 
 The owner wants Ctrl + Shift twist zoom to continue like Shift twist roll. Reuse

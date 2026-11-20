@@ -1,7 +1,6 @@
 namespace Chamfer.Trackball.Core;
 public enum NavMode { Idle,Orbit,PanZoom,Zoom,Snap,Navigate,Roll,Gestures }
 public sealed record KeyChord(int[] Keys,string Canonical) {
-    public bool IsCtrlAlone=>Keys.Length==1&&Keys[0]==17;
     public int Weight=>Keys.Length;
     public bool Matches(IReadOnlySet<int> held) {
         if(!Keys.All(held.Contains))return false;
@@ -15,7 +14,7 @@ public sealed record KeyChord(int[] Keys,string Canonical) {
         if(s.Length==1){if(s[0]=='`')return 192;if(char.IsAsciiLetterOrDigit(s[0]))return char.ToUpperInvariant(s[0]);}
         if(s.StartsWith("num")&&int.TryParse(s[3..],out var num)&&num is >=0 and <=9)return 96+num;
         if(s.StartsWith("f")&&int.TryParse(s[1..],out var f)&&f is >=1 and <=24)return 111+f;
-        return s switch{"ctrl" or "control"=>17,"shift"=>16,"alt"=>18,"backtick" or "grave"=>192,"space"=>32,"tab"=>9,"enter" or "return"=>13,"escape" or "esc"=>27,"backspace"=>8,"delete"=>46,"insert"=>45,"home"=>36,"end"=>35,"pageup"=>33,"pagedown"=>34,"left"=>37,"up"=>38,"right"=>39,"down"=>40,"plus"=>187,"minus"=>189,"equals"=>187,"comma"=>188,"period"=>190,"slash"=>191,"backslash"=>220,"semicolon"=>186,"quote"=>222,"["=>219,"]"=>221,"win" or "windows"=>91,"capslock"=>20,"printscreen"=>44,"pause"=>19,"menu"=>93,"volumeup"=>175,"volumedown"=>174,"mute"=>173,"playpause"=>179,"nexttrack"=>176,"prevtrack"=>177,_=>throw new FormatException("Unsupported key: "+raw)};
+        return s switch{"ctrl" or "control"=>17,"shift"=>16,"alt"=>18,"backtick" or "grave"=>192,"space"=>32,"tab"=>9,"enter" or "return"=>13,"escape" or "esc"=>27,"backspace"=>8,"delete"=>46,"insert"=>45,"home"=>36,"end"=>35,"pageup"=>33,"pagedown"=>34,"left"=>37,"up"=>38,"right"=>39,"down"=>40,"plus"=>187,"minus"=>189,"equals"=>187,"num." or "decimal"=>110,"comma"=>188,"period"=>190,"slash"=>191,"backslash"=>220,"semicolon"=>186,"quote"=>222,"["=>219,"]"=>221,"win" or "windows"=>91,"capslock"=>20,"printscreen"=>44,"pause"=>19,"menu"=>93,"volumeup"=>175,"volumedown"=>174,"mute"=>173,"playpause"=>179,"nexttrack"=>176,"prevtrack"=>177,_=>throw new FormatException("Unsupported key: "+raw)};
     }
     public static KeyChord Parse(string s){
         var keys=s.Split('+',StringSplitOptions.RemoveEmptyEntries).Select(VirtualKey).Distinct().Order().ToArray();
@@ -61,6 +60,7 @@ public static class NavigationBindings {
 public static class ModeResolver {
     public static NavMode Resolve(System.Text.Json.Nodes.JsonObject config,IReadOnlySet<int> keys){
         var options=new[]{("panKeys",NavMode.PanZoom),("navigateKeys",NavMode.Navigate),("snapKeys",NavMode.Snap),("twistKeys",NavMode.Roll),("zoomKeys",NavMode.Zoom),("orbitKeys",NavMode.Orbit)};
+        bool altWalk=false;
         foreach(var (name,mode) in options){
             var spec=ConfigStore.S(config,name,"none");
             if(spec is "" or "none")continue;
@@ -70,12 +70,12 @@ public static class ModeResolver {
                 // Alt is an intentional navigation height modifier for the held chord.
                 if(mode==NavMode.Navigate&&keys.Contains(18)&&!chord.Keys.Contains(18)){
                     var withoutAlt=new HashSet<int>(keys);withoutAlt.Remove(18);
-                    if(chord.Matches(withoutAlt))return mode;
+                    altWalk=chord.Matches(withoutAlt);
                 }
-                if((!chord.IsCtrlAlone||mode==NavMode.Zoom)&&chord.Matches(keys))return mode;
+                if(chord.Matches(keys))return mode;
             }catch(FormatException){ }
         }
-        return NavMode.Idle;
+        return altWalk?NavMode.Navigate:NavMode.Idle;
     }
 }
 public sealed class ComboTracker {

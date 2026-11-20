@@ -107,6 +107,19 @@ public sealed class FractionalInput{
  public (int X,int Y,int Wheel) Add(float dx,float dy,float delta)=>(Take(ref x,dx),Take(ref y,dy),Take(ref wheel,delta));
  public void Reset()=>x=y=wheel=0;
 }
+// Software zoom for CAD views that require a complete Windows wheel notch.
+public sealed class WheelSteps{
+ const int Notch=120;
+ float remaining;
+ public int Add(float delta){
+   if(delta!=0&&MathF.Sign(delta)!=MathF.Sign(remaining))remaining=0;
+   remaining+=delta;
+   int output=(int)(remaining/Notch)*Notch;
+   remaining-=output;
+   return output;
+ }
+ public void Reset()=>remaining=0;
+}
 public static class MotionPolicy{
  // A 16 ms WinForms interval often rounds to two 15.6 ms Windows ticks.
  // Request 8 ms so ordinary timer resolution can deliver one camera frame per tick.

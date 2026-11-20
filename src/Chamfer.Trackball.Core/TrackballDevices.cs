@@ -4,6 +4,16 @@ namespace Chamfer.Trackball.Core;
 public sealed record TrackballDevice(string Id,string Name,bool SwapButtons=false,bool SwapWheels=false);
 public static class TrackballDevices{
  public const int Maximum=16;
+ public static string Model(string device,string name){
+   if(SlimBladeTwist.IsDevice(device)||name.Contains("SlimBlade",StringComparison.OrdinalIgnoreCase))return "slimblade";
+   if(device.Contains("VID_25A7&PID_FA61",StringComparison.OrdinalIgnoreCase)||name.Contains("M512",StringComparison.OrdinalIgnoreCase))return "m512";
+   return "generic";
+ }
+ static string SuggestedName(string device,int index)=>Model(device,"") switch{
+   "slimblade"=>"Kensington SlimBlade Pro",
+   "m512"=>"Nulea M512",
+   _=>"Trackball "+index
+ };
  static string Identity(string value){
   if(string.IsNullOrWhiteSpace(value)||value.Length>4095||value.Any(char.IsControl))throw new InvalidDataException("Invalid trackball identity.");
   return value;
@@ -24,7 +34,7 @@ public static class TrackballDevices{
   var selected=ConfigStore.S(config,"selectedDevice");
   if(selected.Length>0&&!list.Any(d=>d.Id.Equals(selected,StringComparison.OrdinalIgnoreCase))){
    Identity(selected);if(list.Length>=Maximum)throw new InvalidDataException("You can remember up to 16 trackballs.");
-   config["trackballs"]!.AsArray().Add(new JsonObject{["id"]=selected,["name"]="Trackball "+(list.Length+1),["swapButtons"]=ConfigStore.B(config,"trackballSwapButtons"),["swapWheels"]=ConfigStore.B(config,"trackballSwapWheels")});
+   config["trackballs"]!.AsArray().Add(new JsonObject{["id"]=selected,["name"]=SuggestedName(selected,list.Length+1),["swapButtons"]=ConfigStore.B(config,"trackballSwapButtons"),["swapWheels"]=ConfigStore.B(config,"trackballSwapWheels")});
   }
  }
  static JsonObject Row(JsonObject config,string id)=>config["trackballs"]!.AsArray().OfType<JsonObject>().FirstOrDefault(d=>ConfigStore.S(d,"id").Equals(id,StringComparison.OrdinalIgnoreCase))??throw new InvalidDataException("Identify this trackball first.");
@@ -32,7 +42,7 @@ public static class TrackballDevices{
   Identity(id);Normalize(config);
   if(!Read(config).Any(d=>d.Id.Equals(id,StringComparison.OrdinalIgnoreCase))){
    var list=config["trackballs"]!.AsArray();if(list.Count>=Maximum)throw new InvalidDataException("You can remember up to 16 trackballs.");
-   list.Add(new JsonObject{["id"]=id,["name"]="Trackball "+(list.Count+1),["swapButtons"]=false,["swapWheels"]=false});
+   list.Add(new JsonObject{["id"]=id,["name"]=SuggestedName(id,list.Count+1),["swapButtons"]=false,["swapWheels"]=false});
   }
   Select(config,id);
  }

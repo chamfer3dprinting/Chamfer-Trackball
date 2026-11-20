@@ -4,11 +4,27 @@ namespace Chamfer.Trackball.Core;
 
 public sealed class ConfigStore {
     private static readonly string[] ProgramFields=["buttons","leftWheel","rightWheel","modeButtons","combos","wheelPrograms","orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","altTwistEstimate","twistCalibration","navigateKeys","navigateLookKeys","navigateHeightKeys","circleZoom","circleSize","gestures","pointerSpeed","ball","feel","leftWheelUpKeys","leftWheelDownKeys","rightWheelUpKeys","rightWheelDownKeys"];
+    public const int CurrentVersion=33;
+    private static readonly string[] ScopedMotionFields=["twist","steadyCamera","cameraResponseMs","slimBladeSmoothTwist"];
     private readonly object gate=new();
     private readonly string path;
     private JsonObject config;
     public long Revision {get;private set;}
     private static JsonObject? nodeProgram(JsonObject c,string name)=>c["programs"]!.AsArray().Select(n=>n?.AsObject()).FirstOrDefault(p=>p!=null&&S(p,"name").Contains(name,StringComparison.OrdinalIgnoreCase));
+    static bool ModellingKind(JsonNode? program)=>
+        S(program,"defaultKind",S(program,"name")).Equals("3D modelling",StringComparison.OrdinalIgnoreCase);
+    public static bool Is3DProgram(JsonObject config){
+        int index=I(config,"activeProgram");
+        return config["programs"] is JsonArray programs&&index>=0&&index<programs.Count&&ModellingKind(programs[index]);
+    }
+    public static KeyChord? ProgramSwitch(JsonObject config){
+        var spec=S(config,"programKeys");
+        if(spec.Length==0)return null;
+        try{
+            var chord=KeyChord.Parse(spec);
+            return chord.Keys.Any(k=>k is not (16 or 17 or 18 or 91))?chord:null;
+        }catch(FormatException){return null;}
+    }
     static bool BacktickAvailable(JsonObject settings){
         foreach(var key in new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys"}){
             var value=S(settings,key,"none");if(value is "" or "none")continue;
@@ -91,13 +107,25 @@ public sealed class ConfigStore {
             }
             LoadProgram(config,I(config,"activeProgram",0));
         }
-        config["configVersion"]=32;Validate(config);
-        if(oldVersion<32&&File.Exists(path))Write(config);
+        if(oldVersion<CurrentVersion){
+            var formerDefault=JsonNode.Parse("""{"buttons":[3,4],"bind":{"action":"lockRotate","tap":"click"}}""");
+            foreach(var program in config["programs"]!.AsArray().OfType<JsonObject>()){
+                if(S(program,"name")=="Normal mouse"&&program["combos"] is JsonArray combos&&combos.Count==1&&JsonNode.DeepEquals(combos[0],formerDefault))combos.Clear();
+            }
+            var fusion=config["profiles"]!.AsArray().OfType<JsonObject>().FirstOrDefault(p=>S(p,"id")=="fusion");
+            if(fusion!=null&&JsonNode.DeepEquals(fusion["exe"],new JsonArray("fusion360.exe","fusion*"))){
+                var standard=Defaults()["profiles"]!.AsArray().OfType<JsonObject>().First(p=>S(p,"id")=="fusion");
+                fusion["exe"]=standard["exe"]!.DeepClone();fusion["note"]=standard["note"]!.DeepClone();
+            }
+        }
+        LoadProgram(config,I(config,"activeProgram",0));
+        config["configVersion"]=CurrentVersion;Validate(config);
+        if(oldVersion<CurrentVersion&&File.Exists(path))Write(config);
     }
     public JsonObject Snapshot(){lock(gate)return (JsonObject)config.DeepClone();}
     public void Save(JsonObject incoming) {
         lock(gate){
-            var next=(JsonObject)incoming.DeepClone();Normalize(next);next["configVersion"]=32;
+            var next=(JsonObject)incoming.DeepClone();Normalize(next);next["configVersion"]=CurrentVersion;
             // Device identity comes from Raw Input, not a possibly stale settings page.
             bool sameDevice=S(incoming,"selectedDevice").Equals(S(config,"selectedDevice"),StringComparison.OrdinalIgnoreCase);
             next["selectedDevice"]=config["selectedDevice"]?.DeepClone()??JsonValue.Create("");
@@ -115,7 +143,10 @@ public sealed class ConfigStore {
             foreach(var key in ProgramFields) if(key!="gestures"&&next.ContainsKey(key))p[key]=next[key]?.DeepClone();
             p["feel"]??=new JsonObject();
             foreach(var key in new[]{"orbitSens","panSens","zoomSens","twistSens","twistAxis","invertTwist","invertOrbitX","invertOrbitY","invertPan","invertZoom","preciseSlow","clickSlop","smooth","glide","spaceMouseCruise","navigationCruise","navigationLevelFlight","navigationFreeLook","threeAxisControls"})if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
+            foreach(var key in ScopedMotionFields)if(next.ContainsKey(key))p["feel"]![key]=next[key]?.DeepClone();
             next["feel"]=p["feel"]!.DeepClone();
+            if(S(next,"programKeys").Length>0&&S(next,"programKeys")!=S(config,"programKeys")&&ProgramSwitch(next)==null)
+                throw new InvalidDataException("Program switching needs a key such as F9, with optional modifiers.");
             Validate(next);Write(next);config=next;Revision++;
         }
     }
@@ -185,7 +216,6 @@ public sealed class ConfigStore {
                 current["feel"]??=new JsonObject();foreach(var entry in feel)current["feel"]![entry.Key]=entry.Value?.DeepClone();
             }else current[field]=settings[field]?.DeepClone();
         }
-        if(settings["defaultKind"]!=null)current["defaultKind"]=settings["defaultKind"]!.DeepClone();
         LoadProgram(n,active);return PersistPresetChange(n);
     }}
     public JsonObject RenamePreset(int index,string name){lock(gate){
@@ -211,13 +241,26 @@ public sealed class ConfigStore {
     }
     public static void Normalize(JsonObject c){
         var d=Defaults();
+        bool migrating=I(c,"configVersion",0)<CurrentVersion;
+        var legacyMotion=ScopedMotionFields.Where(c.ContainsKey).ToDictionary(key=>key,key=>c[key]);
         foreach(var x in d)if(!c.ContainsKey(x.Key))c[x.Key]=x.Value?.DeepClone();
         if(c["programs"] is not JsonArray ps||ps.Count==0)throw new InvalidDataException("At least one program is required.");
         foreach(var node in ps){
             var p=node?.AsObject()??throw new InvalidDataException("Invalid program.");
-            foreach(var k in ProgramFields)if(!p.ContainsKey(k))p[k]=k is "snapKeys" or "twistKeys" or "navigateKeys" or "navigateLookKeys" or "navigateHeightKeys"?JsonValue.Create("none"):d["programs"]![0]![k]?.DeepClone();
-            if(p["feel"] is not JsonObject)p["feel"]=d["programs"]![0]!["feel"]!.DeepClone();
-            foreach(var entry in d["programs"]![0]!["feel"]!.AsObject())if(!p["feel"]!.AsObject().ContainsKey(entry.Key))p["feel"]![entry.Key]=entry.Value?.DeepClone();
+            // Pre-program-type installs could save custom 3D programs by name alone.
+            if(p["defaultKind"]==null&&S(p,"name")!="Normal mouse"&&
+               (ModellingKind(p)||new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys"}.Any(k=>S(p,k,"none") is not ("" or "none"))))
+                p["defaultKind"]="3D modelling";
+            bool modelling=ModellingKind(p);
+            var standard=d["programs"]![modelling?1:0]!;
+            p["defaultKind"]??=S(standard,"name");
+            foreach(var k in ProgramFields)if(!p.ContainsKey(k))
+                p[k]=migrating&&k is ("snapKeys" or "twistKeys" or "navigateKeys" or "navigateLookKeys" or "navigateHeightKeys")?JsonValue.Create("none"):standard[k]?.DeepClone();
+            if(p["feel"] is not JsonObject)p["feel"]=new JsonObject();
+            foreach(var entry in standard["feel"]!.AsObject()){
+                if(p["feel"]!.AsObject().ContainsKey(entry.Key))continue;
+                p["feel"]![entry.Key]=modelling&&migrating&&legacyMotion.TryGetValue(entry.Key,out var legacy)?legacy?.DeepClone():entry.Value?.DeepClone();
+            }
         }
         foreach(var preset in c["presets"] as JsonArray??new JsonArray()){
             if(preset?["settings"] is JsonObject settings){
@@ -229,7 +272,7 @@ public sealed class ConfigStore {
             }
         }
         TrackballDevices.Normalize(c);
-        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);c["configVersion"]=30;
+        c["activeProgram"]=Math.Clamp(I(c,"activeProgram",0),0,ps.Count-1);
     }
     public static void Validate(JsonObject c){
         _=TrackballDevices.Read(c);
@@ -246,7 +289,6 @@ public sealed class ConfigStore {
             foreach(var key in new[]{"orbitKeys","panKeys","zoomKeys","snapKeys","twistKeys","navigateKeys"}){
                 var chord=S(p,key,"none");if(chord=="none"||chord=="")continue;
                 var binding=KeyChord.Parse(chord);
-                if(binding.IsCtrlAlone&&key!="zoomKeys")throw new InvalidDataException("Ctrl by itself is available for Zoom. Choose another key for this navigation command.");
                 if(!used.Add(binding.Canonical))throw new InvalidDataException("Two navigation modes cannot use the same held keys. Pan and zoom share the Pan + zoom mode.");
             }
             NavigationBindings.Validate(p,used);

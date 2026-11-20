@@ -11,10 +11,11 @@ public sealed class ForegroundApps{
         observed=true;lastWindow=window;nextProbe=now+RefreshMs;return true;
     }
     public void Invalidate()=>observed=false;
-    public static JsonObject? Match(JsonArray profiles,string exe,string title)=>
-        profiles.OfType<JsonObject>().FirstOrDefault(p=>ConfigStore.B(p,"enabled")&&
-            (p["exe"]?.AsArray().Any(x=>Executable(exe,x?.GetValue<string>()??""))==true||
-             p["title"]?.AsArray().Any(x=>title.Contains(x?.GetValue<string>()??"\0",StringComparison.OrdinalIgnoreCase))==true));
+    public static JsonObject? Match(JsonArray profiles,string exe,string title){
+        var enabled=profiles.OfType<JsonObject>().Where(p=>ConfigStore.B(p,"enabled"));
+        return enabled.FirstOrDefault(p=>p["exe"]?.AsArray().Any(x=>Executable(exe,x?.GetValue<string>()??""))==true)
+            ??enabled.FirstOrDefault(p=>p["title"]?.AsArray().Any(x=>x?.GetValue<string>() is {Length:>0} fragment&&title.Contains(fragment,StringComparison.OrdinalIgnoreCase))==true);
+    }
     public static bool Same(JsonObject? before,JsonObject? after)=>
         before==null&&after==null||before!=null&&after!=null&&
         ConfigStore.S(before,"id")==ConfigStore.S(after,"id");

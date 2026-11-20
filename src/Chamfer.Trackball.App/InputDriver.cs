@@ -10,6 +10,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     readonly object keysGate=new(),routingGate=new();
     readonly ConcurrentQueue<(int Key,bool Down)> keyReplays=new();
     readonly HashSet<int> delayedKeys=[];
+    readonly HashSet<int> programKeysDown=[];
     int keysPending,stalled,heldRouting;
     long uiPulse=Environment.TickCount64;
     string? hookError;
@@ -25,11 +26,14 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     public Func<bool> IsCapture=()=>false;
     public Func<bool> IsCad=()=>false;
     public Func<IReadOnlySet<int>,bool> IsNavigationChord=_=>false;
+    public Func<IReadOnlySet<int>,bool> IsProgramChord=_=>false;
+    public event Action? ProgramShortcut;
     public Func<string> SelectedDevice=()=>"";
     readonly DeviceMapping mapping=new();readonly MouseGate gate=new();readonly TrackballRoster roster=new();
     string TargetDevice=>roster.Count==0?SelectedDevice():roster.ActiveId;
     public string ActiveDevice=>TargetDevice;
     public string ActiveDeviceName=>roster.Find(TargetDevice)?.Name??"Trackball";
+    public string ActiveDeviceModel=>TrackballDevices.Model(TargetDevice,ActiveDeviceName);
     bool DeviceButtons(string device)=>roster.Find(device)?.SwapButtons??SwapButtons();
     bool DeviceWheels(string device)=>roster.Find(device)?.SwapWheels??SwapWheels();
     public event Action? DeviceChanged;
@@ -39,7 +43,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
         nextPresenceCheck=0;
     }
     public JsonObject DeviceState()=>new(){
-        ["ready"]=Ready,["status"]=DeviceStatus,["active"]=TargetDevice,["name"]=ActiveDeviceName,
+        ["ready"]=Ready,["status"]=DeviceStatus,["active"]=TargetDevice,["name"]=ActiveDeviceName,["model"]=ActiveDeviceModel,
         ["trackballs"]=new JsonArray(roster.Snapshot().Select(row=>(JsonNode)new JsonObject{
             ["id"]=row.Device.Id,["name"]=row.Device.Name,["connected"]=row.Connected,["active"]=row.Active,
             ["editing"]=row.Editing,["swapButtons"]=row.Device.SwapButtons,["swapWheels"]=row.Device.SwapWheels
@@ -53,7 +57,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     readonly InputRecovery recovery=new();
     long selectedMovementReports,deliveredMovementReports,otherMovementReports,lastMovementAt;
     readonly MotionHealth motionHealth=new();readonly ConcurrentQueue<MouseMatch> matched=[];
-    const int DispatchEdges=0x8001,DispatchKeys=0x8002,DispatchFailure=0x8003;
+    const int DispatchEdges=0x8001,DispatchKeys=0x8002,DispatchFailure=0x8003,DispatchProgram=0x8004;
     readonly System.Windows.Forms.Timer watchdog=new(){Interval=30};
     readonly HashSet<(string,int,int)> consumed=[];
     volatile bool failed,connected,motionBlocked;
@@ -321,7 +325,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     }
     public IReadOnlySet<int> Keys {
         get{lock(keysGate){
-            var result=new HashSet<int>(physical.Where(x=>x is not (160 or 161 or 162 or 163 or 164 or 165 or 91 or 92)));
+            var result=new HashSet<int>(physical.Where(x=>!programKeysDown.Contains(x)&&x is not (160 or 161 or 162 or 163 or 164 or 165 or 91 or 92)));
             if(physical.Any(x=>x is 16 or 160 or 161))result.Add(16);
             if(physical.Any(x=>x is 17 or 162 or 163))result.Add(17);
             if(physical.Any(x=>x is 18 or 164 or 165))result.Add(18);
@@ -342,7 +346,15 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     }
     bool RouteKey(int k,bool down){
         lock(keysGate){
-            if(down)physical.Add(k);else physical.Remove(k);
+            bool newPress=down?physical.Add(k):physical.Remove(k);
+            if(programKeysDown.Contains(k)){
+                if(!down){programKeysDown.Remove(k);NotifyKeys();}
+                return true;
+            }
+            if(down&&newPress&&k is not (16 or 17 or 18 or 91 or 92 or >=160 and <=165)&&
+               HookHealthy&&Enabled()&&IsProgramChord(Keys)&&Win32.PostMessage(Handle,DispatchProgram,0,0)){
+                programKeysDown.Add(k);NotifyKeys();return true;
+            }
             if(delayedKeys.Contains(k)){
                 ReplayKey(k,down);if(!down)delayedKeys.Remove(k);return true;
             }
@@ -489,6 +501,9 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
                 KeysChanged?.Invoke();
             }catch(Exception ex){FailOpen("Normal keyboard restored: "+ex.Message);}
         }
+        if(m.Msg==DispatchProgram){
+            try{ProgramShortcut?.Invoke();}catch(Exception ex){FailOpen("Program switch failed: "+ex.Message);}
+        }
         if(m.Msg==DispatchFailure)FailOpen(Interlocked.Exchange(ref hookError,null)??"Normal input restored.",true);
         if(m.Msg==DispatchEdges){
             while(matched.TryDequeue(out var match))try{Edge(match.Device,match.Edge);}catch(Exception ex){FailOpen("Normal input restored: "+ex.Message);}
@@ -526,7 +541,7 @@ internal sealed class InputDriver:NativeWindow,IDisposable {
     }
     public void Dispose(){
         watchdog.Stop();watchdog.Dispose();hooks?.Dispose();hooks=null;FailOpen("Closed");
-        lock(keysGate){deferred.Clear();usedDeferred.Clear();delayedKeys.Clear();physical.Clear();}
+        lock(keysGate){deferred.Clear();usedDeferred.Clear();delayedKeys.Clear();programKeysDown.Clear();physical.Clear();}
         while(keyReplays.TryDequeue(out _)){ }DestroyHandle();
     }
 }

@@ -68,7 +68,7 @@ internal sealed class MainForm:Form{
                 case "ctSave":store.Save(args[0]!.AsObject());result=store.Snapshot();break;
                 case "ctStatus":result=controller.Status();break;
                 case "ctResetAll":result=store.Reset();break;
-                case "ctProgram":store.Select(args[0]!.GetValue<int>());result=true;break;
+                case "ctProgram":store.Select(args[0]!.GetValue<int>());result=store.Snapshot();break;
                 case "ctProgramDelete":result=store.DeleteProgram(args[0]!.GetValue<int>());break;
                 case "ctPresetSave":result=store.SavePreset(args[0]!.GetValue<string>(),args.Count>1&&args[1]!.GetValue<bool>());break;
                 case "ctPresetApply":result=store.ApplyPreset(args[0]!.GetValue<int>());break;

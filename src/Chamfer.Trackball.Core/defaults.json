@@ -1,5 +1,5 @@
 {
-  "configVersion": 32,
+  "configVersion": 33,
   "slimBladeSmoothTwist": false,
   "steadyCamera": false,
   "cameraResponseMs": 18,
@@ -25,18 +25,7 @@
   "rightWheel": "normal",
   "leftWheel": "normal",
   "modeButtons": {},
-  "combos": [
-    {
-      "buttons": [
-        3,
-        4
-      ],
-      "bind": {
-        "action": "lockRotate",
-        "tap": "click"
-      }
-    }
-  ],
+  "combos": [],
   "wheelPrograms": [
     0,
     1,
@@ -60,7 +49,7 @@
   "ball": "pointer",
   "trackballDpi": 1600,
   "preciseSlow": true,
-  "smooth": true,
+  "smooth": false,
   "glide": 5,
   "orbitSens": 50,
   "panSens": 50,
@@ -118,8 +107,8 @@
       "name": "Autodesk Fusion",
       "enabled": true,
       "exe": [
-        "fusion360.exe",
-        "fusion*"
+        "Fusion360.exe",
+        "Fusion.exe"
       ],
       "title": null,
       "orbit": {
@@ -139,7 +128,7 @@
       "wheelZoomInvert": false,
       "smoothZoom": true,
       "fit": "F6",
-      "note": "Fusion default navigation."
+      "note": "Uses Fusion’s default mouse setup. Enable the Fusion add-in for native camera control."
     },
     {
       "id": "blender",
@@ -673,7 +662,7 @@
         "invertZoom": false,
         "preciseSlow": true,
         "clickSlop": 8,
-        "smooth": true,
+        "smooth": false,
         "glide": 5,
         "twistSens": 50,
         "twistAxis": "x",
@@ -682,21 +671,14 @@
         "navigationCruise": false,
         "navigationLevelFlight": false,
         "navigationFreeLook": false,
-        "threeAxisControls": false
+        "threeAxisControls": false,
+        "twist": true,
+        "steadyCamera": false,
+        "cameraResponseMs": 18,
+        "slimBladeSmoothTwist": false
       },
       "modeButtons": {},
-      "combos": [
-        {
-          "buttons": [
-            3,
-            4
-          ],
-          "bind": {
-            "action": "lockRotate",
-            "tap": "click"
-          }
-        }
-      ],
+      "combos": [],
       "snapKeys": "none",
       "navigateKeys": "none",
       "circleZoom": false,
@@ -705,7 +687,8 @@
       "altTwistEstimate": false,
       "twistCalibration": null,
       "navigateLookKeys": "none",
-      "navigateHeightKeys": "none"
+      "navigateHeightKeys": "none",
+      "defaultKind": "Normal mouse"
     },
     {
       "name": "3D modelling",
@@ -742,9 +725,9 @@
       "pointerSpeed": 10,
       "ball": "pointer",
       "feel": {
-        "orbitSens": 50,
-        "panSens": 50,
-        "zoomSens": 50,
+        "orbitSens": 38,
+        "panSens": 38,
+        "zoomSens": 38,
         "invertOrbitX": false,
         "invertOrbitY": false,
         "invertPan": false,
@@ -752,27 +735,32 @@
         "preciseSlow": true,
         "clickSlop": 8,
         "smooth": true,
-        "glide": 5,
-        "twistSens": 50,
+        "glide": 1,
+        "twistSens": 37,
         "twistAxis": "x",
         "invertTwist": false,
         "spaceMouseCruise": false,
         "navigationCruise": true,
-        "navigationLevelFlight": false,
+        "navigationLevelFlight": true,
         "navigationFreeLook": false,
-        "threeAxisControls": true
+        "threeAxisControls": true,
+        "twist": true,
+        "steadyCamera": true,
+        "cameraResponseMs": 12,
+        "slimBladeSmoothTwist": true
       },
       "modeButtons": {},
       "combos": [],
       "snapKeys": "alt",
       "navigateKeys": "backtick",
-      "circleZoom": true,
-      "circleSize": 160,
+      "circleZoom": false,
+      "circleSize": 90,
       "twistKeys": "none",
       "altTwistEstimate": false,
       "twistCalibration": null,
       "navigateLookKeys": "1",
-      "navigateHeightKeys": "ctrl"
+      "navigateHeightKeys": "ctrl",
+      "defaultKind": "3D modelling"
     }
   ],
   "activeProgram": 0,
@@ -796,7 +784,7 @@
     "invertZoom": false,
     "preciseSlow": true,
     "clickSlop": 8,
-    "smooth": true,
+    "smooth": false,
     "glide": 5,
     "twistSens": 50,
     "twistAxis": "x",
@@ -804,7 +792,12 @@
     "navigationCruise": false,
     "navigationLevelFlight": false,
     "navigationFreeLook": false,
-    "threeAxisControls": false
+    "threeAxisControls": false,
+    "spaceMouseCruise": false,
+    "twist": true,
+    "steadyCamera": false,
+    "cameraResponseMs": 18,
+    "slimBladeSmoothTwist": false
   },
   "snapKeys": "none",
   "navigateKeys": "none",
