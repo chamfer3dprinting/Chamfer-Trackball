@@ -131,7 +131,7 @@ internal sealed class GuideForm:Form{
    g.DrawString(label,tiny,held?accent:muted,new RectangleF(13,y,156,18));
    g.DrawString(ConfigStore.S(item,"label"),tiny,held?accent:text,180,y);
   }
-  string footer=heldTwist?(mode=="Orbit"?"Release the orbit key to stop rolling":"Release a pan/zoom key to stop zooming"):
+  string footer=mode=="Idle"&&twist?"Ball twist scrolls up / down":heldTwist?(mode=="Orbit"?"Release the orbit key to stop rolling":"Release a pan/zoom key to stop zooming"):
    drone&&looking?"Opposite twist reverses · release look to stop":
    drone&&threeAxes&&!height?"Opposite twist reverses · release to stop turning":
    drone?"Roll back to centre or release to stop":ConfigStore.B(s,"knobActive")?"Turn: "+ConfigStore.D(s,"knobDegrees").ToString("0")+"° · next "+ConfigStore.D(s,"knobProgress").ToString("0")+"%":mode=="Snap"?ConfigStore.S(s["snapTurn"],"message","Roll up/down/left/right to switch faces"):"Physical keyboard · held keys light up";

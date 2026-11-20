@@ -32,7 +32,8 @@ internal static class LevelFlightChecks {
         var file=Path.Combine(Path.GetTempPath(),"chamfer-level-flight-"+Guid.NewGuid().ToString("N")+".json");
         try{
             var store=new ConfigStore(file);store.Select(1);var cfg=store.Snapshot();var normal=cfg["programs"]![0]!.DeepClone();
-            check(!ConfigStore.B(cfg,"navigationLevelFlight"),"Level flight is an opt-in trial");
+            check(ConfigStore.B(cfg,"navigationLevelFlight")&&!ConfigStore.B(normal["feel"],"navigationLevelFlight"),"The approved 3D defaults use level flight only in the modelling program");
+            cfg["navigationLevelFlight"]=false;store.Save(cfg);
             store.SavePreset("Before level flight");cfg["navigationLevelFlight"]=true;store.Save(cfg);store.SavePreset("Level flight trial");
             var reopened=new ConfigStore(file);check(ConfigStore.B(reopened.Snapshot(),"navigationLevelFlight")&&JsonNode.DeepEquals(normal,reopened.Snapshot()["programs"]![0]),"Trial persists in its program without changing Normal mouse");
             reopened.ApplyPreset(0);check(!ConfigStore.B(reopened.Snapshot(),"navigationLevelFlight"),"Before-trial preset restores view-direction navigation");

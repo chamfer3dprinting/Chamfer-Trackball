@@ -67,7 +67,7 @@ Blender and Fusion adapters are embedded and can be installed from CAD apps insi
 
 ## Current controls and motion settings
 
-The Normal mouse program preserves the manufacturer's clicks and wheel axes. The confirmed btn3 + btn4 rotation toggle is retained as a program default and only acts in a 3D context. The 3D modelling program also points normally until a command is held:
+Normal mouse is the factory program. It keeps standard clicks, scrolling and typing in every app, including CAD. Pointer sensitivity, glide, button assignments, combinations and scroll shortcuts can be saved per program. Choose 3D modelling on Home or in Buttons & keys for the approved camera bindings. Each hold has its own editable shortcut.
 
 | Hold with the ball | Action |
 | --- | --- |

@@ -1,3 +1,10 @@
+## Normal mouse and 3D modelling
+
+- Normal mouse is the factory program, with its own pointer sensitivity, glide, button assignments and scroll shortcuts.
+- 3D modelling keeps the approved navigation defaults and saves each shortcut independently. Record the hold or type the keys.
+- The device guide follows the active trackball. SlimBlade Pro shows ball twist scrolling, and M512 shows its two wheels.
+- Fusion and other configured CAD profiles send camera drags and wheel steps separately. Fusion and Blender support native camera controls through their add-ins.
+
 # Continuous twist zoom and version rollover
 
 - Hold Ctrl + Shift and twist the Kensington ball to keep zooming at the cursor. Roll the ball to pan during zoom. Twist the other way to reverse, or release either key to stop.

@@ -9,9 +9,10 @@ JsonObject Legacy3DDefaults(){
     return value;
 }
 var defaults=ConfigStore.Defaults();
-Check(ConfigStore.I(defaults,"activeProgram")==0&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Idle,"Factory startup is an ordinary mouse");
+Check(ConfigStore.I(defaults,"activeProgram")==0&&!ConfigStore.Is3DProgram(defaults)&&defaults["combos"]!.AsArray().Count==0&&ModeResolver.Resolve(defaults,new HashSet<int>{16})==NavMode.Idle,"Factory startup is an ordinary mouse");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Normal mouse keeps Ctrl as an ordinary modifier");
 ConfigStore.LoadProgram(defaults,1);
+Check(ConfigStore.Is3DProgram(defaults)&&ConfigStore.I(defaults,"orbitSens")==38&&ConfigStore.I(defaults,"panSens")==38&&ConfigStore.I(defaults,"zoomSens")==38&&ConfigStore.I(defaults,"twistSens")==37&&ConfigStore.I(defaults,"glide")==1&&ConfigStore.I(defaults,"cameraResponseMs")==12&&ConfigStore.B(defaults,"steadyCamera")&&!ConfigStore.B(defaults,"circleZoom"),"3D factory program uses the approved speed, response, glide and held navigation");
 Check(ConfigStore.S(defaults,"ball")=="pointer"&&ModeResolver.Resolve(defaults,new HashSet<int>())==NavMode.Idle,"The 3D program points normally until a navigation key is held");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17})==NavMode.Idle,"Ctrl stays a regular modifier in the default 3D program");
 Check(ModeResolver.Resolve(defaults,new HashSet<int>{17,67})==NavMode.Idle&&ModeResolver.Resolve(defaults,new HashSet<int>{17,86})==NavMode.Idle,"Ctrl+C and Ctrl+V remain ordinary keyboard shortcuts");
@@ -125,14 +126,23 @@ try{
  Check(ConfigStore.I(reset,"activeProgram")==0&&ModeResolver.Resolve(reset,new HashSet<int>{16})==NavMode.Idle,"Reset selects normal mouse without navigation");
  Check(!ConfigStore.B(reset,"trackballSwapButtons")&&!ConfigStore.B(reset,"trackballSwapWheels"),"Reset disables device corrections as well as bindings");Check(ConfigStore.S(reset,"leftWheel")=="normal"&&ConfigStore.S(reset,"rightWheel")=="normal","Reset restores both wheels");
  Check(reset["programs"]![0]!["buttons"]!.AsObject().All(b=>ConfigStore.S(b.Value,"action")=="normal")&&reset["programs"]![1]!["buttons"]!.AsObject().Where(b=>b.Key!="back").All(b=>ConfigStore.S(b.Value,"action")=="normal")&&ConfigStore.S(reset["programs"]![1]!["buttons"]!["back"],"action")=="faceSnap","Reset restores normal mouse clicks and the 3D Back toggle");
- var bad=store.Snapshot();bad["orbitKeys"]="ctrl";bool rejected=false;try{store.Save(bad);}catch(InvalidDataException){rejected=true;}Check(rejected,"Saving Ctrl-only navigation is rejected");
+ store.Select(1);
+ var changedKeys=store.Snapshot();changedKeys["orbitKeys"]="ctrl";changedKeys["panKeys"]="q";changedKeys["zoomKeys"]="alt+z";changedKeys["snapKeys"]="f7";
+ changedKeys["twistKeys"]="t";changedKeys["navigateKeys"]="v";changedKeys["navigateLookKeys"]="2";changedKeys["navigateHeightKeys"]="shift";
+ changedKeys["programKeys"]="Ctrl+F9";
+ store.Save(changedKeys);var reopenedKeys=new ConfigStore(path).Snapshot();
+ foreach(var (chord,expected) in new[]{("Ctrl",NavMode.Orbit),("Q",NavMode.PanZoom),("Alt+Z",NavMode.Zoom),("F7",NavMode.Snap),("T",NavMode.Roll),("V",NavMode.Navigate)})
+     Check(ModeResolver.Resolve(reopenedKeys,KeyChord.Parse(chord).Keys.ToHashSet())==expected,"Custom "+expected+" hold survives a restart");
+ Check(NavigationBindings.Resolve(reopenedKeys,new HashSet<int>{86,50})==NavigationLayer.Look&&NavigationBindings.Resolve(reopenedKeys,new HashSet<int>{16,86})==NavigationLayer.Height,"Both camera walk layers can use different keys");
+ Check(ConfigStore.ProgramSwitch(reopenedKeys)?.Matches(new HashSet<int>{17,120})==true,"The configured program switch chord survives restart");
+ store.Select(0);
 
  var partial=store.Snapshot();partial["programs"]!.AsArray().Add(new JsonObject{["name"]="New legacy program",["feel"]=new JsonObject{["orbitSens"]=82}});
  store.Save(partial);store.Select(2);var repaired=store.Snapshot();
  Check(ConfigStore.I(repaired,"orbitSens")==82&&ConfigStore.I(repaired,"panSens")==50&&ConfigStore.I(repaired,"pointerSpeed")==10,"An incomplete added program gets its own full motion defaults instead of leaking the previous program");
  store.Select(0);
  var migrated=Legacy3DDefaults();migrated["configVersion"]=20;migrated["activeProgram"]=1;migrated["programs"]![1]!["orbitKeys"]="ctrl";File.WriteAllText(path,migrated.ToJsonString());var ms=new ConfigStore(path).Snapshot();
- Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==32,"Legacy config migrates without Ctrl-only orbit");
+ Check(ConfigStore.S(ms,"orbitKeys")=="shift"&&ConfigStore.I(ms,"configVersion")==ConfigStore.CurrentVersion,"Legacy config migrates without Ctrl-only orbit");
  Check(ConfigStore.S(ms,"ball")=="pointer"&&ConfigStore.S(ms,"zoomKeys")=="none","Legacy 3D defaults migrate to held navigation without creating a standalone Zoom binding");
  foreach(var zoomBinding in new[]{"none","z","Shift+Z"}){
   var old=Legacy3DDefaults();old["configVersion"]=23;old["activeProgram"]=1;old["selectedDevice"]="retained-trackball";
@@ -144,6 +154,15 @@ try{
  }
 }finally{Directory.Delete(dirPath,true);}
 
+Check(TrackballDevices.Model(@"\\?\HID#VID_047D&PID_80D6&COL01#123","Custom name")=="slimblade","Kensington detection uses the hardware identity after renaming");
+Check(TrackballDevices.Model(@"\\?\HID#VID_25A7&PID_FA61&COL01#123","Custom name")=="m512"&&TrackballDevices.Model("unrelated","Other mouse")=="generic","M512 and unrecognized devices use their own layouts");
+var cadProfiles=ConfigStore.Defaults()["profiles"]!.AsArray();
+foreach(var exe in new[]{"Fusion360.exe","Fusion.exe"}){
+ var fusionProfile=ForegroundApps.Match(cadProfiles,exe,"Chamfer Studio — imported part");
+ Check(ConfigStore.S(fusionProfile,"id")=="fusion","Installed "+exe+" uses its executable profile ahead of title matches");
+ Check(fusionProfile?["orbit"]?["mods"]?[0]?.GetValue<string>()=="shift"&&fusionProfile?["orbit"]?["buttons"]?[0]?.GetValue<string>()=="middle"&&fusionProfile?["pan"]?["buttons"]?[0]?.GetValue<string>()=="middle","Fusion emulation uses Fusion's default orbit and pan drags");
+}
+Check(ForegroundApps.Match(cadProfiles,"FusionLauncher.exe","Launching Autodesk Fusion")==null,"The Fusion launcher does not arm CAD mouse emulation");
 var dm=new DeviceMapping();var leftDown=new MouseEdge(0x201);var rightDown=new MouseEdge(0x204);
 Check(dm.Map("mouse","ball",leftDown,true,true)==leftDown,"Other mouse keeps left click");
 Check(dm.Map("mouse","ball",new(0x202),true,true)==new MouseEdge(0x202),"Other mouse keeps left release");
@@ -307,7 +326,7 @@ Check(ModeResolver.Resolve(defaults,new HashSet<int>{91,68})==NavMode.Idle,"Wind
 Check(ModeResolver.Resolve(ConfigStore.Defaults(),new HashSet<int>{192})==NavMode.Idle,"Normal mouse keeps Backtick available for ordinary typing");
 var mouseDefaults=ConfigStore.Defaults();
 Check(ModeResolver.Resolve(mouseDefaults,new HashSet<int>{91})==NavMode.Idle,"Normal mouse does not reserve Windows");
-Check(mouseDefaults["combos"]!.AsArray().Any(n=>n?["buttons"]?.ToJsonString()=="[3,4]"&&ConfigStore.S(n?["bind"],"action")=="lockRotate"),"Confirmed btn3+btn4 combination is a default without swapping clicks");
+Check(mouseDefaults["combos"]!.AsArray().Count==0,"Normal mouse has no factory combination that intercepts standard click pairs");
 Check(PointerPolicy.Gain(1)==1f/32&&PointerPolicy.Gain(10)==1&&PointerPolicy.Gain(20)==3.5f,"Pointer gain matches every displayed DPI endpoint and neutral speed");
 Check(!PointerPolicy.Capture(10,false)&&PointerPolicy.Capture(1,false)&&PointerPolicy.Capture(10,true),"Neutral pointing can pass through; speed and glide request device routing");
 foreach(int step in new[]{1,6,10,15,20}){
@@ -315,7 +334,11 @@ foreach(int step in new[]{1,6,10,15,20}){
  for(int sample=0;sample<320;sample++){var output=pointerTest.Move(1,-2,PointerPolicy.Gain(step));x+=output.X;y+=output.Y;}
  Check(x==(int)MathF.Round(320*PointerPolicy.Gain(step))&&y==(int)MathF.Round(-640*PointerPolicy.Gain(step)),"Pointer speed "+step+" changes actual counts without losing subpixels");
 }
-var pointerGlide=new PointerMotion();pointerGlide.Move(16,0,1);
+var cadWheel=new WheelSteps();
+ Check(cadWheel.Add(41)==0&&cadWheel.Add(39)==0&&cadWheel.Add(41)==120,"CAD wheel zoom accumulates a whole Windows notch");
+ Check(cadWheel.Add(-119)==0&&cadWheel.Add(-1)==-120&&cadWheel.Add(360)==360,"CAD wheel reversal starts immediately and supports multiple notches");
+ cadWheel.Add(119);cadWheel.Reset();Check(cadWheel.Add(1)==0,"Leaving CAD mode clears unfinished wheel motion");
+ var pointerGlide=new PointerMotion();pointerGlide.Move(16,0,1);
 Check(pointerGlide.Tick(100,.1f,true,1)==(0,0),"Immediate pointer delivery is never repeated by the frame timer");
 var pointerTail=pointerGlide.Tick(116,.1f,true,1);
 Check(pointerTail.X>0&&pointerTail.Y==0,"Pointer glide emits a real decaying tail after the ball stops");
@@ -371,7 +394,7 @@ try{
  var reopenedLibrary=new ConfigStore(presetPath);reopenedLibrary.Select(0);
  var beforeApply=reopenedLibrary.Snapshot();var otherBefore=beforeApply["programs"]![1]!.ToJsonString();
  var applied=reopenedLibrary.ApplyPreset(0);
- Check(ConfigStore.S(applied["programs"]![0],"name")=="Normal mouse"&&applied["programs"]![1]!.ToJsonString()==otherBefore,"Applying a preset preserves program names and the other program's settings");
+ Check(!ConfigStore.Is3DProgram(applied)&&ConfigStore.S(applied["programs"]![0],"name")=="Normal mouse"&&applied["programs"]![1]!.ToJsonString()==otherBefore,"Applying a preset preserves program names and the other program's settings");
  Check(ConfigStore.I(applied,"pointerSpeed")==7&&ConfigStore.I(applied,"orbitSens")==62&&ConfigStore.I(applied,"panSens")==71&&ConfigStore.I(applied,"zoomSens")==39&&ConfigStore.I(applied,"glide")==64,"Applied presets reach every actual speed and glide field");
  Check(ConfigStore.S(applied,"selectedDevice")=="preset-trackball"&&applied["combos"]![0]!["buttons"]!.ToJsonString()=="[1,2]","Applying a preset keeps the identified trackball and restores combinations");
  var edited=reopenedLibrary.Snapshot();edited["pointerSpeed"]=18;reopenedLibrary.Save(edited);
@@ -469,7 +492,7 @@ try{
  foreach(var node in old["programs"]!.AsArray()){node!.AsObject().Remove("twistKeys");node["feel"]!.AsObject().Remove("twistSens");node["feel"]!.AsObject().Remove("twistAxis");node["feel"]!.AsObject().Remove("invertTwist");}
  old["programs"]![1]!["feel"]!["orbitSens"]=4;old["programs"]![0]!["pointerSpeed"]=3;File.WriteAllText(twistPath,old.ToJsonString());
  var store=new ConfigStore(twistPath);var migrated=store.Snapshot();
- Check(ConfigStore.I(migrated,"configVersion")==32&&ConfigStore.S(migrated,"twistKeys")=="none"&&!ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program uses approved Alt faces and left-wheel turns without a Shift requirement");
+ Check(ConfigStore.I(migrated,"configVersion")==ConfigStore.CurrentVersion&&ConfigStore.S(migrated,"twistKeys")=="none"&&!ConfigStore.B(migrated,"altTwistEstimate"),"The existing 3D program uses approved Alt faces and left-wheel turns without a Shift requirement");
  Check(ConfigStore.S(migrated,"selectedDevice")=="twist-device"&&ConfigStore.I(migrated,"orbitSens")==4&&ConfigStore.I(migrated["programs"]![0],"pointerSpeed")==3,"Twist migration preserves trackball identity and existing speed settings");
  Check(ConfigStore.S(migrated["programs"]![0],"twistKeys")=="none","Twist migration leaves Normal mouse shortcuts off");
  migrated["twistKeys"]="alt+t";migrated["twistSens"]=23;migrated["twistAxis"]="y";migrated["invertTwist"]=true;store.Save(migrated);store.SavePreset("Knob");
