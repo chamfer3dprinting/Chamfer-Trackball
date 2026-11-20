@@ -13,7 +13,9 @@ internal static class ReleaseSmoke{
  static AdminService Service(MemoryGitHub api,string credential="smoke-test-credential")=>new(new HttpClient(api){Timeout=TimeSpan.FromSeconds(10)},credential);
  static async Task VerifyLockedExecutableUpdate(){
   var temp=Path.Combine(Path.GetTempPath(),"chamfer-update-"+Guid.NewGuid().ToString("N"));
-  var source=temp+".download",target=temp+".exe",backup=target+".previous";
+  var source=temp+".download";
+  var target=temp+".exe";
+  var backup=target+".previous";
   try{
    File.WriteAllText(source,"new verified executable");File.WriteAllText(target,"current executable");
    File.WriteAllText(backup,"older backup");
