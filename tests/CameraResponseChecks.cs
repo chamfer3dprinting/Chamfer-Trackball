@@ -41,9 +41,13 @@ static class CameraResponseChecks{
   check(!ConfigStore.B(original,"steadyCamera")&&ConfigStore.D(original,"cameraResponseMs")==18,"The optional response keeps old setups off and uses an 18 ms default");
   var path=Path.Combine(Path.GetTempPath(),"chamfer-response-"+Guid.NewGuid().ToString("N")+".json");
   try{
-   var store=new ConfigStore(path);var settings=store.Snapshot();var programs=settings["programs"]!.DeepClone();var presets=settings["presets"]!.DeepClone();
+   var store=new ConfigStore(path);store.Select(1);
+   var settings=store.Snapshot();var programs=settings["programs"]!.DeepClone();var presets=settings["presets"]!.DeepClone();
+   programs[1]!["feel"]!["steadyCamera"]=true;programs[1]!["feel"]!["cameraResponseMs"]=32;
    settings["steadyCamera"]=true;settings["cameraResponseMs"]=32;store.Save(settings);var reopened=new ConfigStore(path).Snapshot();
-   check(ConfigStore.B(reopened,"steadyCamera")&&ConfigStore.D(reopened,"cameraResponseMs")==32&&JsonNode.DeepEquals(programs,reopened["programs"])&&JsonNode.DeepEquals(presets,reopened["presets"]),"Response tuning persists without changing program speeds, controls or presets");
+   check(ConfigStore.B(reopened,"steadyCamera")&&ConfigStore.D(reopened,"cameraResponseMs")==32&&JsonNode.DeepEquals(programs,reopened["programs"])&&JsonNode.DeepEquals(presets,reopened["presets"]),"Response tuning persists in the selected program while other controls and presets stay intact");
+   store.Select(0);var normal=store.Snapshot();
+   check(!ConfigStore.B(normal,"steadyCamera")&&ConfigStore.D(normal,"cameraResponseMs")==18,"Normal mouse has independent motion settings");
   }finally{foreach(var file in new[]{path,path+".previous",path+".writing"})if(File.Exists(file))File.Delete(file);}
   var dial=new SlimBladeTwist();dial.Add(120,NavMode.PanZoom);
   check(dial.Take()==90&&dial.Step()==0,"The shared response takes the reduced SlimBlade twist once without double smoothing");

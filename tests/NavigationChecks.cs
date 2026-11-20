@@ -57,12 +57,12 @@ internal static class NavigationChecks {
             var store=new ConfigStore(file);check(!ConfigStore.B(store.Snapshot(),"navigationCruise"),"Normal mouse leaves continuous navigation off");
             store.Select(1);var cfg=store.Snapshot();check(ConfigStore.B(cfg,"navigationCruise")&&!ConfigStore.B(cfg,"spaceMouseCruise"),"3D default enables only navigation continuity, not orbit/pan/zoom cruise");
             var original=cfg["programs"]![0]!.DeepClone();cfg["navigationCruise"]=false;store.Save(cfg);store.SavePreset("Direct navigation");cfg=store.Snapshot();cfg["navigationCruise"]=true;store.Save(cfg);store.SavePreset("Drone navigation");
-            cfg=store.Snapshot();cfg["configVersion"]=31;store.Save(cfg);check(ConfigStore.I(JsonNode.Parse(File.ReadAllText(file)),"configVersion")==32,"An older interface save cannot downgrade the current navigation schema");
+            cfg=store.Snapshot();cfg["configVersion"]=31;store.Save(cfg);check(ConfigStore.I(JsonNode.Parse(File.ReadAllText(file)),"configVersion")==ConfigStore.CurrentVersion,"An older interface save cannot downgrade the current navigation schema");
             var reopened=new ConfigStore(file);check(ConfigStore.B(reopened.Snapshot(),"navigationCruise")&&JsonNode.DeepEquals(original,reopened.Snapshot()["programs"]![0]),"Navigation choice persists without modifying Normal mouse");
             reopened.ApplyPreset(0);check(!ConfigStore.B(reopened.Snapshot(),"navigationCruise"),"Saved preset restores direct navigation");
             reopened.ApplyPreset(1);check(ConfigStore.B(reopened.Snapshot(),"navigationCruise"),"Saved preset restores drone navigation");
             var old=reopened.Snapshot();old["configVersion"]=30;old.Remove("navigationCruise");foreach(var p in old["programs"]!.AsArray())p!["feel"]!.AsObject().Remove("navigationCruise");File.WriteAllText(file,old.ToJsonString());
-            var migrated=new ConfigStore(file).Snapshot();check(ConfigStore.I(migrated,"configVersion")==32&&ConfigStore.B(migrated,"navigationCruise")&&!ConfigStore.B(migrated["programs"]![0]!["feel"],"navigationCruise"),"Existing 3D settings gain navigation without changing Normal mouse");
+            var migrated=new ConfigStore(file).Snapshot();check(ConfigStore.I(migrated,"configVersion")==ConfigStore.CurrentVersion&&ConfigStore.B(migrated,"navigationCruise")&&!ConfigStore.B(migrated["programs"]![0]!["feel"],"navigationCruise"),"Existing 3D settings gain navigation without changing Normal mouse");
 
             var keyLegacy=new ConfigStore(file).Snapshot();keyLegacy["configVersion"]=31;keyLegacy["programs"]![1]!["navigateKeys"]="win";keyLegacy["programs"]![0]!["navigateKeys"]="none";
             keyLegacy["presets"]!.AsArray().Add(new JsonObject{["name"]="Legacy 3D key",["settings"]=new JsonObject{["defaultKind"]="3D modelling",["navigateKeys"]="win"}});

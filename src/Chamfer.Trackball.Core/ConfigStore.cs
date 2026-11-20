@@ -89,7 +89,7 @@ public sealed class ConfigStore {
         if(oldVersion<29){
             foreach(var node in config["programs"]!.AsArray()){
                 var p=node!.AsObject();
-                if(S(p,"defaultKind",S(p,"name")).Equals("3D modelling",StringComparison.OrdinalIgnoreCase))p["altTwistEstimate"]=false;
+                if(S(p,"name").Equals("3D modelling",StringComparison.OrdinalIgnoreCase))p["altTwistEstimate"]=false;
             }
             LoadProgram(config,I(config,"activeProgram",0));
         }
