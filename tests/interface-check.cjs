@@ -185,10 +185,12 @@ const speedStart=html.indexOf('function speedGain('),speedEnd=html.indexOf('func
 const speedContext={};vm.runInNewContext(html.slice(speedStart,speedEnd),speedContext);
 assert.equal(speedContext.speedLabel(0),'0%');assert.equal(speedContext.speedLabel(1),'1.0%');assert.equal(speedContext.speedLabel(50),'100%');assert.equal(speedContext.speedLabel(100),'400%');
 assert.ok(Math.abs(speedContext.speedGain(4)-.0132571137)<.000001);
-for(const key of ['orbitSens','panSens','zoomSens'])assert.ok(html.includes('min="0" max="100" data-k="'+key+'"'));
+for(const key of ['orbitSens','panSens','zoomSens','twistSens'])assert.ok(html.includes('min="0" max="100" data-k="'+key+'"'));
 assert.ok(controller.includes('MotionPolicy.Scale(output,x,y,w,OrbitGain,PanGain,ZoomGain,threeAxisRotation?TwistGain:native==null?ZoomGain:null)'));
 assert.ok(controller.includes('MotionPolicy.SnapGain(')&&controller.includes('server.Move(native,output,x,y,w,input.Keys.Contains(18),nativeGain)'));
 assert.ok(html.includes('id="activeSpeeds"'));
+assert.ok(html.includes('aria-label="Zoom speed"')&&html.includes('aria-label="Twist rotation speed"'));
+assert.ok(controller.includes('int delta=ScaleAssignedWheelZoom(data)')&&controller.includes('assignedWheelZoom.Reset()'));
 console.log('3D slider labels span 0 to 400 percent and use the same widened curve as actual motion; snap gestures keep raw movement.');
 
 const faceFeedbackStart=html.indexOf('function updateFaceTurn('),faceFeedbackEnd=html.indexOf('/* cheat sheet on Home */',faceFeedbackStart);

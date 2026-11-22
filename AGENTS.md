@@ -43,6 +43,18 @@ a physical test establishes that it is needed. Retain the owner's confirmed
 choice across updates and preserve custom programs/combinations when restoring
 native mouse inputs.
 
+# 2026-11-22 — Codex: Twist speed controls
+
+Zoom speed now scales wheel reports assigned to Smooth zoom. At 100% it
+passes the original report through. Other speeds accumulate whole wheel
+steps for CAD apps and discard unused counts when the input context changes.
+The two speed labels explain which setting controls Zoom and Twist rotation.
+Existing bindings, saved speeds and the fixed 90° Alt turn are preserved.
+
+The Windows smoke fixture checks fast, slow and zero assigned wheel zoom,
+plus actual held roll and zoom rates on the Home cube. Test the installed
+version with a physical SlimBlade for feel.
+
 # 2026-11-20 — Codex: Normal mouse, 3D modelling and trackball layouts
 
 Normal mouse starts with pointing and the device’s original click and scroll

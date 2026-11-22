@@ -16,7 +16,7 @@ internal sealed class Controller:IDisposable{
     readonly Dictionary<int,JsonObject> intercepted=[];
     readonly Queue<JsonObject> logs=new();long seq;long revision=-1;
     readonly List<int> sentMods=[];readonly List<string> sentButtons=[];
-    readonly WheelSteps emulatedZoom=new();
+    readonly WheelSteps emulatedZoom=new(),assignedWheelZoom=new();
     volatile KeyChord? programShortcut;
     volatile NavMode mode=NavMode.Idle;NavMode latched=NavMode.Idle;string gestureButton="";
     TwistCalibrationModel? learnedTwist;
@@ -208,7 +208,7 @@ public string AppName{get;private set;}="";
         navigationSession=false;StopHeldTwist();navigationWasMoving=false;navigationLayer=NavigationLayer.Travel;navigationMotion.Reset();
         if(native==preview.Client)preview.Remember();
         server.End(native);native=null;pending.Reset();motionSamples.Reset();circle.Reset();glide.Reset();pointer.Reset();slimBladeTwist.Reset();cameraMotion.Reset();heldRate.Reset();
-        ReleaseEmulation();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
+        ReleaseEmulation();assignedWheelZoom.Reset();mode=NavMode.Idle;knobHoldActive=false;knobAngle=0;knobSteps.Reset();
     }
     void ReleaseEmulatedDrag(){
         for(int i=sentButtons.Count-1;i>=0;i--)try{Button(sentButtons[i],false);}catch(InvalidOperationException){ }
@@ -453,6 +453,11 @@ public string AppName{get;private set;}="";
             var name=b!.GetValue<string>();Button(name,true);sentButtons.Add(name);
         }
     }
+    int ScaleAssignedWheelZoom(int delta){
+        float gain=ZoomGain;
+        // Preserve high-resolution wheel reports at the unscaled setting.
+        return gain==1?delta:assignedWheelZoom.Add(delta*gain);
+    }
     bool MouseEvent(int msg,int data){
         UpdateCalibrationForeground();
         bool wheel=msg is 0x20a or 0x20e;
@@ -490,7 +495,11 @@ public string AppName{get;private set;}="";
             if(ConfigStore.Is3DProgram(cfg)&&!IsCad&&(wheelAction is "invert" or "disabled")&&!ConfigStore.B(cfg,"shortcutsEverywhere"))return false;
             if(wheelAction=="invert"){Win32.Mouse(msg==0x20a?0x800u:0x1000u,0,0,-data);return true;}
             if(wheelAction=="disabled")return true;
-            if(wheelAction=="zoom"&&IsCad){Win32.Mouse(0x800,0,0,data);return true;}
+            if(wheelAction=="zoom"&&IsCad){
+                int delta=ScaleAssignedWheelZoom(data);
+                if(delta!=0)Win32.Mouse(0x800,0,0,delta);
+                return true;
+            }
             if(wheelAction is "program" or "goProgram"){int i=wheelAction=="program"?ConfigStore.I(cfg,"activeProgram")+(data>0?1:-1):cfg["wheelPrograms"]?[(prefix=="left"?0:2)+(data>0?0:1)]?.GetValue<int>()??0;int count=cfg["programs"]!.AsArray().Count;store.Select((i%count+count)%count);return true;}
             if(wheelAction=="keys"){Shortcut(ConfigStore.S(cfg,prefix+"Wheel"+(data>0?"UpKeys":"DownKeys")));return true;}
             if(wheelAction=="cycle"&&IsCad){latched=latched switch{NavMode.Idle=>NavMode.Orbit,NavMode.Orbit=>NavMode.PanZoom,NavMode.PanZoom=>NavMode.Roll,_=>NavMode.Idle};Change(latched);return true;}
@@ -668,6 +677,19 @@ public string AppName{get;private set;}="";
             if(IsCad||MouseEvent(0x20b,1)||MouseEvent(0x20c,1))
                 throw new InvalidOperationException("Normal mouse reserved a CAD binding in the foreground.");
             cfg=modelling;
+            if(ScaleAssignedWheelZoom(30)!=30)throw new InvalidOperationException("Default Zoom speed altered a partial wheel report.");
+            cfg["zoomSens"]=25;
+            for(int i=0;i<10;i++){
+                if(ScaleAssignedWheelZoom(120)!=0)throw new InvalidOperationException("Slow assigned wheel zoom emitted a notch too early.");
+            }
+            if(ScaleAssignedWheelZoom(120)!=120||ScaleAssignedWheelZoom(-120)!=0)
+                throw new InvalidOperationException("Assigned wheel zoom lost fractional travel or did not reset it on reversal.");
+            cfg["zoomSens"]=100;
+            if(ScaleAssignedWheelZoom(-120)!=-480)throw new InvalidOperationException("Fast assigned wheel zoom ignored the Zoom speed.");
+            cfg["zoomSens"]=0;
+            if(ScaleAssignedWheelZoom(120)!=0)throw new InvalidOperationException("Zero Zoom speed still emitted assigned wheel zoom.");
+            cfg["zoomSens"]=50;
+
             var orbit=Open(NavMode.Orbit,NavigationLayer.Travel,16);
             SendMotion(mode,24,0,0);
             var rolled=preview.View;
@@ -696,13 +718,18 @@ public string AppName{get;private set;}="";
             Flush(timeMilliseconds:1208);
             if(RollDirection(resumed,reversed)>=0||RollDirection(reversed,preview.View)>=0||ReadGuideMotion().Wheel>=0)
                 throw new InvalidOperationException("Shift twist did not reverse on the latest opposite report.");
+            cfg["twistSens"]=25;
+            var beforeSlowRoll=preview.View;
+            Flush(timeMilliseconds:1216);
+            if(Math.Abs(RollDirection(beforeSlowRoll,preview.View)+RollDirection(rolled,turned)*TwistGain)>.00001f)
+                throw new InvalidOperationException("Twist rotation speed did not scale held roll.");
             cfg["twistSens"]=0;
             var heldAtZeroSpeed=preview.View;
-            Flush(timeMilliseconds:1216);
+            Flush(timeMilliseconds:1224);
             if(preview.View!=heldAtZeroSpeed)throw new InvalidOperationException("Zero Twist speed still rolled the view.");
             cfg["twistSens"]=50;
             setKeys([]);
-            Flush(timeMilliseconds:1224);
+            Flush(timeMilliseconds:1232);
             if(preview.View!=heldAtZeroSpeed||heldTwistDirection!=0||navigationClock.Enabled)
                 throw new InvalidOperationException("Shift release did not stop continuous roll.");
 
@@ -742,19 +769,24 @@ public string AppName{get;private set;}="";
             float snappedBack=Distance(preview.View)/Distance(beforeNewZoomScene);
             if(Math.Abs(snappedBack-MathF.Exp(.0144f))>.00001f)
                 throw new InvalidOperationException("Held zoom stopped or caught up during a new cursor scene.");
+            cfg["zoomSens"]=25;
+            float beforeSlowZoom=Distance(preview.View);
+            Flush(timeMilliseconds:1524);
+            if(Math.Abs(Distance(preview.View)/beforeSlowZoom-MathF.Exp(.0144f*ZoomGain))>.00001f)
+                throw new InvalidOperationException("Zoom speed did not scale held twist zoom.");
             cfg["zoomSens"]=0;
             float heldAtZeroZoom=Distance(preview.View);
-            Flush(timeMilliseconds:1524);
+            Flush(timeMilliseconds:1532);
             if(Math.Abs(Distance(preview.View)-heldAtZeroZoom)>.00001f||heldTwistDirection!=0||navigationClock.Enabled)
                throw new InvalidOperationException("Zero Zoom speed still ran continuous zoom.");
             cfg["zoomSens"]=50;
             cfg["invertZoom"]=true;
             if(!MouseEvent(0x20a,120))throw new InvalidOperationException("Reversed zoom did not accept a twist.");
-            Flush(timeMilliseconds:1532);
+            Flush(timeMilliseconds:1540);
             if(Distance(preview.View)<=heldAtZeroZoom)throw new InvalidOperationException("Continuous zoom ignored Reverse zoom.");
             cfg["invertZoom"]=false;
             float zoomAtRelease=Distance(preview.View);
-            setKeys([16]);Flush(timeMilliseconds:1540);
+            setKeys([16]);Flush(timeMilliseconds:1548);
             if(mode!=NavMode.Orbit||heldTwistDirection!=0||navigationClock.Enabled||
                Math.Abs(Distance(preview.View)-zoomAtRelease)>.00001f)
                throw new InvalidOperationException("Changing from pan to Shift orbit reused the zoom command.");

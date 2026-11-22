@@ -500,11 +500,11 @@ details .ver{margin-top:10px;font-weight:600}
         <p class="mu" id="activeSpeeds" style="font-size:12px"></p>
         <div class="slider"><b>Orbit</b><input type="range" min="0" max="100" data-k="orbitSens"><span class="val" data-v="orbitSens"></span></div>
         <div class="slider"><b>Pan</b><input type="range" min="0" max="100" data-k="panSens"><span class="val" data-v="panSens"></span></div>
-        <div class="slider"><b>Zoom</b><input type="range" min="0" max="100" data-k="zoomSens"><span class="val" data-v="zoomSens"></span></div>
-        <div class="slider"><b>Twist</b><input type="range" min="0" max="100" data-k="twistSens"><span class="val" data-v="twistSens"></span></div>
+        <div class="slider"><b>Zoom speed</b><input type="range" min="0" max="100" data-k="zoomSens" aria-label="Zoom speed" aria-describedby="twistSpeedHelp"><span class="val" data-v="zoomSens"></span></div>
+        <div class="slider"><b>Twist rotation</b><input type="range" min="0" max="100" data-k="twistSens" aria-label="Twist rotation speed" aria-describedby="twistSpeedHelp"><span class="val" data-v="twistSens"></span></div>
         <div class="opt"><div class="t">Twist direction<small id="twistAxisHelp">Choose Horizontal or Vertical, or learn the direction with Twist calibration in Buttons &amp; keys.</small></div><select data-k="twistAxis"><option value="x">Horizontal</option><option value="y">Vertical</option></select></div>
         <div class="opt"><div class="t">Reverse twist<small>Switch on if turning clockwise turns the view the other way.</small></div><label class="sw"><input type="checkbox" data-k="invertTwist"><span></span></label></div>
-        <p class="mu" style="font-size:12px">Twist has its own speed. Use it with Alt Snap or an optional separate held shortcut. It stops with the ball while the shortcut is held; it does not coast. Change the keys in Buttons &amp; keys.</p>
+        <p class="mu" id="twistSpeedHelp" style="font-size:12px">Zoom speed controls Pan + zoom twists and wheels assigned to Smooth zoom. Twist rotation controls ball twist in Orbit and Camera walk with native three-axis controls.</p>
       </div>
       <div data-camera class="card" style="margin-bottom:16px">
         <h2>Precision</h2>
@@ -830,7 +830,7 @@ function renderBinds(){
     const detail=deviceModel==="slimblade"?"Scroll by turning the ball":deviceModel==="m512"?BTN_SUB[w]:L?"Left / right scroll":"Up / down scroll";
     const wheelOptions=cad?LWHEEL:Object.fromEntries(Object.entries(LWHEEL).filter(([action])=>action!=="zoom"&&action!=="cycle"));
     const wheelAction=wheelOptions[cfg[w]]?cfg[w]:"normal";
-    const desc=wheelAction==="normal"?"Uses the device’s usual scrolling.":wheelAction==="zoom"?"Sends vertical wheel zoom in CAD.":LWHEEL_DESC[wheelAction]||"";
+    const desc=wheelAction==="normal"?"Uses the device’s usual scrolling.":wheelAction==="zoom"?"Sends vertical wheel zoom in CAD using the Zoom speed slider.":LWHEEL_DESC[wheelAction]||"";
     out.push(`<div class="bind" data-row="${w}"><div class="nm"><b>${title}</b><small>${detail}</small></div><div class="opts"><div class="line"><select data-wheel="${w}" aria-label="${title} assignment">${opts(wheelOptions,wheelAction)}</select></div><div class="desc">${desc}</div>${extra}</div></div>`)}
   // While Rotate / Translate is on, a button can do something else.
   cfg.modeButtons=cfg.modeButtons||{};
@@ -1285,7 +1285,7 @@ async function poll(){let s;try{s=await call("ctStatus")}catch{setTimeout(poll,5
   const focused=!document.hidden&&document.hasFocus();
   if(page==="home"&&!document.hidden)updateKeyboard(s);
   if((page==="home"||page==="controls")&&!document.hidden)updateFaceTurn(s);
-  if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1)+" · twist "+gainLabel(s.twistGain??1));
+  if(page==="speed")liveText("#activeSpeeds","Active settings: pointer "+gainLabel(s.pointerGain??1)+" · orbit "+gainLabel(s.orbitGain??1)+" · pan "+gainLabel(s.panGain??1)+" · zoom "+gainLabel(s.zoomGain??1)+" · twist rotation "+gainLabel(s.twistGain??1));
   if(s.padCamera&&page==="home"&&focused)drawPad();
   const live=s.mode!=="Idle";liveText("#padMode",live?motionLabel(s):"Move the pointer here and use a 3D shortcut");$("#padMode").classList.toggle("live",live);
   const dirTxt=s.ballDir?" "+s.ballDir:"";
