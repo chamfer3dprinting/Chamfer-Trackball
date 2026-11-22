@@ -1,3 +1,8 @@
+## Adjust twist zoom and rotation
+
+- In Speed & direction, Zoom speed controls held twist zoom and wheels assigned to Smooth zoom.
+- Twist rotation controls the speed of native three-axis view roll and camera-walk turns.
+
 ## Install updates through temporary Windows file locks
 
 - Update now waits briefly for Windows to release the app file, then replaces it and keeps a rollback copy of the previous version.
